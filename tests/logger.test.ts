@@ -76,7 +76,7 @@ describe("logging methods", () => {
     ["error", "error"],
   ] as const)("%s level uses console.%s", (logLevel, consoleMethod) => {
     const log = createLogger("test")
-    log[logLevel](`${logLevel} message`)
+    log[logLevel]!(`${logLevel} message`)
 
     expect(consoleMock.output).toHaveLength(1)
     expect(consoleMock.output[0]!.level).toBe(consoleMethod)
@@ -84,7 +84,7 @@ describe("logging methods", () => {
 
   test("includes data in output", () => {
     const log = createLogger("test")
-    log.info("message", { key: "value" })
+    log.info!("message", { key: "value" })
 
     expect(consoleMock.output[0]!.message).toContain("key")
     expect(consoleMock.output[0]!.message).toContain("value")
@@ -92,7 +92,7 @@ describe("logging methods", () => {
 
   test("inherits props in output", () => {
     const log = createLogger("test", { app: "myapp" })
-    log.info("message")
+    log.info!("message")
 
     expect(consoleMock.output[0]!.message).toContain("app")
     expect(consoleMock.output[0]!.message).toContain("myapp")
@@ -120,7 +120,7 @@ describe("logging methods", () => {
     const log = createLogger("test")
     const err = new Error("Something went wrong")
 
-    log.error(err)
+    log.error!(err)
 
     expect(consoleMock.output[0]!.message).toContain("Something went wrong")
     expect(consoleMock.output[0]!.message).toContain("error_type")
@@ -461,10 +461,10 @@ describe("JSON format output", () => {
     process.env.TRACE_FORMAT = "json"
     const log = createLogger("test")
 
-    log.info("test message", { key: "value" })
+    log.info!("test message", { key: "value" })
 
     const output = consoleMock.output[0]!.message
-    const parsed = JSON.parse(output)
+    const parsed = JSON.parse(output) as Record<string, unknown>
     expect(parsed.level).toBe("info")
     expect(parsed.name).toBe("test")
     expect(parsed.msg).toBe("test message")
@@ -477,10 +477,10 @@ describe("JSON format output", () => {
     delete process.env.TRACE_FORMAT
     const log = createLogger("test")
 
-    log.info("prod message")
+    log.info!("prod message")
 
     const output = consoleMock.output[0]!.message
-    const parsed = JSON.parse(output)
+    const parsed = JSON.parse(output) as Record<string, unknown>
     expect(parsed.level).toBe("info")
     expect(parsed.msg).toBe("prod message")
   })
@@ -489,10 +489,10 @@ describe("JSON format output", () => {
     process.env.TRACE_FORMAT = "json"
     const log = createLogger("test", { app: "myapp", version: "1.0" })
 
-    log.info("message")
+    log.info!("message")
 
     const output = consoleMock.output[0]!.message
-    const parsed = JSON.parse(output)
+    const parsed = JSON.parse(output) as Record<string, unknown>
     expect(parsed.app).toBe("myapp")
     expect(parsed.version).toBe("1.0")
   })
@@ -502,10 +502,10 @@ describe("JSON format output", () => {
     const log = createLogger("test")
     const err = new Error("test error")
 
-    log.error(err)
+    log.error!(err)
 
     const output = consoleMock.output[0]!.message
-    const parsed = JSON.parse(output)
+    const parsed = JSON.parse(output) as Record<string, unknown>
     expect(parsed.msg).toBe("test error")
     expect(parsed.error_type).toBe("Error")
     expect(parsed.error_stack).toContain("Error: test error")
@@ -523,7 +523,7 @@ describe("JSON format output", () => {
 
     const spanOutput = consoleMock.output.find((o) => {
       try {
-        const parsed = JSON.parse(o.message)
+        const parsed = JSON.parse(o.message) as Record<string, unknown>
         return parsed.level === "span"
       } catch {
         return false
@@ -531,7 +531,7 @@ describe("JSON format output", () => {
     })
     expect(spanOutput).toBeDefined()
 
-    const parsed = JSON.parse(spanOutput!.message)
+    const parsed = JSON.parse(spanOutput!.message) as Record<string, unknown>
     expect(parsed.level).toBe("span")
     expect(parsed.name).toBe("test:work")
     expect(parsed.duration).toBeGreaterThanOrEqual(0)
@@ -545,7 +545,7 @@ describe("JSON format output", () => {
     const circular: Record<string, unknown> = { name: "test" }
     circular.self = circular
 
-    log.info("circular", circular)
+    log.info!("circular", circular)
 
     const output = consoleMock.output[0]!.message
     // Should not throw, should contain [Circular]
@@ -556,7 +556,7 @@ describe("JSON format output", () => {
 describe("console format output", () => {
   test("includes timestamp", () => {
     const log = createLogger("test")
-    log.info("message")
+    log.info!("message")
 
     // Format: HH:MM:SS
     expect(consoleMock.output[0]!.message).toMatch(/\d{2}:\d{2}:\d{2}/)
@@ -571,14 +571,14 @@ describe("console format output", () => {
     ["error", "ERROR"],
   ] as const)("%s level outputs %s label", (method, label) => {
     const log = createLogger("test")
-    log[method]("msg")
+    log[method]!("msg")
 
     expect(consoleMock.output[0]!.message).toContain(label)
   })
 
   test("includes namespace", () => {
     const log = createLogger("myapp")
-    log.info("message")
+    log.info!("message")
 
     expect(consoleMock.output[0]!.message).toContain("myapp")
   })
@@ -606,7 +606,7 @@ describe("TRACE namespace filtering", () => {
   })
 
   // Test that setTraceFilter clears filter (but doesn't disable spans)
-  test.each([[null], [[]]] as const)("setTraceFilter(%j) clears filter", (filter) => {
+  test.each([[null], [[]]])("setTraceFilter(%j) clears filter", (filter) => {
     setTraceFilter(["myapp"])
     setTraceFilter(filter)
 
@@ -673,7 +673,7 @@ describe("TRACE namespace filtering", () => {
     setTraceFilter(["myapp"])
     const log = createLogger("other") // Not in filter
 
-    log.info("regular log")
+    log.info!("regular log")
 
     // Regular logs still appear
     expect(consoleMock.output).toHaveLength(1)
@@ -719,7 +719,7 @@ describe("DEBUG namespace filtering", () => {
   test("filter allows exact namespace match", () => {
     setDebugFilter(["myapp"])
     const log = createLogger("myapp")
-    log.info("visible")
+    log.info!("visible")
 
     expect(consoleMock.output).toHaveLength(1)
     expect(consoleMock.output[0]!.message).toContain("visible")
@@ -738,7 +738,7 @@ describe("DEBUG namespace filtering", () => {
   test("filter blocks non-matching namespace", () => {
     setDebugFilter(["myapp"])
     const log = createLogger("other")
-    log.info("hidden")
+    log.info!("hidden")
 
     expect(consoleMock.output).toHaveLength(0)
   })
@@ -750,9 +750,9 @@ describe("DEBUG namespace filtering", () => {
     const log2 = createLogger("other")
     const log3 = createLogger("blocked")
 
-    log1.info("msg1")
-    log2.info("msg2")
-    log3.info("msg3")
+    log1.info!("msg1")
+    log2.info!("msg2")
+    log3.info!("msg3")
 
     expect(consoleMock.output).toHaveLength(2)
     expect(consoleMock.output[0]!.message).toContain("myapp")
@@ -765,8 +765,8 @@ describe("DEBUG namespace filtering", () => {
     const log1 = createLogger("any")
     const log2 = createLogger("namespace")
 
-    log1.info("msg1")
-    log2.info("msg2")
+    log1.info!("msg1")
+    log2.info!("msg2")
 
     expect(consoleMock.output).toHaveLength(2)
   })
@@ -778,7 +778,7 @@ describe("DEBUG namespace filtering", () => {
     const quiet = log.logger("db")
     const noisy = log.logger("noisy")
 
-    log.info("root")
+    log.info!("root")
     quiet.info("db msg")
     noisy.info("noisy msg")
 
@@ -795,7 +795,7 @@ describe("DEBUG namespace filtering", () => {
     const sql = storage.logger("sql")
     const sqlChild = sql.logger("detail")
 
-    log.info("visible")
+    log.info!("visible")
     storage.info("visible")
     sql.info("hidden")
     sqlChild.info("also hidden")
@@ -810,9 +810,9 @@ describe("DEBUG namespace filtering", () => {
     const log2 = createLogger("km").logger("noisy")
     const log3 = createLogger("other")
 
-    log1.info("visible")
+    log1.info!("visible")
     log2.info("hidden")
-    log3.info("visible")
+    log3.info!("visible")
 
     expect(consoleMock.output).toHaveLength(2)
     expect(consoleMock.output[0]!.message).toContain("km")

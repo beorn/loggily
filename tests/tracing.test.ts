@@ -34,7 +34,7 @@ import {
 import { createConsoleMock } from "./helpers.ts"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const parseJSON = (s: string): Record<string, any> => JSON.parse(s)
+const parseJSON = (s: string): Record<string, any> => JSON.parse(s) as Record<string, any>
 
 let consoleMock: ReturnType<typeof createConsoleMock>
 

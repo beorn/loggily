@@ -34,27 +34,27 @@
   ],
   "type": "module",
   "module": "src/index.ts",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "browser": "./src/index.browser.ts",
       "default": "./src/index.ts"
     },
     "./file-writer": {
-      "types": "./dist/file-writer.d.ts",
+      "types": "./src/file-writer.ts",
       "default": "./src/file-writer.ts"
     },
     "./worker": {
-      "types": "./dist/worker.d.ts",
+      "types": "./src/worker.ts",
       "default": "./src/worker.ts"
     },
     "./context": {
-      "types": "./dist/context.d.ts",
+      "types": "./src/context.ts",
       "default": "./src/context.ts"
     },
     "./tracing": {
-      "types": "./dist/tracing.d.ts",
+      "types": "./src/tracing.ts",
       "default": "./src/tracing.ts"
     }
   },

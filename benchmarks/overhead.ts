@@ -89,6 +89,8 @@ disableSpans()
 type LogFn = {
   (msg: string): void
   (obj: Record<string, unknown>, msg: string): void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (...args: any[]): void
 }
 
 interface BenchLogger {
@@ -232,7 +234,7 @@ console.log(`Platform: ${process.platform} ${process.arch}`)
   const err = new Error("something broke")
 
   const results = [
-    measure("loggily: log.warn?.(Error)", () => loggilyLog.warn?.(err), N / 10),
+    measure("loggily: log.warn?.(Error)", () => loggilyLog.warn?.(err as unknown as string), N / 10),
     measure("pino: log.warn(Error)", () => pinoEnabled.warn({ err }, "something broke"), N / 10),
     measure("winston: log.warn(str, Error)", () => winstonEnabled.warn("something broke", { error: err }), N / 10),
   ]

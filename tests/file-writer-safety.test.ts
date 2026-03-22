@@ -7,7 +7,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
 
 // Mock node:fs to control writeSync behavior
-const mockOpenSync = vi.fn(() => 42) // fake fd
+const mockOpenSync = vi.fn((_path?: string, _flags?: string) => 42) // fake fd
 const mockWriteSync = vi.fn()
 const mockCloseSync = vi.fn()
 
