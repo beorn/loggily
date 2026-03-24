@@ -70,9 +70,9 @@
     "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
-    "@types/node": "^25.3.3",
-    "vitepress": "^1.6.3",
-    "vitest": "^4.0.18"
+    "@types/node": "^25.5.0",
+    "vitepress": "^1.6.4",
+    "vitest": "^4.1.1"
   },
   "engines": {
     "bun": ">=1.0",
