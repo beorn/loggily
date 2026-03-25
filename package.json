@@ -29,8 +29,7 @@
     "url": "https://github.com/beorn/loggily.git"
   },
   "files": [
-    "src",
-    "dist"
+    "src"
   ],
   "type": "module",
   "module": "src/index.ts",
@@ -76,6 +75,6 @@
   },
   "engines": {
     "bun": ">=1.0",
-    "node": ">=18"
+    "node": ">=23.6.0"
   }
 }
