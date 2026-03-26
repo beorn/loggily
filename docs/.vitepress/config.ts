@@ -5,7 +5,10 @@ export default defineConfig({
   description: "Clarity without the clutter. Ergonomic unified logs, spans, and debugs for modern TypeScript.",
   base: "/loggily/",
 
-  head: [["link", { rel: "icon", type: "image/svg+xml", href: "/loggily/logo.svg" }]],
+  head: [
+    ["link", { rel: "icon", type: "image/svg+xml", href: "/loggily/logo.svg" }],
+    ["script", { defer: "", src: "https://static.cloudflareinsights.com/beacon.min.js", "data-cf-beacon": '{"token": "26d824c9dc3a41a4aea222d9c42cf9fa"}' }],
+  ],
 
   themeConfig: {
     logo: "/logo.svg",
