@@ -1,6 +1,6 @@
 {
   "name": "loggily",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "TypeScript logger with debug-style namespaces, structured JSON output, and lightweight spans. Disabled logs skip argument evaluation via optional chaining.",
   "keywords": [
     "browser",
