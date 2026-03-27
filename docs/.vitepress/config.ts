@@ -7,7 +7,14 @@ export default defineConfig({
 
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/loggily/logo.svg" }],
-    ["script", { defer: "", src: "https://static.cloudflareinsights.com/beacon.min.js", "data-cf-beacon": '{"token": "26d824c9dc3a41a4aea222d9c42cf9fa"}' }],
+    [
+      "script",
+      {
+        defer: "",
+        src: "https://static.cloudflareinsights.com/beacon.min.js",
+        "data-cf-beacon": '{"token": "26d824c9dc3a41a4aea222d9c42cf9fa"}',
+      },
+    ],
   ],
 
   themeConfig: {
