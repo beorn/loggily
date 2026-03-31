@@ -121,7 +121,7 @@ export default defineConfig({
 
     footer: {
       message: 'Used by <a href="https://silvery.dev">Silvery</a>, <a href="https://termless.dev">Termless</a>, and <a href="https://terminfo.dev">terminfo.dev</a>',
-      copyright: 'Built by <a href="https://beorn.codes">Bjorn Stabell</a>'
+      copyright: 'Built by <a href="https://beorn.codes">Bjørn Stabell</a>'
     },
   },
 })
