@@ -1,6 +1,8 @@
 import { defineConfig } from "vitepress"
 import llmstxt from "vitepress-plugin-llms"
-import { seoHead, seoTransformPageData } from "@bearly/vitepress-enrich"
+import { glossaryPlugin, seoHead, seoTransformPageData, loadEcosystemGlossary } from "@bearly/vitepress-enrich"
+
+const glossary = loadEcosystemGlossary({ exclude: ["beorn.codes/loggily"] })
 
 const seoOptions = {
   hostname: "https://beorn.codes/loggily",
@@ -18,6 +20,12 @@ export default defineConfig({
   lastUpdated: true,
 
   sitemap: { hostname: "https://beorn.codes/loggily/" },
+
+  markdown: {
+    config(md) {
+      md.use(glossaryPlugin, { entities: glossary })
+    },
+  },
 
   vite: {
     plugins: [llmstxt()],
