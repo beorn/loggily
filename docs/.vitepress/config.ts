@@ -46,8 +46,30 @@ export default defineConfig({
     siteTitle: "Loggily",
 
     nav: [
-      { text: "Guide", link: "/guide/journey" },
-      { text: "API", link: "/api/" },
+      {
+        text: "Guide",
+        items: [
+          { text: "The Journey", link: "/guide/journey" },
+          { text: "Getting Started", link: "/guide/getting-started" },
+          { text: "Why Loggily?", link: "/guide/why" },
+          { text: "Near-Zero Cost Logging", link: "/guide/zero-overhead" },
+          { text: "Spans", link: "/guide/spans" },
+          { text: "Benchmarks", link: "/guide/benchmarks" },
+          { text: "Comparison", link: "/guide/comparison" },
+        ],
+      },
+      {
+        text: "API",
+        items: [
+          { text: "Overview", link: "/api/" },
+          { text: "Logger", link: "/api/logger" },
+          { text: "Configuration", link: "/api/configuration" },
+          { text: "Tracing", link: "/api/tracing" },
+          { text: "Context Propagation", link: "/api/context" },
+          { text: "Writers", link: "/api/writers" },
+          { text: "Worker Thread", link: "/api/worker" },
+        ],
+      },
       { text: "GitHub", link: "https://github.com/beorn/loggily" },
     ],
 
