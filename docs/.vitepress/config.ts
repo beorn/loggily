@@ -1,11 +1,30 @@
 import { defineConfig } from "vitepress"
+import llmstxt from "vitepress-plugin-llms"
+import { seoHead, seoTransformPageData } from "@bearly/vitepress-enrich"
+
+const seoOptions = {
+  hostname: "https://beorn.codes/loggily",
+  siteName: "Loggily",
+  description: "Structured logging for TypeScript",
+  ogImage: "https://beorn.codes/loggily/og-image.svg",
+  author: "Bjørn Stabell",
+  codeRepository: "https://github.com/beorn/loggily",
+}
 
 export default defineConfig({
   title: "Loggily",
   description: "Clarity without the clutter. Ergonomic unified logs, spans, and debugs for modern TypeScript.",
   base: "/loggily/",
+  lastUpdated: true,
 
-  sitemap: { hostname: "https://beorn.codes/loggily" },
+  sitemap: { hostname: "https://beorn.codes/loggily/" },
+
+  vite: {
+    plugins: [llmstxt()],
+    ssr: {
+      noExternal: ["@bearly/vitepress-enrich"],
+    },
+  },
 
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/loggily/logo.svg" }],
@@ -17,38 +36,10 @@ export default defineConfig({
         "data-cf-beacon": '{"token": "26d824c9dc3a41a4aea222d9c42cf9fa"}',
       },
     ],
-    ["meta", { property: "og:type", content: "website" }],
-    ["meta", { property: "og:site_name", content: "Loggily" }],
-    ["meta", { name: "twitter:card", content: "summary" }],
-    [
-      "script",
-      { type: "application/ld+json" },
-      JSON.stringify({
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        name: "Loggily",
-        url: "https://beorn.codes/loggily",
-        description: "Structured logging for TypeScript",
-      }),
-    ],
+    ...seoHead(seoOptions),
   ],
 
-  transformPageData(pageData) {
-    const cleanPath = pageData.relativePath.replace(/\.md$/, ".html").replace(/index\.html$/, "")
-    pageData.frontmatter.head ??= []
-    pageData.frontmatter.head.push(
-      ["link", { rel: "canonical", href: `https://beorn.codes/loggily/${cleanPath}` }],
-      ["meta", { property: "og:title", content: pageData.title || "Loggily" }],
-      [
-        "meta",
-        {
-          property: "og:description",
-          content: pageData.description || "Structured logging for TypeScript",
-        },
-      ],
-      ["meta", { property: "og:url", content: `https://beorn.codes/loggily/${cleanPath}` }],
-    )
-  },
+  transformPageData: seoTransformPageData(seoOptions),
 
   themeConfig: {
     logo: "/logo.svg",
@@ -120,8 +111,9 @@ export default defineConfig({
     },
 
     footer: {
-      message: 'Used by <a href="https://silvery.dev">Silvery</a>, <a href="https://termless.dev">Termless</a>, and <a href="https://terminfo.dev">terminfo.dev</a>',
-      copyright: 'Built by <a href="https://beorn.codes">Bjørn Stabell</a>'
+      message:
+        'Used by <a href="https://silvery.dev">Silvery</a>, <a href="https://termless.dev">Termless</a>, and <a href="https://terminfo.dev">terminfo.dev</a>',
+      copyright: 'Built by <a href="https://beorn.codes">Bjørn Stabell</a>',
     },
   },
 })
