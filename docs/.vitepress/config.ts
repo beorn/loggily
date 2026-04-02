@@ -6,7 +6,7 @@ const seoOptions = {
   hostname: "https://beorn.codes/loggily",
   siteName: "Loggily",
   description: "Structured logging for TypeScript",
-  ogImage: "https://beorn.codes/loggily/og-image.svg",
+  ogImage: "https://beorn.codes/loggily/og-image.png",
   author: "Bjørn Stabell",
   codeRepository: "https://github.com/beorn/loggily",
 }
