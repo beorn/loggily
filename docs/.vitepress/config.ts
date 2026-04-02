@@ -1,6 +1,6 @@
 import { defineConfig } from "vitepress"
 import llmstxt from "vitepress-plugin-llms"
-import { glossaryPlugin, seoHead, seoTransformPageData, loadEcosystemGlossary } from "@bearly/vitepress-enrich"
+import { glossaryPlugin, seoHead, seoTransformPageData, loadEcosystemGlossary } from "vitepress-enrich"
 
 const glossary = loadEcosystemGlossary({ exclude: ["beorn.codes/loggily"] })
 
@@ -30,7 +30,7 @@ export default defineConfig({
   vite: {
     plugins: [llmstxt()],
     ssr: {
-      noExternal: ["@bearly/vitepress-enrich"],
+      noExternal: ["vitepress-enrich"],
     },
   },
 
