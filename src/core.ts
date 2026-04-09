@@ -27,6 +27,29 @@
 
 import { colors as pc } from "./colors.js"
 
+// ============ Metrics ============
+
+/** Data passed to span recorders on disposal */
+export interface SpanRecord {
+  readonly name: string
+  readonly durationMs: number
+}
+
+/** Interface for span duration recording — implemented by createMetricsCollector() in metrics.ts */
+export interface SpanRecorder {
+  recordSpan(data: SpanRecord): void
+}
+
+/**
+ * Ambient span recorder — auto-records when TRACE is active.
+ * Set by metrics.ts on import; can be replaced for testing.
+ * @internal
+ */
+export let _ambientRecorder: SpanRecorder | null = null
+export function _setAmbientRecorder(recorder: SpanRecorder | null): void {
+  _ambientRecorder = recorder
+}
+
 // ============ Runtime Detection ============
 
 /** Cached process reference — undefined in browser/edge runtimes */
@@ -56,6 +79,9 @@ export type LogLevel = OutputLogLevel | "silent"
 
 /** Message can be a string or a lazy function that returns a string */
 export type LazyMessage = string | (() => string)
+
+/** Span props can be an object or a lazy function (skipped entirely via ?. when tracing is off) */
+export type LazyProps = Record<string, unknown> | (() => Record<string, unknown>)
 
 /** Span data accessible via logger.spanData */
 export interface SpanData {
@@ -90,8 +116,8 @@ export interface Logger {
   // Create children
   /** Create child logger (extends namespace, inherits props) */
   logger(namespace?: string, props?: Record<string, unknown>): Logger
-  /** Create child span (extends namespace, inherits props, adds timing) */
-  span(namespace?: string, props?: Record<string, unknown>): SpanLogger
+  /** Create child span (extends namespace, inherits props, adds timing). Props can be lazy. */
+  span(namespace?: string, props?: LazyProps): SpanLogger
 
   /** Create child logger with context fields merged into every message */
   child(context: Record<string, unknown>): Logger
@@ -631,9 +657,10 @@ function createLoggerImpl(
       return createLoggerImpl(childName, mergedProps, null, parentSpanId, traceId, traceSampled)
     },
 
-    span(namespace?: string, childProps?: Record<string, unknown>): SpanLogger {
+    span(namespace?: string, childProps?: LazyProps): SpanLogger {
       const childName = namespace ? `${name}:${namespace}` : name
-      const mergedProps = { ...props, ...childProps }
+      const resolvedChildProps = typeof childProps === "function" ? childProps() : childProps
+      const mergedProps = { ...props, ...resolvedChildProps }
       const newSpanId = generateSpanId()
 
       // Resolve parent from context propagation if not explicitly set
@@ -703,6 +730,9 @@ function createLoggerImpl(
 
         // Exit span context (restore previous context snapshot)
         _exitContext?.(newSpanId)
+
+        // Record to ambient recorder (auto-active when TRACE is on, set by metrics.ts)
+        _ambientRecorder?.recordSpan({ name: childName, durationMs: newSpanData.duration })
 
         // Only emit span if sampled
         if (sampled) {
@@ -797,7 +827,7 @@ export interface ConditionalLogger {
   }
 
   logger(namespace?: string, props?: Record<string, unknown>): Logger
-  span(namespace?: string, props?: Record<string, unknown>): SpanLogger
+  span(namespace?: string, props?: LazyProps): SpanLogger
   child(context: Record<string, unknown>): Logger
   child(context: string): Logger
   end(): void
