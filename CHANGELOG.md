@@ -5,6 +5,29 @@ All notable changes to Loggily will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-09
+
+### Added
+
+- **Metrics API** — `SpanRecorder`, `LazyProps`, ambient recording, `withMetrics()` for composable instrumentation alongside spans
+- **Ecosystem glossary cross-linking** in docs — vitepress-enrich integration
+- **SEO + social meta** — sitemap, robots.txt, OG image, JSON-LD schemas
+- **Footer** — author info and ecosystem cross-links
+
+### Documentation
+
+- Navigation submenus for Guide and API
+- Bjorn → Bjørn corrections, removed km references from public docs
+- Switched OG image from SVG to PNG for social platform compatibility
+
+## [0.4.0]–[0.4.2] — undocumented in this file
+
+These versions shipped between 0.3.0 and 0.5.0 with incremental fixes and tracing improvements. See git log for details:
+
+```bash
+git log v0.3.0..v0.4.2 --oneline
+```
+
 ## [0.3.0] - 2026-03-13
 
 ### Added
