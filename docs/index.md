@@ -23,7 +23,7 @@ features:
   - title: Near-Zero Cost via ?.
     details: "Optional chaining skips the entire call — including argument evaluation — when a level is disabled. The big win is disabled logging with expensive arguments (string interpolation, serialization) — typically 10x+ faster."
   - title: ~3KB, Zero Dependencies
-    details: "No external dependencies. Native TypeScript, ESM-only. Runs on Node 18+, Bun 1.0+, and browsers."
+    details: "No external dependencies. Native TypeScript, ESM-only. Runs on Node.js 23.6+, Bun 1.0+, and browsers."
   - title: One Unified Pipeline
     details: "Many projects end up with separate tools for debug output, production logs, and tracing — three configs, three formats, three APIs. Loggily integrates all three: one namespace tree, one output pipeline, one import."
 ---
