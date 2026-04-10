@@ -18,7 +18,7 @@ npm install loggily
 
 | Requirement   | Version                                           |
 | ------------- | ------------------------------------------------- |
-| Node.js       | 18+                                               |
+| Node.js       | >= 23.6                                            |
 | Bun           | 1.0+                                              |
 | TypeScript    | 5.2+ (for `using`; `.end()` works on any version) |
 | Module format | ESM-only                                          |
