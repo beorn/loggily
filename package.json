@@ -32,7 +32,6 @@
     "src"
   ],
   "type": "module",
-  "module": "src/index.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": {
