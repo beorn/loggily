@@ -1,6 +1,6 @@
 {
   "name": "loggily",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "TypeScript logger with debug-style namespaces, structured JSON output, and lightweight spans. Disabled logs skip argument evaluation via optional chaining.",
   "keywords": [
     "browser",
@@ -29,35 +29,36 @@
     "url": "https://github.com/beorn/loggily.git"
   },
   "files": [
-    "src"
+    "src",
+    "dist"
   ],
   "type": "module",
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "bun": "./src/index.ts",
       "browser": "./src/index.browser.ts",
-      "default": "./src/index.ts"
+      "import": "./dist/index.mjs"
     },
     "./file-writer": {
-      "types": "./src/file-writer.ts",
-      "default": "./src/file-writer.ts"
+      "bun": "./src/file-writer.ts",
+      "import": "./dist/file-writer.mjs"
     },
     "./worker": {
-      "types": "./src/worker.ts",
-      "default": "./src/worker.ts"
+      "bun": "./src/worker.ts",
+      "import": "./dist/worker.mjs"
     },
     "./context": {
-      "types": "./src/context.ts",
-      "default": "./src/context.ts"
+      "bun": "./src/context.ts",
+      "import": "./dist/context.mjs"
     },
     "./tracing": {
-      "types": "./src/tracing.ts",
-      "default": "./src/tracing.ts"
+      "bun": "./src/tracing.ts",
+      "import": "./dist/tracing.mjs"
     },
     "./metrics": {
-      "types": "./src/metrics.ts",
-      "default": "./src/metrics.ts"
+      "bun": "./src/metrics.ts",
+      "import": "./dist/metrics.mjs"
     }
   },
   "publishConfig": {
@@ -69,10 +70,12 @@
     "test": "bunx --bun vitest run",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "pack": "vp pack src/index.ts src/file-writer.ts src/worker.ts src/context.ts src/tracing.ts src/metrics.ts --format esm --dts"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "vite-plus": "^0.1.16",
     "vitepress": "^1.6.4",
     "vitepress-enrich": "^0.4.0",
     "vitepress-plugin-llms": "^1.12.0",
