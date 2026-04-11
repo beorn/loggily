@@ -1,6 +1,8 @@
 # Loggily
 
-Structured logging with spans. Logger-first architecture: Span = Logger + Duration.
+Debugs, logs, and spans — one API. Clarity without the clutter.
+
+**Design philosophy**: Opinionated defaults, composable primitives. See [docs/guide/why.md](docs/guide/why.md#design-principles) for full principles.
 
 ## Documentation Site
 

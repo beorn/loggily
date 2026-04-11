@@ -52,8 +52,25 @@ Loggily is a superset of `debug` — same namespace patterns, same `DEBUG=` env 
 
 ## Design Principles
 
+### Opinionated defaults, composable primitives
+
+Every feature has two layers:
+
+- **Porcelain** — the simple, opinionated entry point that works with sensible defaults. This is what the README shows, what new users reach for, and what the docs lead with.
+- **Primitives** — the composable building blocks the porcelain is built from. Exported for power users who need full control.
+
+The porcelain IS composed from the primitives — it's not a separate code path. When you outgrow the defaults, you reach for the same pieces the defaults use.
+
+Examples:
+- `createLogger("myapp")` is porcelain. The Proxy-based conditional logger is the primitive.
+- `otel()` (planned) is porcelain. `createSpanWriter()` and `bridge()` are primitives.
+- Environment variables (`DEBUG=`, `LOG_LEVEL=`) are porcelain for configuration. `setLogLevel()`, `setDebugFilter()` are primitives.
+
+### Core principles
+
 1. **Logger = Span**: Every logger can become a span. No separate tracing library needed.
 2. **Near-zero cost**: Disabled levels skip argument evaluation entirely via optional chaining.
 3. **Minimal surface**: Few functions, each does one thing well.
-4. **Type enforced**: TypeScript makes `?.` mandatory -- you can't accidentally call a disabled level.
+4. **Type enforced**: TypeScript makes `?.` mandatory — you can't accidentally call a disabled level.
 5. **Structured**: JSON in production, readable console in development.
+6. **Progressive disclosure**: Start with one import and one function call. Discover namespaces, spans, context, workers, and OTel as you need them — each capability is additive, not a migration.
