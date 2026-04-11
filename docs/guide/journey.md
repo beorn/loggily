@@ -190,7 +190,7 @@ Every log from `reqLog` carries `requestId` and `userId`. In JSON mode, these be
 
 ### Automatic context propagation (no passing required)
 
-When threading a logger through every function isn't practical, enable `AsyncLocalStorage`-based context propagation. Logs and spans automatically inherit the current request's trace context — no parameter passing needed:
+When threading a logger through every function isn't practical, enable automatic context propagation. This uses Node's [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html#class-asynclocalstorage) — a built-in mechanism that carries data through `async`/`await` chains without passing it as function arguments. Logs and spans automatically inherit the current request's trace context:
 
 ```typescript
 import { enableContextPropagation, getCurrentSpan } from "loggily/context"
