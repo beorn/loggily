@@ -1,6 +1,6 @@
 {
   "name": "loggily",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "TypeScript logger with debug-style namespaces, structured JSON output, and lightweight spans. Disabled logs skip argument evaluation via optional chaining.",
   "keywords": [
     "browser",
@@ -23,59 +23,44 @@
     "url": "https://github.com/beorn/loggily/issues"
   },
   "license": "MIT",
-  "author": "Beorn",
+  "author": "Bjørn Stabell <bjorn@stabell.org>",
   "repository": {
     "type": "git",
     "url": "https://github.com/beorn/loggily.git"
   },
+  "type": "module",
   "files": [
-    "src",
     "dist"
   ],
-  "type": "module",
-  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "bun": "./src/index.ts",
-      "browser": "./src/index.browser.ts",
-      "import": "./dist/index.mjs"
-    },
-    "./file-writer": {
-      "bun": "./src/file-writer.ts",
-      "import": "./dist/file-writer.mjs"
-    },
-    "./worker": {
-      "bun": "./src/worker.ts",
-      "import": "./dist/worker.mjs"
-    },
-    "./context": {
-      "bun": "./src/context.ts",
-      "import": "./dist/context.mjs"
-    },
-    "./tracing": {
-      "bun": "./src/tracing.ts",
-      "import": "./dist/tracing.mjs"
-    },
-    "./metrics": {
-      "bun": "./src/metrics.ts",
-      "import": "./dist/metrics.mjs"
-    }
+    ".": "./src/index.ts"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs"
+      }
+    }
+  },
+  "tsdown": {
+    "entry": "src/index.ts",
+    "format": "esm",
+    "dts": true,
+    "clean": true
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "bunx --bun vitest run",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs",
-    "pack": "vp pack src/index.ts src/file-writer.ts src/worker.ts src/context.ts src/tracing.ts src/metrics.ts --format esm --dts"
+    "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "vite-plus": "^0.1.16",
+    "tsdown": "^0.21.7",
     "vitepress": "^1.6.4",
     "vitepress-enrich": "^0.4.0",
     "vitepress-plugin-llms": "^1.12.0",
