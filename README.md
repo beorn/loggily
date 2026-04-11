@@ -79,6 +79,7 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 - **Lightweight spans** — time any operation with `using span = log.span("name")`. Automatic duration, parent-child tracking, and trace IDs.
 - **Dev & production** — colorized console in development, structured JSON in production. Same code, zero config.
 - **Child context** — `log.child({ requestId })` adds structured fields to every message in the chain.
+- **Automatic async context** — enable `AsyncLocalStorage`-based propagation and every log in a request's async chain inherits trace/span IDs without passing loggers around.
 - **Lazy messages** — `log.debug?.(() => expensiveString())` skips the function entirely when disabled.
 - **File writer** — `addWriter()` + `createFileWriter()` for buffered file output.
 - **Worker threads** — forward logs from workers to the main thread with full type safety.

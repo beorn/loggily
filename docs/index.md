@@ -24,6 +24,8 @@ features:
     details: "Colorized console with timestamps and clickable source lines in development. Structured JSON in production. Same code, same API — output format switches automatically."
   - title: "Lightweight Spans"
     details: "Built-in spans with automatic timing, parent-child tracking, and trace IDs. Uses TC39 Explicit Resource Management (using) for automatic cleanup."
+  - title: "Automatic Async Context"
+    details: "Enable AsyncLocalStorage-based propagation and every log in a request's async chain inherits trace and span IDs — no need to pass loggers through every function."
   - title: "~3KB, Zero Dependencies"
     details: "No external dependencies. Native TypeScript, ESM-only. Runs on Node.js 23.6+, Bun 1.0+, and browsers."
 ---
