@@ -7,7 +7,7 @@ const glossary = loadEcosystemGlossary({ exclude: ["beorn.codes/loggily"] })
 const seoOptions = {
   hostname: "https://beorn.codes/loggily",
   siteName: "Loggily",
-  description: "Structured logging for TypeScript",
+  description: "Debugs, logs, and spans — one API. Pure TypeScript, ~3KB, zero dependencies.",
   ogImage: "https://beorn.codes/loggily/og-image.png",
   author: "Bjørn Stabell",
   codeRepository: "https://github.com/beorn/loggily",
@@ -15,7 +15,7 @@ const seoOptions = {
 
 export default defineConfig({
   title: "Loggily",
-  description: "Clarity without the clutter. Ergonomic unified logs, spans, and debugs for modern TypeScript.",
+  description: "Debugs, logs, and spans — one API. Clarity without the clutter.",
   base: "/loggily/",
   lastUpdated: true,
 

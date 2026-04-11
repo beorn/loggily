@@ -2,7 +2,9 @@
 
 ## The Problem
 
-Most loggers waste work when logging is disabled. Even when `debug` level is off:
+Most apps end up with three logging tools: `debug` for local troubleshooting, a JSON logger for production, and ad-hoc timers for performance. Three APIs, three configs, three output formats. Loggily gives you one namespace tree and one output pipeline for all three.
+
+But there's a deeper problem: most loggers waste work when logging is disabled. Even when `debug` level is off:
 
 ```typescript
 // Pino, Winston, Bunyan
@@ -40,11 +42,13 @@ For cheap arguments the overhead is ~0.2ns -- negligible. For expensive argument
 | ------------------ | ---------- | ----- | ------- | ----- |
 | Near-zero disabled | `?.` (22x) | noop  | noop    | check |
 | Built-in spans     | Yes        | No    | No      | No    |
+| Debug namespaces   | Yes        | No    | No      | Yes   |
+| Structured JSON    | Yes        | Yes   | Yes     | No    |
 | Bundle size        | ~3KB       | ~17KB | ~200KB+ | ~2KB  |
 | TypeScript native  | Yes        | Types | Types   | Types |
 | Worker threads     | Yes        | No    | No      | No    |
 
-See [Comparison](/guide/comparison) for detailed analysis of each.
+Loggily is a superset of `debug` — same namespace patterns, same `DEBUG=` env var — plus levels, structured data, spans, and JSON output. See [Comparison](/guide/comparison) for detailed analysis.
 
 ## Design Principles
 

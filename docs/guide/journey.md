@@ -1,6 +1,6 @@
 # The Guide
 
-> Clarity without the clutter. Ergonomic unified logs, spans, and debugs for modern TypeScript.
+> Clarity without the clutter. Debugs, logs, and spans — one API.
 
 Your first app uses `console.log`. That's enough for a script, a prototype, a small server. Then your app grows. You need structured logs for production, the `debug` package for conditional verbose output, a tracing library for timings, maybe OpenTelemetry for distributed traces — and suddenly you're juggling three tools with three APIs, three configuration schemes, and three output formats.
 

@@ -1,7 +1,7 @@
 {
   "name": "loggily",
   "version": "0.6.1",
-  "description": "TypeScript logger with debug-style namespaces, structured JSON output, and lightweight spans. Disabled logs skip argument evaluation via optional chaining.",
+  "description": "Debugs, logs, and spans — one API. Disabled logs skip argument evaluation entirely via optional chaining. ~3KB, zero dependencies.",
   "keywords": [
     "browser",
     "bun",
@@ -16,7 +16,8 @@
     "spans",
     "structured-logging",
     "tracing",
-    "typescript"
+    "typescript",
+    "zero-dependency"
   ],
   "homepage": "https://beorn.codes/loggily/",
   "bugs": {
@@ -68,6 +69,6 @@
   },
   "engines": {
     "bun": ">=1.0",
-    "node": ">=18.0.0"
+    "node": ">=23.6.0"
   }
 }
