@@ -168,11 +168,13 @@ worker.on("message", (msg) => handler(msg))
 
 Logs and spans from workers appear in the same output stream with the same formatting. No interleaving, no lost messages.
 
-**The wall**: You need child loggers that carry request context through async call chains without passing the logger everywhere.
+**The wall**: You need request context (request ID, user ID) to appear in every log across a request — without threading a logger through every function call.
 
 ## Level 6: Context
 
-Child loggers carry structured context through async call chains. Create one at the request boundary, and every downstream log inherits its fields:
+### Child loggers (explicit passing)
+
+The simplest approach: create a child logger at the request boundary, pass it to downstream functions.
 
 ```typescript
 const reqLog = log.child({ requestId: "abc-123", userId: 42 })
@@ -180,12 +182,38 @@ const reqLog = log.child({ requestId: "abc-123", userId: 42 })
 reqLog.info?.("handling request")
 // -> 14:32:15 INFO myapp handling request {requestId: "abc-123", userId: 42}
 
-// Pass reqLog to downstream functions -- context propagates
 await handleAuth(reqLog)
 await handleQuery(reqLog)
 ```
 
-Every log from `reqLog` and its descendants carries `requestId` and `userId` without manual field-passing. In JSON mode, these become top-level fields — perfect for filtering in your log aggregator.
+Every log from `reqLog` carries `requestId` and `userId`. In JSON mode, these become top-level fields — perfect for filtering in your log aggregator.
+
+### Automatic context propagation (no passing required)
+
+When threading a logger through every function isn't practical, enable `AsyncLocalStorage`-based context propagation. Logs and spans automatically inherit the current request's trace context — no parameter passing needed:
+
+```typescript
+import { enableContextPropagation, getCurrentSpan } from "loggily/context"
+
+enableContextPropagation()
+
+{
+  using span = log.span("request", { path: "/api/users" })
+
+  // ANY logger, ANYWHERE in this async context, auto-inherits trace_id and span_id
+  log.info?.("handling request")
+  // -> includes trace_id and span_id in JSON output
+
+  // Child spans from other loggers auto-parent to the current span
+  const dbLog = createLogger("db")
+  {
+    using query = dbLog.span("query")
+    // query.spanData.parentId === span.spanData.id — automatic!
+  }
+}
+```
+
+No need to pass `span` or `reqLog` down the call stack. The async context carries it.
 
 ## What You Have
 
@@ -198,7 +226,7 @@ At this point you've replaced that patchwork with a single library:
 - **Span timing** with `using` keyword, nested traces, and independent `TRACE=` control
 - **Flexible output** via writers — file, HTTP, tracing backends, anything
 - **Worker thread support** with automatic forwarding
-- **Context propagation** via child loggers
+- **Context propagation** via child loggers or automatic `AsyncLocalStorage`
 
 All sharing one namespace tree. All respecting the same log levels. All using the same `?.` pattern — disabled calls are skipped entirely, including argument evaluation. There when you need it, invisible when you don't.
 
