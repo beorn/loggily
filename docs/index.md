@@ -78,5 +78,9 @@ log.error?.(new Error("connection lost"))
 
 // Without `using` — call .end() manually
 const span = log.span("db:query", { table: "users" })
-try { /* ... */ } finally { span.end() }
+try {
+  /* ... */
+} finally {
+  span.end()
+}
 ```

@@ -104,7 +104,6 @@ export default defineConfig({
           items: [
             { text: "Benchmarks", link: "/guide/benchmarks" },
             { text: "Comparison", link: "/guide/comparison" },
-            { text: "Conditional Logging Research", link: "/guide/conditional-logging-research" },
           ],
         },
         {

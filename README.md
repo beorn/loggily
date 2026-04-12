@@ -63,13 +63,13 @@ In benchmarks with expensive disabled log arguments, this is [~22x faster](https
 npm install loggily
 ```
 
-| Requirement | Version |
-|---|---|
-| Node.js | >= 23.6 |
-| Bun | 1.0+ |
-| TypeScript | 5.2+ for `using`; `.end()` works on any version |
-| Module format | ESM-only |
-| Browser | Supported via conditional export |
+| Requirement   | Version                                         |
+| ------------- | ----------------------------------------------- |
+| Node.js       | >= 23.6                                         |
+| Bun           | 1.0+                                            |
+| TypeScript    | 5.2+ for `using`; `.end()` works on any version |
+| Module format | ESM-only                                        |
+| Browser       | Supported via conditional export                |
 
 Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span cleanup, which requires a modern runtime.
 
@@ -96,17 +96,21 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 
 // Without `using` — call .end() manually
 const span = log.span("db:query")
-try { /* ... */ } finally { span.end() }
+try {
+  /* ... */
+} finally {
+  span.end()
+}
 ```
 
 ### Common configuration
 
-| Variable | Example | Effect |
-|---|---|---|
-| `DEBUG` | `myapp:db,-myapp:sql` | Namespace filter (same syntax as the `debug` package) |
-| `LOG_LEVEL` | `debug`, `info`, `warn` | Minimum output level |
-| `LOG_FORMAT` | `console`, `json` | Override output format |
-| `TRACE` | `1` or namespace prefixes | Enable span output |
+| Variable     | Example                   | Effect                                                |
+| ------------ | ------------------------- | ----------------------------------------------------- |
+| `DEBUG`      | `myapp:db,-myapp:sql`     | Namespace filter (same syntax as the `debug` package) |
+| `LOG_LEVEL`  | `debug`, `info`, `warn`   | Minimum output level                                  |
+| `LOG_FORMAT` | `console`, `json`         | Override output format                                |
+| `TRACE`      | `1` or namespace prefixes | Enable span output                                    |
 
 See the [full environment variable reference](https://beorn.codes/loggily/api/configuration).
 

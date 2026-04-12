@@ -265,7 +265,7 @@ log.info?.("starting") // Enabled when level=info
 - TypeScript enforces `?.` at compile time (methods are typed as possibly undefined)
 - Main benefit: expensive string formatting and function calls are completely skipped
 
-See [docs/guide/conditional-logging-research.md](docs/guide/conditional-logging-research.md) for detailed research and external references.
+See the internal research doc for detailed methodology and external references.
 
 ## Lazy Messages
 

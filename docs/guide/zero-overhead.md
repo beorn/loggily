@@ -86,4 +86,4 @@ log.debug?.("msg") // Correct
 
 The Proxy overhead (~1ns) comes from `createLogger()` wrapping the base logger. For logging operations this is negligible compared to the actual I/O.
 
-See [Conditional Logging Research](/guide/conditional-logging-research) for methodology and external references.
+See [Benchmarks](/guide/benchmarks) for detailed methodology and results.

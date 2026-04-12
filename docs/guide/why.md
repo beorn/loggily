@@ -62,6 +62,7 @@ Every feature has two layers:
 The porcelain IS composed from the primitives — it's not a separate code path. When you outgrow the defaults, you reach for the same pieces the defaults use.
 
 Examples:
+
 - `createLogger("myapp")` is porcelain. The Proxy-based conditional logger is the primitive.
 - `otel()` (planned) is porcelain. `createSpanWriter()` and `bridge()` are primitives.
 - Environment variables (`DEBUG=`, `LOG_LEVEL=`) are porcelain for configuration. `setLogLevel()`, `setDebugFilter()` are primitives.

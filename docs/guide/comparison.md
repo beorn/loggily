@@ -208,7 +208,7 @@ child.info("logged in", { user: "alice" })
 
 **Choose Loggily if:**
 
-- You want debug-style namespaces *plus* log levels, structured data, and spans
+- You want debug-style namespaces _plus_ log levels, structured data, and spans
 - You want near-zero cost disabled logging
 - You may eventually need production JSON output — Loggily grows with your app without a migration
 
@@ -300,13 +300,13 @@ NODE_ENV=production bun run app
 
 ## Summary
 
-| Use Case                        | Recommended     |
-| ------------------------------- | --------------- |
-| Near-zero cost disabled logging | Loggily         |
-| Built-in span timing            | Loggily         |
-| Debug namespaces + structured logs | Loggily      |
-| Multiple transports             | Pino or Winston |
-| Extensive configuration         | Winston         |
-| JSON CLI tools                  | Bunyan          |
-| Minimal bundle size             | Loggily         |
-| TypeScript-first                | Loggily or Pino |
+| Use Case                           | Recommended     |
+| ---------------------------------- | --------------- |
+| Near-zero cost disabled logging    | Loggily         |
+| Built-in span timing               | Loggily         |
+| Debug namespaces + structured logs | Loggily         |
+| Multiple transports                | Pino or Winston |
+| Extensive configuration            | Winston         |
+| JSON CLI tools                     | Bunyan          |
+| Minimal bundle size                | Loggily         |
+| TypeScript-first                   | Loggily or Pino |
