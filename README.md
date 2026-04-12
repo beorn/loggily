@@ -55,7 +55,7 @@ log.debug?.(`state: ${JSON.stringify(computeExpensiveState())}`)
 // nothing runs when debug is off — not the function, not the stringify, not the template
 ```
 
-In benchmarks with expensive disabled log arguments, this is [~22x faster](https://beorn.codes/loggily/guide/benchmarks) than a conventional noop logger.
+In benchmarks with expensive disabled log arguments, this is [~22x faster](https://loggily.dev/guide/benchmarks) than a conventional noop logger.
 
 ## Install
 
@@ -250,10 +250,10 @@ Loggily was built while developing a terminal UI where disabled debug logs insid
 
 ## Documentation
 
-- **[Get Started](https://beorn.codes/loggily/guide/journey)** -- progressive guide from first log to full observability
-- **[Full docs site](https://beorn.codes/loggily/)** -- guides, API reference, migration guides
-- [Comparison](https://beorn.codes/loggily/guide/comparison) -- what Loggily does, compatibility, when to use something else
-- [Migration from debug](https://beorn.codes/loggily/guide/migration-from-debug) -- step-by-step migration guide
+- **[Get Started](https://loggily.dev/guide/journey)** -- progressive guide from first log to full observability
+- **[Full docs site](https://loggily.dev/)** -- guides, API reference, migration guides
+- [Comparison](https://loggily.dev/guide/comparison) -- what Loggily does, compatibility, when to use something else
+- [Migration from debug](https://loggily.dev/guide/migration-from-debug) -- step-by-step migration guide
 
 ## License
 

@@ -2,13 +2,13 @@ import { defineConfig } from "vitepress"
 import llmstxt from "vitepress-plugin-llms"
 import { glossaryPlugin, seoHead, seoTransformPageData, loadEcosystemGlossary } from "vitepress-enrich"
 
-const glossary = loadEcosystemGlossary({ exclude: ["beorn.codes/loggily"] })
+const glossary = loadEcosystemGlossary({ exclude: ["loggily.dev"] })
 
 const seoOptions = {
-  hostname: "https://beorn.codes/loggily",
+  hostname: "https://loggily.dev",
   siteName: "Loggily",
   description: "Debugs, logs, and spans — one API. Pure TypeScript, ~3KB, zero dependencies.",
-  ogImage: "https://beorn.codes/loggily/og-image.png",
+  ogImage: "https://loggily.dev/og-image.png",
   author: "Bjørn Stabell",
   codeRepository: "https://github.com/beorn/loggily",
 }
@@ -16,10 +16,10 @@ const seoOptions = {
 export default defineConfig({
   title: "Loggily",
   description: "Debugs, logs, and spans — one API. Clarity without the clutter.",
-  base: "/loggily/",
+  base: "/",
   lastUpdated: true,
 
-  sitemap: { hostname: "https://beorn.codes/loggily/" },
+  sitemap: { hostname: "https://loggily.dev/" },
 
   markdown: {
     config(md) {
@@ -35,7 +35,7 @@ export default defineConfig({
   },
 
   head: [
-    ["link", { rel: "icon", type: "image/svg+xml", href: "/loggily/logo.svg" }],
+    ["link", { rel: "icon", type: "image/svg+xml", href: "/logo.svg" }],
     [
       "script",
       {

@@ -6,7 +6,7 @@ Debugs, logs, and spans -- one API. Clarity without the clutter.
 
 ## Documentation Site
 
-VitePress docs at `docs/` -- deployed to beorn.github.io/loggily via GitHub Pages.
+VitePress docs at `docs/` -- deployed to loggily.dev via GitHub Pages.
 
 - **Source**: `docs/` (edit files here)
 - **Config**: `docs/.vitepress/config.ts`

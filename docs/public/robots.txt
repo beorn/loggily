@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://beorn.codes/loggily/sitemap.xml
+Sitemap: https://loggily.dev/sitemap.xml
