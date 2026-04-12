@@ -60,12 +60,36 @@ function writeStderr(text: string): void {
 
 // ============ Formatting ============
 
+/** Serialize Error.cause chains up to a max depth */
+export function serializeCause(cause: unknown, maxDepth: number = 3): unknown {
+  if (maxDepth <= 0 || cause === undefined || cause === null) return undefined
+  if (cause instanceof Error) {
+    const result: Record<string, unknown> = {
+      name: cause.name,
+      message: cause.message,
+      stack: cause.stack,
+    }
+    if ((cause as { code?: string }).code) result.code = (cause as { code?: string }).code
+    if (cause.cause !== undefined) {
+      result.cause = serializeCause(cause.cause, maxDepth - 1)
+    }
+    return result
+  }
+  // Non-Error cause (spec allows any value)
+  return cause
+}
+
 export function safeStringify(value: unknown): string {
   const seen = new WeakSet()
   return JSON.stringify(value, (_key, val) => {
     if (typeof val === "bigint") return val.toString()
     if (typeof val === "symbol") return val.toString()
-    if (val instanceof Error) return { message: val.message, stack: val.stack, name: val.name }
+    if (val instanceof Error) {
+      const result: Record<string, unknown> = { message: val.message, stack: val.stack, name: val.name }
+      if ((val as { code?: string }).code) result.code = (val as { code?: string }).code
+      if (val.cause !== undefined) result.cause = serializeCause(val.cause)
+      return result
+    }
     if (typeof val === "object" && val !== null) {
       if (seen.has(val)) return "[Circular]"
       seen.add(val)
@@ -143,6 +167,10 @@ export type NsFilter = (namespace: string) => boolean
 
 function matchesPattern(namespace: string, pattern: string): boolean {
   if (pattern === "*") return true
+  if (pattern.endsWith(":*")) {
+    const prefix = pattern.slice(0, -2)
+    return namespace === prefix || namespace.startsWith(prefix + ":")
+  }
   return namespace === pattern || namespace.startsWith(pattern + ":")
 }
 
@@ -213,7 +241,11 @@ function createFileSink(path: string, format: LogFormat): { write: (event: Event
   }
 }
 
-function createWritableSink(writable: { write: (s: string) => unknown }, format: LogFormat): (event: Event) => void {
+function createWritableSink(writable: Writable, format: LogFormat): (event: Event) => void {
+  if (writable.objectMode) {
+    // Object mode: pass raw Event directly (for Pino transport compat)
+    return (event: Event) => writable.write(event)
+  }
   const formatter = format === "json" ? formatJSONEvent : formatConsoleEvent
   return (event: Event) => writable.write(formatter(event) + "\n")
 }
@@ -244,7 +276,7 @@ function isPojo(obj: unknown): obj is Record<string, unknown> {
   return proto === Object.prototype || proto === null
 }
 
-function isWritable(obj: unknown): obj is { write: (s: string) => unknown } {
+function isWritable(obj: unknown): obj is Writable {
   return (
     typeof obj === "object" &&
     obj !== null &&
@@ -257,6 +289,45 @@ function isValidLogLevel(val: unknown): val is LogLevel {
   return typeof val === "string" && val in LOG_LEVEL_PRIORITY
 }
 
+// ============ Config Types ============
+
+/** A writable sink — any object with a write method (Pino transports, streams, etc.) */
+export interface Writable {
+  write: (data: unknown) => unknown
+  /** When true, raw Event objects are passed instead of formatted strings */
+  objectMode?: boolean
+}
+
+/** Config keys that set scope for subsequent siblings */
+export interface ConfigObject {
+  level?: LogLevel
+  ns?: string | string[]
+  format?: LogFormat
+  spans?: boolean
+}
+
+/** File output descriptor */
+export interface FileDescriptor extends ConfigObject {
+  file: string
+}
+
+/** OTEL output descriptor (Phase 4) */
+export interface OtelDescriptor extends ConfigObject {
+  otel: Record<string, unknown>
+}
+
+/** A single element in a createLogger config array */
+export type ConfigElement =
+  | ConfigObject
+  | FileDescriptor
+  | OtelDescriptor
+  | Console
+  | "console"
+  | "stderr"
+  | Stage
+  | Writable
+  | ConfigElement[]
+
 // ============ Build Pipeline ============
 
 interface ScopeConfig {
@@ -265,7 +336,7 @@ interface ScopeConfig {
   format: LogFormat
 }
 
-export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeConfig>): Pipeline {
+export function buildPipeline(elements: ConfigElement[], parentConfig?: Partial<ScopeConfig>): Pipeline {
   const config: ScopeConfig = {
     level: parentConfig?.level ?? readEnvLevel(),
     ns: parentConfig?.ns ?? readEnvNs(),
@@ -283,7 +354,7 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
   for (const element of elements) {
     // 1. Array → branch
     if (Array.isArray(element)) {
-      const branch = buildPipeline(element, { ...config })
+      const branch = buildPipeline(element as ConfigElement[], { ...config })
       branches.push(branch)
       disposables.push(() => branch.dispose())
       continue
@@ -344,6 +415,9 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
             dispose: sink.dispose,
           })
         }
+        if (obj.otel !== undefined) {
+          throw new Error("loggily: OTEL sink is not yet implemented. See loggily/otel for the planned bridge.")
+        }
         continue
       }
 
@@ -361,7 +435,7 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
       outputs.push({
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
         nsFilter: config.ns,
-        write: createWritableSink(process.stderr as unknown as { write: (s: string) => unknown }, config.format),
+        write: createWritableSink(process.stderr as unknown as Writable, config.format),
       })
       continue
     }

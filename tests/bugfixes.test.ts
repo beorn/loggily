@@ -3,6 +3,7 @@
  * 1. km-loggily.span-collection-broken — getCollectedSpans() always returns empty
  * 2. km-loggily.json-stringify-throws — JSON.stringify crashes on circular refs, bigint, symbol
  * 3. km-loggily.span-context-corrupt — non-LIFO end() calls corrupt AsyncLocalStorage context
+ * 4. Error.cause chain serialization — cause chains are serialized up to max depth
  */
 
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
@@ -13,6 +14,8 @@ import {
   stopCollecting,
   getCollectedSpans,
   clearCollectedSpans,
+  type Event,
+  type LogEvent,
 } from "../src/index.ts"
 import { enableContextPropagation, disableContextPropagation, getCurrentSpan } from "../src/context.ts"
 import { createConsoleMock } from "./helpers.ts"
@@ -361,5 +364,174 @@ describe("span context non-LIFO end (km-loggily.span-context-corrupt)", () => {
 
     parent.end()
     expect(getCurrentSpan()).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bug 4: Error.cause chain serialization
+// When log.error?.(new Error("timeout")) is called and the Error has a .cause
+// chain, the causes should be serialized (not silently dropped).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Error.cause chain serialization", () => {
+  test("Error.cause chain is serialized", () => {
+    const logs: Event[] = []
+    const log = createLogger("test", [
+      (e: Event) => {
+        logs.push(e)
+        return e
+      },
+      "console",
+    ])
+
+    const root = new Error("timeout")
+    root.cause = new Error("DNS failed")
+    ;(root.cause as Error).cause = new Error("network unreachable")
+
+    log.error?.(root)
+
+    const event = logs[0] as LogEvent
+    expect(event.props?.error_cause).toEqual({
+      name: "Error",
+      message: "DNS failed",
+      stack: expect.any(String),
+      cause: {
+        name: "Error",
+        message: "network unreachable",
+        stack: expect.any(String),
+      },
+    })
+  })
+
+  test("Error.cause chain depth is capped at 3", () => {
+    const logs: Event[] = []
+    const log = createLogger("test", [
+      (e: Event) => {
+        logs.push(e)
+        return e
+      },
+      "console",
+    ])
+
+    let err = new Error("level 0")
+    for (let i = 1; i <= 5; i++) {
+      const outer = new Error(`level ${i}`)
+      outer.cause = err
+      err = outer
+    }
+
+    log.error?.(err)
+
+    const event = logs[0] as LogEvent
+    // Should have cause chain but capped at depth 3
+    let cause = event.props?.error_cause as Record<string, unknown>
+    expect(cause).toBeDefined()
+    let depth = 0
+    while (cause?.cause) {
+      depth++
+      cause = cause.cause as Record<string, unknown>
+    }
+    expect(depth).toBeLessThanOrEqual(3)
+  })
+
+  test("Error without cause has no error_cause property", () => {
+    const logs: Event[] = []
+    const log = createLogger("test", [
+      (e: Event) => {
+        logs.push(e)
+        return e
+      },
+      "console",
+    ])
+
+    log.error?.(new Error("simple error"))
+
+    const event = logs[0] as LogEvent
+    expect(event.props?.error_cause).toBeUndefined()
+  })
+
+  test("Error with non-Error cause serializes the raw value", () => {
+    const logs: Event[] = []
+    const log = createLogger("test", [
+      (e: Event) => {
+        logs.push(e)
+        return e
+      },
+      "console",
+    ])
+
+    const err = new Error("failed")
+    err.cause = "string cause"
+
+    log.error?.(err)
+
+    const event = logs[0] as LogEvent
+    expect(event.props?.error_cause).toBe("string cause")
+  })
+
+  test("Error.cause with code property is preserved", () => {
+    const logs: Event[] = []
+    const log = createLogger("test", [
+      (e: Event) => {
+        logs.push(e)
+        return e
+      },
+      "console",
+    ])
+
+    const cause = new Error("connection refused") as Error & { code: string }
+    cause.code = "ECONNREFUSED"
+    const err = new Error("request failed")
+    err.cause = cause
+
+    log.error?.(err)
+
+    const event = logs[0] as LogEvent
+    const serializedCause = event.props?.error_cause as Record<string, unknown>
+    expect(serializedCause.code).toBe("ECONNREFUSED")
+    expect(serializedCause.message).toBe("connection refused")
+  })
+
+  test("Error.cause in error(error, message, data) overload", () => {
+    const logs: Event[] = []
+    const log = createLogger("test", [
+      (e: Event) => {
+        logs.push(e)
+        return e
+      },
+      "console",
+    ])
+
+    const root = new Error("timeout")
+    root.cause = new Error("DNS failed")
+
+    log.error?.(root, "request failed", { url: "/api" })
+
+    const event = logs[0] as LogEvent
+    expect(event.message).toBe("request failed")
+    expect(event.props?.error_cause).toEqual({
+      name: "Error",
+      message: "DNS failed",
+      stack: expect.any(String),
+    })
+    expect(event.props?.url).toBe("/api")
+  })
+
+  test("Error.cause in safeStringify (JSON format)", () => {
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+
+    const root = new Error("timeout")
+    root.cause = new Error("DNS failed")
+
+    log.info?.("error in data", { err: root })
+
+    expect(consoleMock.output).toHaveLength(1)
+    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<string, unknown>
+    const errObj = parsed.err as Record<string, unknown>
+    expect(errObj.cause).toEqual({
+      name: "Error",
+      message: "DNS failed",
+      stack: expect.any(String),
+    })
   })
 })

@@ -49,6 +49,7 @@ import {
   type SpanLogger,
   type SpanData,
 } from "./index.ts"
+import { serializeCause } from "./pipeline.js"
 
 // ============ Message Protocol ============
 
@@ -145,11 +146,14 @@ function serializeArg(arg: unknown, depth = 0): unknown {
   if (typeof arg === "bigint") return arg.toString() + "n"
 
   if (arg instanceof Error) {
-    return {
+    const result: Record<string, unknown> = {
       name: arg.name,
       message: arg.message,
       stack: arg.stack,
     }
+    if ((arg as { code?: string }).code) result.code = (arg as { code?: string }).code
+    if (arg.cause !== undefined) result.cause = serializeArg(arg.cause, depth + 1)
+    return result
   }
 
   if (Array.isArray(arg)) {
@@ -464,6 +468,7 @@ export function createWorkerLogger(
             error_message: msgOrError.message,
             error_stack: msgOrError.stack,
             error_code: (msgOrError as NodeJS.ErrnoException).code,
+            error_cause: msgOrError.cause !== undefined ? serializeCause(msgOrError.cause) : undefined,
           })
         } else {
           log("error", msgOrError.message, {
@@ -471,6 +476,7 @@ export function createWorkerLogger(
             error_type: msgOrError.name,
             error_stack: msgOrError.stack,
             error_code: (msgOrError as NodeJS.ErrnoException).code,
+            error_cause: msgOrError.cause !== undefined ? serializeCause(msgOrError.cause) : undefined,
           })
         }
       } else {
@@ -490,14 +496,17 @@ export function createWorkerLogger(
 
     span: createSpan,
 
-    child(context: Record<string, unknown> | string): ConditionalLogger {
-      if (typeof context === "string") {
-        return this.logger(context)
+    child(
+      namespaceOrContext: Record<string, unknown> | string,
+      childProps?: Record<string, unknown>,
+    ): ConditionalLogger {
+      if (typeof namespaceOrContext === "string") {
+        return this.logger(namespaceOrContext, childProps)
       }
       return createWorkerLogger(
         postMessage,
         namespace,
-        { ...props, ...context },
+        { ...props, ...namespaceOrContext },
         options,
       ) as unknown as ConditionalLogger
     },

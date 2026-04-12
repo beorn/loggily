@@ -352,7 +352,7 @@ Type: `LazyMessage = string | (() => string)`
 
 ```typescript
 // Extend namespace
-const authLog = log.child("auth")          // namespace: "myapp:auth"
+const authLog = log.child("auth") // namespace: "myapp:auth"
 
 // Add context fields (same namespace)
 const reqLog = log.child({ requestId: "abc-123", userId: 42 })

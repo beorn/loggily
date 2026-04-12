@@ -7,6 +7,7 @@
 export {
   // Core API
   createLogger,
+  baseCreateLogger,
   createTestLogger,
   pipe,
   type LoggerFactory,
@@ -83,5 +84,8 @@ export {
   getSampleRate,
 } from "./tracing.js"
 
-// Re-export pipeline builder for power users
-export { buildPipeline, type Pipeline } from "./pipeline.js"
+// Re-export pipeline builder and utilities for power users
+export { buildPipeline, type Pipeline, serializeCause } from "./pipeline.js"
+
+// Re-export config types for typed pipeline construction
+export type { ConfigElement, ConfigObject, FileDescriptor, Writable } from "./pipeline.js"

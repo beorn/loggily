@@ -16,11 +16,11 @@ const log = createLogger("myapp", [
 
 ### Config Object Keys
 
-| Key      | Type                  | Description                            |
-| -------- | --------------------- | -------------------------------------- |
-| `level`  | `LogLevel`            | Minimum log level                      |
-| `ns`     | `string \| string[]`  | Namespace filter pattern               |
-| `format` | `"console" \| "json"` | Output format                          |
+| Key      | Type                  | Description                               |
+| -------- | --------------------- | ----------------------------------------- |
+| `level`  | `LogLevel`            | Minimum log level                         |
+| `ns`     | `string \| string[]`  | Namespace filter pattern                  |
+| `format` | `"console" \| "json"` | Output format                             |
 | `spans`  | `boolean`             | Enable/disable span output (per-pipeline) |
 
 ### Sink Object Keys

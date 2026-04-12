@@ -26,9 +26,11 @@ import {
   type OutputLogLevel,
   type LogFormat,
   type NsFilter,
+  type ConfigElement,
   LOG_LEVEL_PRIORITY,
   buildPipeline,
   safeStringify,
+  serializeCause,
   readEnvLevel,
   readEnvNs,
   readEnvFormat,
@@ -38,7 +40,7 @@ import {
   formatJSONEvent,
 } from "./pipeline.js"
 
-export type { Event, LogEvent, SpanEvent, Stage, LogLevel, OutputLogLevel, LogFormat }
+export type { Event, LogEvent, SpanEvent, Stage, LogLevel, OutputLogLevel, LogFormat, ConfigElement }
 export { LOG_LEVEL_PRIORITY, safeStringify }
 
 // ============ Metrics ============
@@ -94,7 +96,7 @@ export interface Logger {
   end(): void
 }
 
-export interface SpanLogger extends Logger, Disposable {
+export interface SpanLogger extends ConditionalLogger, Disposable {
   readonly spanData: SpanData & { [key: string]: unknown }
 }
 
@@ -248,24 +250,29 @@ function createLoggerImpl(
 
     if (msgOrError instanceof Error) {
       const err = msgOrError
+      const contextTags = _getContextTags?.() ?? {}
       if (typeof dataOrMsg === "string") {
         message = dataOrMsg
         data = {
+          ...contextTags,
           ...props,
           ...extraData,
           error_type: err.name,
           error_message: err.message,
           error_stack: err.stack,
           error_code: (err as { code?: string }).code,
+          error_cause: err.cause !== undefined ? serializeCause(err.cause) : undefined,
         }
       } else {
         message = err.message
         data = {
+          ...contextTags,
           ...props,
           ...(dataOrMsg as Record<string, unknown>),
           error_type: err.name,
           error_stack: err.stack,
           error_code: (err as { code?: string }).code,
+          error_cause: err.cause !== undefined ? serializeCause(err.cause) : undefined,
         }
       }
     } else {
@@ -355,7 +362,7 @@ function createLoggerImpl(
         attrs: {},
       }
 
-      const spanLogger = createLoggerImpl(
+      const rawLogger = createLoggerImpl(
         childName,
         mergedProps,
         pipeline,
@@ -363,11 +370,11 @@ function createLoggerImpl(
         newSpanId,
         finalTraceId,
         sampled,
-      ) as SpanLogger
+      )
 
       _enterContext?.(newSpanId, finalTraceId, resolvedParentId)
 
-      ;(spanLogger as unknown as { [Symbol.dispose]: () => void })[Symbol.dispose] = () => {
+      const disposeSpan = () => {
         if (newSpanData.endTime !== null) return
 
         newSpanData.endTime = Date.now()
@@ -411,10 +418,18 @@ function createLoggerImpl(
         }
       }
 
+      // Set Symbol.dispose on the raw logger before wrapping with Proxy
+      ;(rawLogger as unknown as { [Symbol.dispose]: () => void })[Symbol.dispose] = disposeSpan
+
+      // Wrap with conditional proxy so disabled levels return undefined (span.info?.() short-circuits)
+      const spanLogger = wrapConditional(rawLogger, () => pipeline.level) as unknown as SpanLogger
       return spanLogger
     },
 
-    child(namespaceOrContext?: string | Record<string, unknown>, childProps?: Record<string, unknown>): ConditionalLogger {
+    child(
+      namespaceOrContext?: string | Record<string, unknown>,
+      childProps?: Record<string, unknown>,
+    ): ConditionalLogger {
       if (typeof namespaceOrContext === "string") {
         const childName = namespaceOrContext ? `${name}:${namespaceOrContext}` : name
         const mergedProps = { ...props, ...childProps }
@@ -425,7 +440,15 @@ function createLoggerImpl(
       }
       // Object → context fields, same namespace
       return wrapConditional(
-        createLoggerImpl(name, { ...props, ...namespaceOrContext }, pipeline, null, parentSpanId, traceId, traceSampled),
+        createLoggerImpl(
+          name,
+          { ...props, ...namespaceOrContext },
+          pipeline,
+          null,
+          parentSpanId,
+          traceId,
+          traceSampled,
+        ),
         () => pipeline.level,
       )
     },
@@ -463,7 +486,10 @@ function wrapConditional(logger: Logger, getLevel: () => LogLevel): ConditionalL
  * Base createLogger — requires a config array.
  * Use the default `createLogger` export (with `withEnvDefaults`) for zero-config.
  */
-function baseCreateLogger(name: string, configOrProps?: unknown[] | Record<string, unknown>): ConditionalLogger {
+export function baseCreateLogger(
+  name: string,
+  configOrProps?: ConfigElement[] | Record<string, unknown>,
+): ConditionalLogger {
   let pipeline: Pipeline
   let props: Record<string, unknown> = {}
 
@@ -482,7 +508,10 @@ function baseCreateLogger(name: string, configOrProps?: unknown[] | Record<strin
 
 // ============ Compose ============
 
-export type LoggerFactory = (name: string, configOrProps?: unknown[] | Record<string, unknown>) => ConditionalLogger
+export type LoggerFactory = (
+  name: string,
+  configOrProps?: ConfigElement[] | Record<string, unknown>,
+) => ConditionalLogger
 export type LoggerPlugin = (factory: LoggerFactory) => LoggerFactory
 
 export function pipe(base: LoggerFactory, ...plugins: LoggerPlugin[]): LoggerFactory {
@@ -637,7 +666,11 @@ export function setSuppressConsole(value: boolean): void {
   _suppressConsole = value
 }
 export type OutputMode = "console" | "stderr" | "writers-only"
-export function setOutputMode(_mode: OutputMode): void {}
+export function setOutputMode(_mode: OutputMode): void {
+  throw new Error(
+    'loggily: setOutputMode() is removed in v2. Use config arrays: omit console from array for writers-only, use "stderr" for stderr mode.',
+  )
+}
 export function getOutputMode(): OutputMode {
   return "console"
 }

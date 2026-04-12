@@ -26,23 +26,23 @@ Objects configure (`{ level, ns, format }`), arrays branch, values write. Custom
 
 ## Feature Overview
 
-| Feature                | Loggily                                                  |
-| ---------------------- | -------------------------------------------------------- |
-| Log Levels             | 5 levels (trace through error)                           |
-| Structured Logging     | JSON + pretty console                                    |
-| Near-zero Disabled     | `?.` skips arg evaluation entirely                       |
-| Built-in Spans         | `using` keyword, auto timing                             |
-| Namespace Filtering    | `DEBUG=` compatible patterns                             |
-| Child / Context Logger | `.child()` — extend namespace, add context, or both    |
-| Output Pipeline        | Config array: objects, arrays, values                    |
-| Pretty Print           | Built-in (auto in dev)                                   |
-| JSON Output            | Built-in (auto in production)                            |
-| File Output            | `{ file: "/path" }` in config array                      |
-| Custom Stages          | `(event) => event \| null \| void`                       |
-| Worker Threads         | `loggily/worker` with typed protocol                     |
-| Bundle Size            | ~3KB                                                     |
-| TypeScript             | Native, ESM-only                                         |
-| Error Handling         | `log.error?.(err, "msg", data?)`                         |
+| Feature                | Loggily                                             |
+| ---------------------- | --------------------------------------------------- |
+| Log Levels             | 5 levels (trace through error)                      |
+| Structured Logging     | JSON + pretty console                               |
+| Near-zero Disabled     | `?.` skips arg evaluation entirely                  |
+| Built-in Spans         | `using` keyword, auto timing                        |
+| Namespace Filtering    | `DEBUG=` compatible patterns                        |
+| Child / Context Logger | `.child()` — extend namespace, add context, or both |
+| Output Pipeline        | Config array: objects, arrays, values               |
+| Pretty Print           | Built-in (auto in dev)                              |
+| JSON Output            | Built-in (auto in production)                       |
+| File Output            | `{ file: "/path" }` in config array                 |
+| Custom Stages          | `(event) => event \| null \| void`                  |
+| Worker Threads         | `loggily/worker` with typed protocol                |
+| Bundle Size            | ~3KB                                                |
+| TypeScript             | Native, ESM-only                                    |
+| Error Handling         | `log.error?.(err, "msg", data?)`                    |
 
 ## Compatibility
 

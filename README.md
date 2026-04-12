@@ -110,9 +110,9 @@ const log = createLogger("myapp", [
 ### Child loggers
 
 ```typescript
-const authLog = log.child("auth")                    // namespace: "myapp:auth"
-const reqLog = log.child({ requestId: "abc-123" })   // context fields
-const dbLog = log.child("db", { pool: "main" })      // both
+const authLog = log.child("auth") // namespace: "myapp:auth"
+const reqLog = log.child({ requestId: "abc-123" }) // context fields
+const dbLog = log.child("db", { pool: "main" }) // both
 ```
 
 ### Spans

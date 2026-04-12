@@ -10,7 +10,7 @@
  * Run: bun benchmarks/overhead.ts
  */
 
-import { addWriter, createLogger, setLogLevel, setOutputMode, setSuppressConsole, disableSpans } from "../src/index.ts"
+import { addWriter, createLogger, setLogLevel, setSuppressConsole, disableSpans } from "../src/index.ts"
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -80,7 +80,6 @@ const noopStream = () =>
 const loggilyLog = createLogger("bench")
 // Route all output to noop writer, suppress console
 setSuppressConsole(true)
-setOutputMode("writers-only")
 addWriter(() => {}) // noop writer — receives formatted output, discards it
 disableSpans()
 
@@ -195,7 +194,7 @@ console.log(`Platform: ${process.platform} ${process.arch}`)
 
 // ─── PART 2: ENABLED LOGGING (all to noop writers) ───────────────────────────
 // Fair comparison: all loggers format + serialize, all write to noop sinks.
-// loggily: addWriter(noop) + setSuppressConsole(true) + setOutputMode("writers-only")
+// loggily: addWriter(noop) + setSuppressConsole(true)
 // pino: pino(opts, noopWritableStream)
 // winston: Stream transport with noop Writable
 

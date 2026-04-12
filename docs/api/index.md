@@ -4,25 +4,25 @@
 
 ### Core
 
-| Export                        | Description                                              |
-| ----------------------------- | -------------------------------------------------------- |
-| `createLogger(name, config?)` | Create a conditional logger (includes `withEnvDefaults`) |
-| `createTestLogger(name)`      | Test helper — all levels enabled, console output         |
-| `pipe(base, ...plugins)`      | Pipe a logger factory through plugins (left-to-right)    |
+| Export                        | Description                                               |
+| ----------------------------- | --------------------------------------------------------- |
+| `createLogger(name, config?)` | Create a conditional logger (includes `withEnvDefaults`)  |
+| `createTestLogger(name)`      | Test helper — all levels enabled, console output          |
+| `pipe(base, ...plugins)`      | Pipe a logger factory through plugins (left-to-right)     |
 | `withEnvDefaults()`           | Plugin: read defaults from env vars (included by default) |
 
 ### Config Array Elements
 
 The second argument to `createLogger` is an optional config array:
 
-| Element Type   | Example                                                   | Description                               |
-| -------------- | --------------------------------------------------------- | ----------------------------------------- |
-| Config object  | `{ level: "debug", ns: "-sql", format: "json", spans: false }` | Set scope for subsequent elements    |
-| `console`      | `console` or `"console"`                                  | Console output at current scope           |
-| File sink      | `{ file: "/path", level?, ns?, format? }`                 | File output with optional overrides       |
-| Stage function | `(event) => event \| null \| void`                        | Transform, filter, or enrich events       |
-| Branch array   | `[{ ns: "metrics" }, { file: "/tmp/m.log" }]`             | Sub-pipeline with own scope               |
-| Writable       | `{ write: (s: string) => void }`                          | Any writable stream                       |
+| Element Type   | Example                                                        | Description                         |
+| -------------- | -------------------------------------------------------------- | ----------------------------------- |
+| Config object  | `{ level: "debug", ns: "-sql", format: "json", spans: false }` | Set scope for subsequent elements   |
+| `console`      | `console` or `"console"`                                       | Console output at current scope     |
+| File sink      | `{ file: "/path", level?, ns?, format? }`                      | File output with optional overrides |
+| Stage function | `(event) => event \| null \| void`                             | Transform, filter, or enrich events |
+| Branch array   | `[{ ns: "metrics" }, { file: "/tmp/m.log" }]`                  | Sub-pipeline with own scope         |
+| Writable       | `{ write: (s: string) => void }`                               | Any writable stream                 |
 
 ### Pipeline (power users)
 
@@ -32,12 +32,12 @@ The second argument to `createLogger` is an optional config array:
 
 ### Testing
 
-| Export                                          | Description                            |
-| ----------------------------------------------- | -------------------------------------- |
-| `createTestLogger(name)`                        | All levels, console output             |
-| `startCollecting()` / `stopCollecting()`        | Collect span data for analysis         |
-| `getCollectedSpans()` / `clearCollectedSpans()` | Access collected spans                 |
-| `resetIds()`                                    | Reset span/trace ID counters           |
+| Export                                          | Description                    |
+| ----------------------------------------------- | ------------------------------ |
+| `createTestLogger(name)`                        | All levels, console output     |
+| `startCollecting()` / `stopCollecting()`        | Collect span data for analysis |
+| `getCollectedSpans()` / `clearCollectedSpans()` | Access collected spans         |
+| `resetIds()`                                    | Reset span/trace ID counters   |
 
 ### Tracing
 

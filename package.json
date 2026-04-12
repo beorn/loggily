@@ -34,15 +34,23 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "browser": "./src/index.browser.ts",
+      "default": "./src/index.ts"
+    },
     "./worker": "./src/worker.ts",
     "./metrics": "./src/metrics.ts",
-    "./context": "./src/context.ts"
+    "./context": "./src/context.ts",
+    "./otel": "./src/otel.ts"
   },
   "publishConfig": {
     "access": "public",
     "exports": {
       ".": {
+        "browser": {
+          "types": "./dist/index.browser.d.mts",
+          "import": "./dist/index.browser.mjs"
+        },
         "types": "./dist/index.d.mts",
         "import": "./dist/index.mjs"
       },
@@ -57,6 +65,10 @@
       "./context": {
         "types": "./dist/context.d.mts",
         "import": "./dist/context.mjs"
+      },
+      "./otel": {
+        "types": "./dist/otel.d.mts",
+        "import": "./dist/otel.mjs"
       }
     }
   },
@@ -70,20 +82,31 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "mitata": "^1.0.34",
     "tsdown": "^0.21.7",
     "vitepress": "^1.6.4",
     "vitepress-enrich": "^0.4.0",
     "vitepress-plugin-llms": "^1.12.0",
     "vitest": "^4.1.1"
   },
+  "peerDependencies": {
+    "@opentelemetry/api": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    }
+  },
   "tsdown": {
     "clean": true,
     "dts": true,
     "entry": [
       "src/index.ts",
+      "src/index.browser.ts",
       "src/worker.ts",
       "src/metrics.ts",
-      "src/context.ts"
+      "src/context.ts",
+      "src/otel.ts"
     ],
     "format": "esm"
   },

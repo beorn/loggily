@@ -8,6 +8,7 @@
 export {
   // Core API
   createLogger,
+  baseCreateLogger,
   createTestLogger,
   pipe,
   withEnvDefaults,
@@ -79,6 +80,9 @@ export {
 
 // Pipeline builder for power users
 export { buildPipeline, type Pipeline } from "./pipeline.js"
+
+// Re-export config types for typed pipeline construction
+export type { ConfigElement, ConfigObject, FileDescriptor, Writable } from "./pipeline.js"
 
 // File writer types (exported for type compatibility, but the function throws)
 export type { FileWriterOptions, FileWriter } from "./file-writer.js"

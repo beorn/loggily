@@ -109,6 +109,7 @@ export default defineConfig({
         {
           text: "Migration",
           items: [
+            { text: "From v1 to v2", link: "/guide/migration-v2" },
             { text: "From debug", link: "/guide/migration-from-debug" },
             { text: "From Pino", link: "/guide/migration-from-pino" },
             { text: "From Winston", link: "/guide/migration-from-winston" },
