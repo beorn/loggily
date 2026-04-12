@@ -384,10 +384,6 @@ export const runtimeState: RuntimeState = {
 }
 
 export function defaultPipeline(): Pipeline {
-  const level = readEnvLevel()
-  const nsFilter = readEnvNs()
-  const format = readEnvFormat()
-  const traceConfig = readEnvTrace()
   const rt = runtimeState
 
   const disposables: (() => void)[] = []
@@ -400,18 +396,21 @@ export function defaultPipeline(): Pipeline {
     disposables.push(sink.dispose)
   }
 
-  const levelPriority = LOG_LEVEL_PRIORITY[level]
-
   const dispatch = (event: Event): void => {
+    // Re-read level dynamically so legacy setters (setLogLevel etc.) work on existing loggers
+    const currentLevel = readEnvLevel()
     if (event.kind === "log") {
-      if (LOG_LEVEL_PRIORITY[event.level] < levelPriority) return
+      if (LOG_LEVEL_PRIORITY[event.level] < LOG_LEVEL_PRIORITY[currentLevel]) return
     } else if (event.kind === "span") {
-      if (!traceConfig.enabled) return
-      if (traceConfig.filter && !traceConfig.filter(event.namespace)) return
+      const trace = readEnvTrace()
+      if (!trace.enabled) return
+      if (trace.filter && !trace.filter(event.namespace)) return
     }
-    if (nsFilter && !nsFilter(event.namespace)) return
+    const currentNs = readEnvNs()
+    if (currentNs && !currentNs(event.namespace)) return
 
-    const useJson = format === "json" || getEnv("NODE_ENV") === "production" || getEnv("TRACE_FORMAT") === "json"
+    const currentFormat = readEnvFormat()
+    const useJson = currentFormat === "json" || getEnv("NODE_ENV") === "production" || getEnv("TRACE_FORMAT") === "json"
     const formatter = useJson ? formatJSONEvent : formatConsoleEvent
 
     if (rt.writers.length > 0) {
@@ -442,7 +441,7 @@ export function defaultPipeline(): Pipeline {
 
   return {
     dispatch,
-    level,
+    get level() { return readEnvLevel() },
     dispose: () => {
       for (const d of disposables) d()
     },
