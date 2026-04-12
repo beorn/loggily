@@ -173,32 +173,35 @@ export function parseNsFilter(ns: string | string[]): NsFilter {
   }
 }
 
+// ============ Console Output ============
+
+function writeToConsole(text: string, event: Event): void {
+  if (event.kind === "span") {
+    writeStderr(text)
+    return
+  }
+  switch (event.level) {
+    case "trace":
+    case "debug":
+      console.debug(text)
+      break
+    case "info":
+      console.info(text)
+      break
+    case "warn":
+      console.warn(text)
+      break
+    case "error":
+      console.error(text)
+      break
+  }
+}
+
 // ============ Sinks ============
 
 function createConsoleSink(format: LogFormat): (event: Event) => void {
   const formatter = format === "json" ? formatJSONEvent : formatConsoleEvent
-  return (event: Event) => {
-    const text = formatter(event)
-    if (event.kind === "span") {
-      writeStderr(text)
-      return
-    }
-    switch (event.level) {
-      case "trace":
-      case "debug":
-        console.debug(text)
-        break
-      case "info":
-        console.info(text)
-        break
-      case "warn":
-        console.warn(text)
-        break
-      case "error":
-        console.error(text)
-        break
-    }
-  }
+  return (event: Event) => writeToConsole(formatter(event), event)
 }
 
 function createFileSink(path: string, format: LogFormat): { write: (event: Event) => void; dispose: () => void } {
@@ -286,19 +289,19 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
       continue
     }
 
-    // 2. Function → stage (but not console which is also a function-like object)
-    if (typeof element === "function" && element !== (console as unknown)) {
-      stages.push(element as Stage)
-      continue
-    }
-
-    // 3. console (literal or "console" string) → console sink
+    // 2. console (literal or "console" string) → console sink (check before function — console is function-like)
     if (element === console || element === "console") {
       outputs.push({
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
         nsFilter: config.ns,
         write: createConsoleSink(config.format),
       })
+      continue
+    }
+
+    // 3. Function → stage
+    if (typeof element === "function") {
+      stages.push(element as Stage)
       continue
     }
 
@@ -424,50 +427,28 @@ export function defaultPipeline(): Pipeline {
 
   // Dynamic dispatch — re-reads env vars each time for legacy setter compat
   const dispatch = (event: Event): void => {
+    // Gate: level
     const currentLevel = readEnvLevel()
     if (event.kind === "log" && LOG_LEVEL_PRIORITY[event.level] < LOG_LEVEL_PRIORITY[currentLevel]) return
+
+    // Gate: spans
     if (event.kind === "span") {
       const trace = readEnvTrace()
       if (!trace.enabled) return
       if (trace.filter && !trace.filter(event.namespace)) return
     }
+
+    // Gate: namespace
     const currentNs = readEnvNs()
     if (currentNs && !currentNs(event.namespace)) return
 
-    // Dynamic format selection
-    const currentFormat = readEnvFormat()
-    const useJson = currentFormat === "json" || getEnv("NODE_ENV") === "production" || getEnv("TRACE_FORMAT") === "json"
-    const formatter = useJson ? formatJSONEvent : formatConsoleEvent
+    // Format once, route to all outputs
+    const formatter = readEnvFormat() === "json" ? formatJSONEvent : formatConsoleEvent
+    const text = formatter(event)
+    const lvl = event.kind === "log" ? event.level : "span"
 
-    // Legacy writers
-    if (rt.writers.length > 0) {
-      const formatted = formatter(event)
-      const lvl = event.kind === "log" ? event.level : "span"
-      for (const w of rt.writers) w(formatted, lvl)
-    }
-
-    if (!rt.suppressConsole) {
-      const text = formatter(event)
-      if (event.kind === "span") {
-        writeStderr(text)
-      } else {
-        switch (event.level) {
-          case "trace":
-          case "debug":
-            console.debug(text)
-            break
-          case "info":
-            console.info(text)
-            break
-          case "warn":
-            console.warn(text)
-            break
-          case "error":
-            console.error(text)
-            break
-        }
-      }
-    }
+    for (const w of rt.writers) w(text, lvl)
+    if (!rt.suppressConsole) writeToConsole(text, event)
     fileSink?.(event)
   }
 
