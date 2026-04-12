@@ -1,22 +1,12 @@
 /**
- * loggily Test Suite
+ * loggily v2 Test Suite
  *
- * Tests for the logger-first observability system.
+ * Tests for the pipeline-based observability system.
  */
 
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
 import {
   createLogger,
-  enableSpans,
-  disableSpans,
-  setLogLevel,
-  getLogLevel,
-  spansAreEnabled,
-  setTraceFilter,
-  getTraceFilter,
-  setDebugFilter,
-  getDebugFilter,
-  setOutputMode,
   resetIds,
   type Logger,
   type SpanLogger,
@@ -27,41 +17,64 @@ import { createConsoleMock } from "./helpers.ts"
 // Console mock instance for all tests
 let consoleMock: ReturnType<typeof createConsoleMock>
 
+// Save/restore env vars
+let savedEnv: Record<string, string | undefined>
+
 beforeEach(() => {
   resetIds()
-  setLogLevel("trace") // Enable all levels
-  disableSpans() // Start with spans disabled
-  setTraceFilter(null) // Clear any trace filter
-  setDebugFilter(null) // Clear any debug filter
-  setOutputMode("console") // Reset output mode
   consoleMock = createConsoleMock()
+  savedEnv = {
+    TRACE: process.env.TRACE,
+    DEBUG: process.env.DEBUG,
+    LOG_LEVEL: process.env.LOG_LEVEL,
+    LOG_FORMAT: process.env.LOG_FORMAT,
+    TRACE_FORMAT: process.env.TRACE_FORMAT,
+    NODE_ENV: process.env.NODE_ENV,
+  }
+  // Clean env so tests start from a known state
+  delete process.env.TRACE
+  delete process.env.DEBUG
+  delete process.env.LOG_LEVEL
+  delete process.env.LOG_FORMAT
+  delete process.env.TRACE_FORMAT
+  delete process.env.NODE_ENV
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
+  // Restore env
+  for (const [key, val] of Object.entries(savedEnv)) {
+    if (val === undefined) {
+      delete process.env[key]
+    } else {
+      process.env[key] = val
+    }
+  }
 })
 
 describe("createLogger", () => {
   test("creates logger with name", () => {
-    const log = createLogger("myapp")
+    const log = createLogger("myapp", [{ level: "trace" }, console])
     expect(log.name).toBe("myapp")
   })
 
-  test("creates logger with props", () => {
-    const log = createLogger("myapp", { version: "1.0" })
-    expect(log.props).toEqual({ version: "1.0" })
+  test("creates logger with props via child", () => {
+    const log = createLogger("myapp", [{ level: "trace" }, console])
+    const child = log.child({ version: "1.0" })
+    expect(child.props).toEqual({ version: "1.0" })
   })
 
   test("props are frozen", () => {
-    const log = createLogger("myapp", { version: "1.0" })
+    const log = createLogger("myapp", [{ level: "trace" }, console])
+    const child = log.child({ version: "1.0" })
     expect(() => {
       // @ts-expect-error - testing immutability
-      log.props.version = "2.0"
+      child.props.version = "2.0"
     }).toThrow()
   })
 
   test("spanData is null for regular logger", () => {
-    const log = createLogger("myapp")
+    const log = createLogger("myapp", [{ level: "trace" }, console])
     expect(log.spanData).toBeNull()
   })
 })
@@ -75,7 +88,7 @@ describe("logging methods", () => {
     ["warn", "warn"],
     ["error", "error"],
   ] as const)("%s level uses console.%s", (logLevel, consoleMethod) => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     log[logLevel]!(`${logLevel} message`)
 
     expect(consoleMock.output).toHaveLength(1)
@@ -83,7 +96,7 @@ describe("logging methods", () => {
   })
 
   test("includes data in output", () => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     log.info!("message", { key: "value" })
 
     expect(consoleMock.output[0]!.message).toContain("key")
@@ -91,8 +104,9 @@ describe("logging methods", () => {
   })
 
   test("inherits props in output", () => {
-    const log = createLogger("test", { app: "myapp" })
-    log.info!("message")
+    const log = createLogger("test", [{ level: "trace" }, console])
+    const child = log.child({ app: "myapp" })
+    child.info!("message")
 
     expect(consoleMock.output[0]!.message).toContain("app")
     expect(consoleMock.output[0]!.message).toContain("myapp")
@@ -104,9 +118,8 @@ describe("logging methods", () => {
     ["warn", ["warn", "error"], 2],
     ["error", ["error"], 1],
     ["info", ["info", "warn", "error"], 3],
-  ] as const)("setLogLevel(%s) filters to %j", (threshold, expectedLevels, expectedCount) => {
-    setLogLevel(threshold)
-    const log = createLogger("test")
+  ] as const)("level %s filters to %j", (threshold, expectedLevels, expectedCount) => {
+    const log = createLogger("test", [{ level: threshold }, console])
 
     log.debug?.("d")
     log.info?.("i")
@@ -117,7 +130,7 @@ describe("logging methods", () => {
   })
 
   test("error accepts Error object", () => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     const err = new Error("Something went wrong")
 
     log.error!(err)
@@ -129,35 +142,37 @@ describe("logging methods", () => {
 
 describe("logger hierarchy", () => {
   test(".logger() creates child with extended namespace", () => {
-    const parent = createLogger("app")
+    const parent = createLogger("app", [{ level: "trace" }, console])
     const child = parent.logger("import")
 
     expect(child.name).toBe("app:import")
   })
 
   test(".logger() inherits parent props", () => {
-    const parent = createLogger("app", { version: "1.0" })
-    const child = parent.logger("import")
+    const parent = createLogger("app", [{ level: "trace" }, console])
+    const withProps = parent.child({ version: "1.0" })
+    const child = withProps.logger("import")
 
     expect(child.props).toEqual({ version: "1.0" })
   })
 
   test(".logger() merges additional props", () => {
-    const parent = createLogger("app", { version: "1.0" })
-    const child = parent.logger("import", { file: "data.csv" })
+    const parent = createLogger("app", [{ level: "trace" }, console])
+    const withProps = parent.child({ version: "1.0" })
+    const child = withProps.logger("import", { file: "data.csv" })
 
     expect(child.props).toEqual({ version: "1.0", file: "data.csv" })
   })
 
   test(".logger() without namespace keeps same name", () => {
-    const parent = createLogger("app")
+    const parent = createLogger("app", [{ level: "trace" }, console])
     const child = parent.logger(undefined, { extra: true })
 
     expect(child.name).toBe("app")
   })
 
   test(".child() is deprecated alias for .logger()", () => {
-    const parent = createLogger("app")
+    const parent = createLogger("app", [{ level: "trace" }, console])
     const child = parent.child("import")
 
     expect(child.name).toBe("app:import")
@@ -166,7 +181,7 @@ describe("logger hierarchy", () => {
 
 describe("spans", () => {
   test(".span() creates logger with spanData", () => {
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace" }, console])
     const span = log.span("import")
 
     expect(span.spanData).not.toBeNull()
@@ -175,21 +190,22 @@ describe("spans", () => {
   })
 
   test("span extends namespace", () => {
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace" }, console])
     const span = log.span("import")
 
     expect(span.name).toBe("app:import")
   })
 
   test("span inherits props", () => {
-    const log = createLogger("app", { version: "1.0" })
-    const span = log.span("import", { file: "data.csv" })
+    const log = createLogger("app", [{ level: "trace" }, console])
+    const withProps = log.child({ version: "1.0" })
+    const span = withProps.span("import", { file: "data.csv" })
 
     expect(span.props).toEqual({ version: "1.0", file: "data.csv" })
   })
 
   test("span has live duration", () => {
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace" }, console])
     const span = log.span("import")
 
     const d1 = span.spanData!.duration
@@ -206,7 +222,7 @@ describe("spans", () => {
   })
 
   test("span attributes can be set", () => {
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace" }, console])
     const span = log.span("import")
 
     span.spanData.count = 42
@@ -219,8 +235,8 @@ describe("spans", () => {
   })
 
   test("using keyword auto-disposes span", () => {
-    enableSpans()
-    const log = createLogger("app")
+    process.env.TRACE = "1"
+    const log = createLogger("app", [{ level: "trace" }, console])
 
     {
       using span = log.span("import")
@@ -233,7 +249,7 @@ describe("spans", () => {
   })
 
   test("nested spans have parent-child relationship", () => {
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace" }, console])
 
     const parent = log.span("import")
     const child = parent.span("parse")
@@ -246,7 +262,7 @@ describe("spans", () => {
   })
 
   test("nested spans share trace ID", () => {
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace" }, console])
 
     const span1 = log.span("import")
     const span2 = span1.span("parse")
@@ -262,8 +278,8 @@ describe("spans", () => {
   })
 
   test(".end() can be called manually", () => {
-    enableSpans()
-    const log = createLogger("app")
+    process.env.TRACE = "1"
+    const log = createLogger("app", [{ level: "trace" }, console])
     const span = log.span("import")
 
     span.end()
@@ -273,8 +289,8 @@ describe("spans", () => {
   })
 
   test("span output includes attributes", () => {
-    enableSpans()
-    const log = createLogger("app")
+    process.env.TRACE = "1"
+    const log = createLogger("app", [{ level: "trace" }, console])
 
     {
       using span = log.span("import", { file: "data.csv" })
@@ -290,6 +306,8 @@ describe("spans", () => {
 
 describe("span output control", () => {
   test("spans disabled by default", () => {
+    // Default pipeline reads TRACE env — unset means spans disabled
+    process.env.LOG_LEVEL = "trace"
     const log = createLogger("app")
 
     {
@@ -302,8 +320,9 @@ describe("span output control", () => {
     expect(consoleMock.output[0]!.message).not.toContain("SPAN")
   })
 
-  test("enableSpans() enables span output", () => {
-    enableSpans()
+  test("TRACE=1 enables span output", () => {
+    process.env.TRACE = "1"
+    process.env.LOG_LEVEL = "trace"
     const log = createLogger("app")
 
     {
@@ -313,9 +332,9 @@ describe("span output control", () => {
     expect(consoleMock.findSpan()).toBeDefined()
   })
 
-  test("disableSpans() disables span output", () => {
-    enableSpans()
-    disableSpans()
+  test("clearing TRACE disables span output", () => {
+    // TRACE is not set (cleared in beforeEach), so spans should not appear
+    process.env.LOG_LEVEL = "trace"
     const log = createLogger("app")
 
     {
@@ -327,12 +346,9 @@ describe("span output control", () => {
 })
 
 describe("console method usage (patchConsole compatibility)", () => {
-  // Consolidated: log level -> console method mapping (covered above in logging methods)
-  // This describe block focuses on patchConsole-specific behavior
-
   test("span output uses process.stderr.write (bypasses Ink patchConsole)", () => {
-    enableSpans()
-    const log = createLogger("test")
+    process.env.TRACE = "1"
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     {
       using span = log.span("work")
@@ -351,8 +367,7 @@ describe("createLogger", () => {
     ["warn", { trace: false, debug: false, info: false, warn: true, error: true }],
     ["error", { trace: false, debug: false, info: false, warn: false, error: true }],
   ] as const)("at level %s, methods defined: %o", (level, expected) => {
-    setLogLevel(level)
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level }, console])
 
     expect(log.trace !== undefined).toBe(expected.trace)
     expect(log.debug !== undefined).toBe(expected.debug)
@@ -362,8 +377,7 @@ describe("createLogger", () => {
   })
 
   test("optional chaining skips call when disabled", () => {
-    setLogLevel("error")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "error" }, console])
 
     log.debug?.("should not log")
     log.info?.("should not log")
@@ -373,8 +387,7 @@ describe("createLogger", () => {
   })
 
   test("optional chaining calls method when enabled", () => {
-    setLogLevel("debug")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "debug" }, console])
 
     log.debug?.("should log")
 
@@ -382,16 +395,15 @@ describe("createLogger", () => {
     expect(consoleMock.output[0]!.message).toContain("should log")
   })
 
-  test("inherits props from base logger", () => {
-    setLogLevel("info")
-    const log = createLogger("test", { version: "1.0" })
+  test("inherits props from child logger", () => {
+    const log = createLogger("test", [{ level: "info" }, console])
+    const child = log.child({ version: "1.0" })
 
-    expect(log.props).toEqual({ version: "1.0" })
+    expect(child.props).toEqual({ version: "1.0" })
   })
 
   test("can create child loggers and spans", () => {
-    setLogLevel("info")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "info" }, console])
 
     const child = log.logger("child")
     expect(child.name).toBe("test:child")
@@ -400,66 +412,26 @@ describe("createLogger", () => {
     expect(span.spanData).not.toBeNull()
     span.end()
   })
-
-  test("responds to log level changes", () => {
-    const log = createLogger("test")
-
-    setLogLevel("error")
-    expect(log.debug).toBeUndefined()
-    expect(log.info).toBeUndefined()
-
-    setLogLevel("debug")
-    expect(log.debug).toBeDefined()
-    expect(log.info).toBeDefined()
-  })
-})
-
-describe("configuration functions", () => {
-  test("getLogLevel returns current level", () => {
-    setLogLevel("warn")
-    expect(getLogLevel()).toBe("warn")
-
-    setLogLevel("debug")
-    expect(getLogLevel()).toBe("debug")
-  })
-
-  test("spansAreEnabled tracks span state", () => {
-    disableSpans()
-    expect(spansAreEnabled()).toBe(false)
-
-    enableSpans()
-    expect(spansAreEnabled()).toBe(true)
-
-    disableSpans()
-    expect(spansAreEnabled()).toBe(false)
-  })
 })
 
 describe("JSON format output", () => {
-  let originalNodeEnv: string | undefined
-  let originalTraceFormat: string | undefined
+  test("format: json produces JSON output", () => {
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
 
-  beforeEach(() => {
-    originalNodeEnv = process.env.NODE_ENV
-    originalTraceFormat = process.env.TRACE_FORMAT
-  })
+    log.info!("test message", { key: "value" })
 
-  afterEach(() => {
-    if (originalNodeEnv === undefined) {
-      delete process.env.NODE_ENV
-    } else {
-      process.env.NODE_ENV = originalNodeEnv
-    }
-    if (originalTraceFormat === undefined) {
-      delete process.env.TRACE_FORMAT
-    } else {
-      process.env.TRACE_FORMAT = originalTraceFormat
-    }
+    const output = consoleMock.output[0]!.message
+    const parsed = JSON.parse(output) as Record<string, unknown>
+    expect(parsed.level).toBe("info")
+    expect(parsed.name).toBe("test")
+    expect(parsed.msg).toBe("test message")
+    expect(parsed.key).toBe("value")
+    expect(parsed.time).toBeDefined()
   })
 
   test("TRACE_FORMAT=json produces JSON output", () => {
     process.env.TRACE_FORMAT = "json"
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     log.info!("test message", { key: "value" })
 
@@ -474,8 +446,7 @@ describe("JSON format output", () => {
 
   test("NODE_ENV=production produces JSON output", () => {
     process.env.NODE_ENV = "production"
-    delete process.env.TRACE_FORMAT
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     log.info!("prod message")
 
@@ -486,10 +457,10 @@ describe("JSON format output", () => {
   })
 
   test("JSON output includes all props", () => {
-    process.env.TRACE_FORMAT = "json"
-    const log = createLogger("test", { app: "myapp", version: "1.0" })
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const child = log.child({ app: "myapp", version: "1.0" })
 
-    log.info!("message")
+    child.info!("message")
 
     const output = consoleMock.output[0]!.message
     const parsed = JSON.parse(output) as Record<string, unknown>
@@ -498,8 +469,7 @@ describe("JSON format output", () => {
   })
 
   test("JSON output handles errors", () => {
-    process.env.TRACE_FORMAT = "json"
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
     const err = new Error("test error")
 
     log.error!(err)
@@ -512,9 +482,8 @@ describe("JSON format output", () => {
   })
 
   test("JSON span output includes duration", () => {
-    process.env.TRACE_FORMAT = "json"
-    enableSpans()
-    const log = createLogger("test")
+    process.env.TRACE = "1"
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
 
     {
       using span = log.span("work")
@@ -539,8 +508,7 @@ describe("JSON format output", () => {
   })
 
   test("JSON handles circular references", () => {
-    process.env.TRACE_FORMAT = "json"
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
 
     const circular: Record<string, unknown> = { name: "test" }
     circular.self = circular
@@ -555,7 +523,7 @@ describe("JSON format output", () => {
 
 describe("console format output", () => {
   test("includes timestamp", () => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     log.info!("message")
 
     // Format: HH:MM:SS
@@ -570,22 +538,22 @@ describe("console format output", () => {
     ["warn", "WARN"],
     ["error", "ERROR"],
   ] as const)("%s level outputs %s label", (method, label) => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     log[method]!("msg")
 
     expect(consoleMock.output[0]!.message).toContain(label)
   })
 
   test("includes namespace", () => {
-    const log = createLogger("myapp")
+    const log = createLogger("myapp", [{ level: "trace" }, console])
     log.info!("message")
 
     expect(consoleMock.output[0]!.message).toContain("myapp")
   })
 
   test("span format includes SPAN label and duration", () => {
-    enableSpans()
-    const log = createLogger("test")
+    process.env.TRACE = "1"
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     {
       using span = log.span("work")
@@ -598,23 +566,21 @@ describe("console format output", () => {
 })
 
 describe("TRACE namespace filtering", () => {
-  test("setTraceFilter with namespaces enables spans and filtering", () => {
-    setTraceFilter(["myapp"])
+  test("TRACE=namespace enables spans and filtering", () => {
+    process.env.TRACE = "myapp"
+    process.env.LOG_LEVEL = "trace"
+    const log = createLogger("myapp")
 
-    expect(spansAreEnabled()).toBe(true)
-    expect(getTraceFilter()).toEqual(["myapp"])
-  })
+    {
+      using span = log.span("work")
+    }
 
-  // Test that setTraceFilter clears filter (but doesn't disable spans)
-  test.each([[null], [[]]])("setTraceFilter(%j) clears filter", (filter) => {
-    setTraceFilter(["myapp"])
-    setTraceFilter(filter)
-
-    expect(getTraceFilter()).toBeNull()
+    expect(consoleMock.findSpan()).toBeDefined()
   })
 
   test("filter allows exact namespace match", () => {
-    setTraceFilter(["myapp"])
+    process.env.TRACE = "myapp"
+    process.env.LOG_LEVEL = "trace"
     const log = createLogger("myapp")
 
     {
@@ -625,7 +591,8 @@ describe("TRACE namespace filtering", () => {
   })
 
   test("filter allows child namespace match", () => {
-    setTraceFilter(["myapp"])
+    process.env.TRACE = "myapp"
+    process.env.LOG_LEVEL = "trace"
     const log = createLogger("myapp")
 
     {
@@ -636,7 +603,8 @@ describe("TRACE namespace filtering", () => {
   })
 
   test("filter blocks non-matching namespace", () => {
-    setTraceFilter(["myapp"])
+    process.env.TRACE = "myapp"
+    process.env.LOG_LEVEL = "trace"
     const log = createLogger("other")
 
     {
@@ -647,7 +615,8 @@ describe("TRACE namespace filtering", () => {
   })
 
   test("filter supports multiple namespaces", () => {
-    setTraceFilter(["myapp", "other"])
+    process.env.TRACE = "myapp,other"
+    process.env.LOG_LEVEL = "trace"
 
     const log1 = createLogger("myapp")
     const log2 = createLogger("other")
@@ -670,8 +639,9 @@ describe("TRACE namespace filtering", () => {
   })
 
   test("filter does not affect regular log messages", () => {
-    setTraceFilter(["myapp"])
-    const log = createLogger("other") // Not in filter
+    process.env.TRACE = "myapp"
+    process.env.LOG_LEVEL = "trace"
+    const log = createLogger("other") // Not in TRACE filter
 
     log.info!("regular log")
 
@@ -680,8 +650,9 @@ describe("TRACE namespace filtering", () => {
     expect(consoleMock.output[0]!.message).toContain("regular log")
   })
 
-  test("no filter when spans enabled without setTraceFilter", () => {
-    enableSpans()
+  test("no filter when TRACE=1 (all spans enabled)", () => {
+    process.env.TRACE = "1"
+    process.env.LOG_LEVEL = "trace"
 
     const log1 = createLogger("any")
     const log2 = createLogger("namespace")
@@ -699,25 +670,17 @@ describe("TRACE namespace filtering", () => {
 })
 
 describe("DEBUG namespace filtering", () => {
-  test("setDebugFilter enables namespace filtering", () => {
-    setDebugFilter(["myapp"])
-    expect(getDebugFilter()).toEqual(["myapp"])
-  })
+  test("DEBUG env var enables namespace filtering", () => {
+    process.env.DEBUG = "myapp"
+    const log = createLogger("myapp")
+    log.info!("visible")
 
-  test("setDebugFilter(null) clears filter", () => {
-    setDebugFilter(["myapp"])
-    setDebugFilter(null)
-    expect(getDebugFilter()).toBeNull()
-  })
-
-  test("setDebugFilter([]) clears filter", () => {
-    setDebugFilter(["myapp"])
-    setDebugFilter([])
-    expect(getDebugFilter()).toBeNull()
+    expect(consoleMock.output).toHaveLength(1)
+    expect(consoleMock.output[0]!.message).toContain("visible")
   })
 
   test("filter allows exact namespace match", () => {
-    setDebugFilter(["myapp"])
+    process.env.DEBUG = "myapp"
     const log = createLogger("myapp")
     log.info!("visible")
 
@@ -726,7 +689,7 @@ describe("DEBUG namespace filtering", () => {
   })
 
   test("filter allows child namespace match", () => {
-    setDebugFilter(["myapp"])
+    process.env.DEBUG = "myapp"
     const log = createLogger("myapp")
     const child = log.logger("db")
     child.info("visible")
@@ -736,7 +699,7 @@ describe("DEBUG namespace filtering", () => {
   })
 
   test("filter blocks non-matching namespace", () => {
-    setDebugFilter(["myapp"])
+    process.env.DEBUG = "myapp"
     const log = createLogger("other")
     log.info!("hidden")
 
@@ -744,7 +707,7 @@ describe("DEBUG namespace filtering", () => {
   })
 
   test("filter supports multiple namespaces", () => {
-    setDebugFilter(["myapp", "other"])
+    process.env.DEBUG = "myapp,other"
 
     const log1 = createLogger("myapp")
     const log2 = createLogger("other")
@@ -760,7 +723,7 @@ describe("DEBUG namespace filtering", () => {
   })
 
   test("wildcard '*' allows all namespaces", () => {
-    setDebugFilter(["*"])
+    process.env.DEBUG = "*"
 
     const log1 = createLogger("any")
     const log2 = createLogger("namespace")
@@ -772,7 +735,7 @@ describe("DEBUG namespace filtering", () => {
   })
 
   test("negative pattern excludes matching namespace", () => {
-    setDebugFilter(["myapp", "-myapp:noisy"])
+    process.env.DEBUG = "myapp,-myapp:noisy"
 
     const log = createLogger("myapp")
     const quiet = log.logger("db")
@@ -788,7 +751,7 @@ describe("DEBUG namespace filtering", () => {
   })
 
   test("negative pattern excludes children of excluded namespace", () => {
-    setDebugFilter(["*", "-km:storage:sql"])
+    process.env.DEBUG = "*,-km:storage:sql"
 
     const log = createLogger("km")
     const storage = log.logger("storage")
@@ -804,7 +767,7 @@ describe("DEBUG namespace filtering", () => {
   })
 
   test("exclude-only pattern (no includes) blocks only excluded", () => {
-    setDebugFilter(["-km:noisy"])
+    process.env.DEBUG = "-km:noisy"
 
     const log1 = createLogger("km")
     const log2 = createLogger("km").logger("noisy")
@@ -819,23 +782,20 @@ describe("DEBUG namespace filtering", () => {
     expect(consoleMock.output[1]!.message).toContain("other")
   })
 
-  test("setDebugFilter auto-lowers log level to debug", () => {
-    setLogLevel("warn")
-    setDebugFilter(["myapp"])
+  test("DEBUG auto-lowers log level to debug", () => {
+    process.env.DEBUG = "myapp"
+    const log = createLogger("myapp")
 
-    expect(getLogLevel()).toBe("debug")
-  })
+    // Without DEBUG, default level is info, so debug would be hidden.
+    // With DEBUG set, level auto-lowers to debug.
+    log.debug?.("debug visible")
 
-  test("setDebugFilter preserves trace log level", () => {
-    setLogLevel("trace")
-    setDebugFilter(["myapp"])
-
-    expect(getLogLevel()).toBe("trace")
+    expect(consoleMock.output).toHaveLength(1)
+    expect(consoleMock.output[0]!.message).toContain("debug visible")
   })
 
   test("debug messages visible when filter matches", () => {
-    setLogLevel("warn") // Would normally hide debug
-    setDebugFilter(["myapp"]) // Auto-lowers to debug
+    process.env.DEBUG = "myapp"
 
     const log = createLogger("myapp")
     log.debug?.("debug visible")
@@ -844,17 +804,9 @@ describe("DEBUG namespace filtering", () => {
     expect(consoleMock.output[0]!.message).toContain("debug visible")
   })
 
-  test("getDebugFilter returns includes and excludes", () => {
-    setDebugFilter(["myapp", "-noisy"])
-
-    const filter = getDebugFilter()!
-    expect(filter).toContain("myapp")
-    expect(filter).toContain("-noisy")
-  })
-
   test("filter also applies to spans", () => {
-    enableSpans()
-    setDebugFilter(["myapp"])
+    process.env.TRACE = "1"
+    process.env.DEBUG = "myapp"
 
     const log1 = createLogger("myapp")
     const log2 = createLogger("other")
@@ -872,10 +824,34 @@ describe("DEBUG namespace filtering", () => {
   })
 })
 
-describe("setOutputMode", () => {
-  test("stderr mode routes writeLog to stderr", () => {
-    setOutputMode("stderr")
-    const log = createLogger("test")
+describe("ns config in pipeline", () => {
+  test("ns in config array filters namespaces", () => {
+    const log = createLogger("myapp", [{ level: "trace", ns: "myapp" }, console])
+    log.info!("visible")
+
+    const other = createLogger("other", [{ level: "trace", ns: "myapp" }, console])
+    other.info!("hidden")
+
+    expect(consoleMock.output).toHaveLength(1)
+    expect(consoleMock.output[0]!.message).toContain("myapp")
+  })
+
+  test("ns with negative pattern in config array", () => {
+    const log = createLogger("myapp", [{ level: "trace", ns: "myapp,-myapp:noisy" }, console])
+    const noisy = log.logger("noisy")
+
+    log.info!("visible")
+    noisy.info("hidden")
+
+    expect(consoleMock.output).toHaveLength(1)
+    expect(consoleMock.output[0]!.message).toContain("myapp")
+    expect(consoleMock.output[0]!.message).not.toContain("noisy")
+  })
+})
+
+describe("output routing", () => {
+  test("process.stderr in config routes output to stderr", () => {
+    const log = createLogger("test", [{ level: "trace" }, process.stderr])
     log.info?.("hello")
 
     const stderrOutput = consoleMock.output.filter((o) => o.level === "stderr")
@@ -887,18 +863,16 @@ describe("setOutputMode", () => {
     expect(consoleOutput).toHaveLength(0)
   })
 
-  test("writers-only mode suppresses all direct output", () => {
-    setOutputMode("writers-only")
-    const log = createLogger("test")
+  test("omitting console from config suppresses all direct output", () => {
+    const log = createLogger("test", [{ level: "trace" }])
     log.info?.("hello")
 
     // No console or stderr output
     expect(consoleMock.output).toHaveLength(0)
   })
 
-  test("console mode (default) uses console methods", () => {
-    setOutputMode("console")
-    const log = createLogger("test")
+  test("console in config uses console methods", () => {
+    const log = createLogger("test", [{ level: "trace" }, console])
     log.info?.("hello")
 
     const consoleOutput = consoleMock.output.filter((o) => o.level === "info")

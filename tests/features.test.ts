@@ -1,45 +1,40 @@
 /**
- * Tests for new logger features:
+ * Tests for logger features (v2 pipeline API):
  * 1. Lazy string interpolation
  * 2. Child loggers with context
- * 3. Structured logging (LOG_FORMAT=json)
+ * 3. Structured logging (format: "json" in config)
  * 4. Async file writer
+ * 5. Pipeline-based configuration
  */
 
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
 import { existsSync, readFileSync, unlinkSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
-import {
-  createLogger,
-  setLogLevel,
-  setLogFormat,
-  getLogFormat,
-  setOutputMode,
-  resetIds,
-  disableSpans,
-  enableSpans,
-  setTraceFilter,
-  setDebugFilter,
-  createFileWriter,
-  addWriter,
-  type FileWriter,
-} from "../src/index.ts"
+import { createLogger, resetIds, createFileWriter, type FileWriter } from "../src/index.ts"
 import { createConsoleMock } from "./helpers.ts"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const parseJSON = (s: string): Record<string, any> => JSON.parse(s) as Record<string, any>
 
+/** A writable that captures formatted output strings.
+ *  Uses a class so the pipeline recognizes it as a writable (not a config POJO). */
+class CaptureWriter {
+  lines: string[] = []
+  write(s: string): void {
+    this.lines.push(s)
+  }
+}
+
+function createCapture() {
+  const w = new CaptureWriter()
+  return { lines: w.lines, writer: w }
+}
+
 let consoleMock: ReturnType<typeof createConsoleMock>
 
 beforeEach(() => {
   resetIds()
-  setLogLevel("trace")
-  disableSpans()
-  setTraceFilter(null)
-  setDebugFilter(null)
-  setOutputMode("console")
-  setLogFormat("console")
   consoleMock = createConsoleMock()
 })
 
@@ -53,7 +48,7 @@ afterEach(() => {
 
 describe("lazy string interpolation", () => {
   test("accepts a function that returns a string", () => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     log.info?.(() => "lazy message")
 
     expect(consoleMock.output).toHaveLength(1)
@@ -62,7 +57,7 @@ describe("lazy string interpolation", () => {
 
   test("function is called when level is enabled", () => {
     const fn = vi.fn(() => "computed value")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     log.info?.(fn)
 
     expect(fn).toHaveBeenCalledTimes(1)
@@ -70,9 +65,8 @@ describe("lazy string interpolation", () => {
   })
 
   test("function is NOT called when level is disabled", () => {
-    setLogLevel("error")
     const fn = vi.fn(() => "expensive computation")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "error" }, console])
 
     // debug is disabled at error level, so fn should never be called
     log.debug?.(fn)
@@ -81,10 +75,10 @@ describe("lazy string interpolation", () => {
     expect(consoleMock.output).toHaveLength(0)
   })
 
-  test("function is NOT called when namespace is filtered out", () => {
-    setDebugFilter(["allowed"])
+  test("function is NOT called when level is disabled via optional chaining", () => {
     const fn = vi.fn(() => "expensive computation")
-    const log = createLogger("blocked")
+    // At "error" level, info is disabled — log.info is undefined, so ?.() skips entirely
+    const log = createLogger("test", [{ level: "error" }, console])
 
     log.info?.(fn)
 
@@ -93,7 +87,7 @@ describe("lazy string interpolation", () => {
   })
 
   test("string messages still work unchanged", () => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     log.info?.("plain string")
 
     expect(consoleMock.output).toHaveLength(1)
@@ -101,7 +95,7 @@ describe("lazy string interpolation", () => {
   })
 
   test("lazy messages work with data parameter", () => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     log.info?.(() => "lazy with data", { key: "value" })
 
     expect(consoleMock.output).toHaveLength(1)
@@ -110,7 +104,7 @@ describe("lazy string interpolation", () => {
   })
 
   test("lazy messages work with all log levels", () => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     log.trace?.(() => "trace lazy")
     log.debug?.(() => "debug lazy")
@@ -124,8 +118,7 @@ describe("lazy string interpolation", () => {
   })
 
   test("lazy messages work in JSON format", () => {
-    setLogFormat("json")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
     log.info?.(() => "json lazy")
 
     const parsed = parseJSON(consoleMock.output[0]!.message)
@@ -139,7 +132,7 @@ describe("lazy string interpolation", () => {
 
 describe("child loggers with context", () => {
   test("child({...}) creates logger with context fields", () => {
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace" }, console])
     const child = log.child({ requestId: "abc-123" })
 
     child.info?.("handling request")
@@ -150,22 +143,22 @@ describe("child loggers with context", () => {
   })
 
   test("child keeps parent namespace", () => {
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace" }, console])
     const child = log.child({ requestId: "abc" })
 
     expect(child.name).toBe("app")
   })
 
   test("child inherits parent props", () => {
-    const log = createLogger("app", { version: "1.0" })
-    const child = log.child({ requestId: "abc" })
+    const log = createLogger("app", [{ level: "trace" }, console])
+    const parent = log.child({ version: "1.0" })
+    const child = parent.child({ requestId: "abc" })
 
     expect(child.props).toEqual({ version: "1.0", requestId: "abc" })
   })
 
   test("child context is included in every log message", () => {
-    setLogFormat("json")
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace", format: "json" }, console])
     const child = log.child({ requestId: "abc" })
 
     child.info?.("first")
@@ -178,8 +171,7 @@ describe("child loggers with context", () => {
   })
 
   test("child context merges with per-call data", () => {
-    setLogFormat("json")
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace", format: "json" }, console])
     const child = log.child({ requestId: "abc" })
 
     child.info?.("msg", { extra: "data" })
@@ -190,8 +182,7 @@ describe("child loggers with context", () => {
   })
 
   test("nested children accumulate context", () => {
-    setLogFormat("json")
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace", format: "json" }, console])
     const child1 = log.child({ requestId: "abc" })
     const child2 = child1.child({ userId: "user-1" })
 
@@ -203,9 +194,9 @@ describe("child loggers with context", () => {
   })
 
   test("child context overrides parent props on conflict", () => {
-    setLogFormat("json")
-    const log = createLogger("app", { env: "prod" })
-    const child = log.child({ env: "test" })
+    const log = createLogger("app", [{ level: "trace", format: "json" }, console])
+    const parent = log.child({ env: "prod" })
+    const child = parent.child({ env: "test" })
 
     child.info?.("override")
 
@@ -214,15 +205,15 @@ describe("child loggers with context", () => {
   })
 
   test("deprecated string child still works", () => {
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace" }, console])
     const child = log.child("import")
 
     expect(child.name).toBe("app:import")
   })
 
   test("child can create spans", () => {
-    enableSpans()
-    const log = createLogger("app")
+    const { lines, writer } = createCapture()
+    const log = createLogger("app", [{ level: "trace" }, writer])
     const child = log.child({ requestId: "abc" })
 
     {
@@ -231,13 +222,13 @@ describe("child loggers with context", () => {
     }
 
     // Check span output includes the context
-    const spanOutput = consoleMock.output.find((o) => o.message.includes("SPAN"))
+    const spanOutput = lines.find((line) => line.includes("SPAN"))
     expect(spanOutput).toBeDefined()
-    expect(spanOutput!.message).toContain("requestId")
+    expect(spanOutput!).toContain("requestId")
   })
 
   test("child can create further children via .logger()", () => {
-    const log = createLogger("app")
+    const log = createLogger("app", [{ level: "trace" }, console])
     const child = log.child({ requestId: "abc" })
     const subLogger = child.logger("db")
 
@@ -247,13 +238,12 @@ describe("child loggers with context", () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Structured Logging (LOG_FORMAT=json)
+// 3. Structured Logging (format: "json")
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("LOG_FORMAT configuration", () => {
-  test("setLogFormat('json') produces JSON output", () => {
-    setLogFormat("json")
-    const log = createLogger("test")
+describe("JSON format configuration", () => {
+  test("format: 'json' in config produces JSON output", () => {
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
 
     log.info?.("json message", { key: "value" })
 
@@ -265,9 +255,8 @@ describe("LOG_FORMAT configuration", () => {
     expect(parsed.time).toBeDefined()
   })
 
-  test("setLogFormat('console') produces human-readable output", () => {
-    setLogFormat("console")
-    const log = createLogger("test")
+  test("console format produces human-readable output", () => {
+    const log = createLogger("test", [{ level: "trace", format: "console" }, console])
 
     log.info?.("console message")
 
@@ -279,21 +268,11 @@ describe("LOG_FORMAT configuration", () => {
     expect(() => parseJSON(output)).toThrow()
   })
 
-  test("getLogFormat returns current format", () => {
-    expect(getLogFormat()).toBe("console")
+  test("JSON format includes child props", () => {
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const child = log.child({ app: "myapp", version: "1.0" })
 
-    setLogFormat("json")
-    expect(getLogFormat()).toBe("json")
-
-    setLogFormat("console")
-    expect(getLogFormat()).toBe("console")
-  })
-
-  test("JSON format includes all props", () => {
-    setLogFormat("json")
-    const log = createLogger("test", { app: "myapp", version: "1.0" })
-
-    log.info?.("message")
+    child.info?.("message")
 
     const parsed = parseJSON(consoleMock.output[0]!.message)
     expect(parsed.app).toBe("myapp")
@@ -301,8 +280,7 @@ describe("LOG_FORMAT configuration", () => {
   })
 
   test("JSON format handles errors", () => {
-    setLogFormat("json")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
     const err = new Error("json error")
 
     log.error?.(err)
@@ -313,9 +291,7 @@ describe("LOG_FORMAT configuration", () => {
   })
 
   test("JSON format works with spans", () => {
-    setLogFormat("json")
-    enableSpans()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
 
     {
       using span = log.span("work")
@@ -338,8 +314,7 @@ describe("LOG_FORMAT configuration", () => {
   })
 
   test("JSON output has standard fields: time, level, name, msg", () => {
-    setLogFormat("json")
-    const log = createLogger("myapp")
+    const log = createLogger("myapp", [{ level: "trace", format: "json" }, console])
 
     log.info?.("request handled")
 
@@ -350,33 +325,6 @@ describe("LOG_FORMAT configuration", () => {
     expect(parsed).toHaveProperty("msg", "request handled")
     // time should be ISO format
     expect(new Date(parsed.time).toISOString()).toBe(parsed.time)
-  })
-
-  describe("LOG_FORMAT env var", () => {
-    let originalLogFormat: string | undefined
-
-    beforeEach(() => {
-      originalLogFormat = process.env.LOG_FORMAT
-    })
-
-    afterEach(() => {
-      if (originalLogFormat === undefined) {
-        delete process.env.LOG_FORMAT
-      } else {
-        process.env.LOG_FORMAT = originalLogFormat
-      }
-    })
-
-    test("LOG_FORMAT=json is respected at init time (tested via setLogFormat)", () => {
-      // The env var is read at module load time, so we test the API directly
-      setLogFormat("json")
-      const log = createLogger("test")
-
-      log.info?.("env json")
-
-      const parsed = parseJSON(consoleMock.output[0]!.message)
-      expect(parsed.msg).toBe("env json")
-    })
   })
 })
 
@@ -427,7 +375,6 @@ describe("createFileWriter", () => {
 
     writer.write("buffered line")
     // Not yet flushed (buffer is large, interval is long)
-    const before = existsSync(testFile) ? readFileSync(testFile, "utf-8") : ""
 
     writer.flush()
     const after = readFileSync(testFile, "utf-8")
@@ -459,18 +406,15 @@ describe("createFileWriter", () => {
     expect(content).not.toContain("after close")
   })
 
-  test("integrates with addWriter", () => {
-    writer = createFileWriter(testFile, { bufferSize: 1 })
-    const unsubscribe = addWriter((formatted) => writer!.write(formatted))
+  test("integrates with pipeline config via CaptureWriter", () => {
+    // In v2, writable objects (non-POJO with .write method) go in the config array
+    const capture = new CaptureWriter()
 
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, capture])
     log.info?.("writer integration")
 
-    writer.flush()
-    unsubscribe()
-
-    const content = readFileSync(testFile, "utf-8")
-    expect(content).toContain("writer integration")
+    expect(capture.lines).toHaveLength(1)
+    expect(capture.lines[0]).toContain("writer integration")
   })
 
   test("flushes on interval", async () => {
@@ -518,5 +462,146 @@ describe("createFileWriter", () => {
     const content = readFileSync(testFile, "utf-8")
     expect(content).toContain("first\n")
     expect(content).toContain("second\n")
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. Pipeline-based Configuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("pipeline-based configuration", () => {
+  test("writer receives formatted output", () => {
+    const { lines, writer } = createCapture()
+    const log = createLogger("test", [{ level: "trace" }, writer])
+
+    log.info?.("hello pipeline")
+
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain("hello pipeline")
+  })
+
+  test("level filtering works in config", () => {
+    const { lines, writer } = createCapture()
+    const log = createLogger("test", [{ level: "warn" }, writer])
+
+    log.debug?.("should be filtered")
+    log.info?.("should be filtered")
+    log.warn?.("should pass")
+    log.error?.("should pass")
+
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).toContain("should pass")
+  })
+
+  test("namespace filtering works in config", () => {
+    const { lines, writer } = createCapture()
+
+    const log1 = createLogger("myapp", [{ level: "trace", ns: "myapp" }, writer])
+    const log2 = createLogger("other", [{ level: "trace", ns: "myapp" }, writer])
+
+    log1.info?.("included")
+    log2.info?.("excluded")
+
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain("included")
+  })
+
+  test("namespace exclusion pattern works", () => {
+    const { lines, writer } = createCapture()
+
+    const log = createLogger("myapp", [{ level: "trace", ns: ["*", "-myapp:sql"] }, writer])
+    const sqlChild = log.logger("sql")
+
+    log.info?.("app message")
+    sqlChild.info?.("sql message")
+
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain("app message")
+  })
+
+  test("omitting console suppresses console output", () => {
+    const { lines, writer } = createCapture()
+    const log = createLogger("test", [{ level: "trace" }, writer])
+
+    log.info?.("only to writer")
+
+    // Writer gets output
+    expect(lines).toHaveLength(1)
+    // Console does not (consoleMock captures console.* calls)
+    expect(consoleMock.output).toHaveLength(0)
+  })
+
+  test("multiple outputs receive events", () => {
+    const { lines: lines1, writer: writer1 } = createCapture()
+    const { lines: lines2, writer: writer2 } = createCapture()
+    const log = createLogger("test", [{ level: "trace" }, writer1, writer2])
+
+    log.info?.("broadcast")
+
+    expect(lines1).toHaveLength(1)
+    expect(lines2).toHaveLength(1)
+    expect(lines1[0]).toContain("broadcast")
+    expect(lines2[0]).toContain("broadcast")
+  })
+
+  test("JSON format works with writer", () => {
+    const { lines, writer } = createCapture()
+    const log = createLogger("test", [{ level: "trace", format: "json" }, writer])
+
+    log.info?.("json via writer", { key: "value" })
+
+    const parsed = parseJSON(lines[0]!)
+    expect(parsed.msg).toBe("json via writer")
+    expect(parsed.key).toBe("value")
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Deprecated v1 API throws
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("deprecated v1 global setters still work", () => {
+  test("setLogLevel sets LOG_LEVEL env var", () => {
+    const { setLogLevel, getLogLevel } = require("../src/index.ts") as typeof import("../src/index.ts")
+    setLogLevel("debug")
+    expect(getLogLevel()).toBe("debug")
+    setLogLevel("info")
+  })
+
+  test("enableSpans/disableSpans toggle TRACE env var", () => {
+    const { enableSpans, disableSpans, spansAreEnabled } = require("../src/index.ts") as typeof import("../src/index.ts")
+    enableSpans()
+    expect(spansAreEnabled()).toBe(true)
+    disableSpans()
+    expect(spansAreEnabled()).toBe(false)
+  })
+
+  test("setDebugFilter sets DEBUG env var", () => {
+    const { setDebugFilter, getDebugFilter } = require("../src/index.ts") as typeof import("../src/index.ts")
+    setDebugFilter(["myapp", "-myapp:sql"])
+    expect(getDebugFilter()).toEqual(["myapp", "-myapp:sql"])
+    setDebugFilter(null)
+    expect(getDebugFilter()).toBeNull()
+  })
+
+  test("setLogFormat sets LOG_FORMAT env var", () => {
+    const { setLogFormat, getLogFormat } = require("../src/index.ts") as typeof import("../src/index.ts")
+    setLogFormat("json")
+    expect(getLogFormat()).toBe("json")
+    setLogFormat("console")
+  })
+
+  test("addWriter registers and unregisters", () => {
+    const { addWriter } = require("../src/index.ts") as typeof import("../src/index.ts")
+    const calls: string[] = []
+    const unsub = addWriter((formatted) => calls.push(formatted))
+    expect(typeof unsub).toBe("function")
+    unsub()
+  })
+
+  test("setSuppressConsole toggles runtime state", () => {
+    const { setSuppressConsole } = require("../src/index.ts") as typeof import("../src/index.ts")
+    setSuppressConsole(true)
+    setSuppressConsole(false)
   })
 })

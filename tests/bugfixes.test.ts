@@ -8,14 +8,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
 import {
   createLogger,
-  enableSpans,
-  disableSpans,
-  setLogLevel,
-  setLogFormat,
-  setOutputMode,
   resetIds,
-  setTraceFilter,
-  setDebugFilter,
   startCollecting,
   stopCollecting,
   getCollectedSpans,
@@ -28,18 +21,14 @@ let consoleMock: ReturnType<typeof createConsoleMock>
 
 beforeEach(() => {
   resetIds()
-  setLogLevel("trace")
-  disableSpans()
-  setTraceFilter(null)
-  setDebugFilter(null)
-  setOutputMode("console")
-  setLogFormat("console")
   disableContextPropagation()
   clearCollectedSpans()
+  delete process.env.TRACE
   consoleMock = createConsoleMock()
 })
 
 afterEach(() => {
+  delete process.env.TRACE
   vi.restoreAllMocks()
 })
 
@@ -52,7 +41,7 @@ afterEach(() => {
 describe("span collection (km-loggily.span-collection-broken)", () => {
   test("startCollecting + span disposal populates collectedSpans", () => {
     startCollecting()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     {
       using span = log.span("work")
@@ -68,7 +57,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
 
   test("multiple spans are collected", () => {
     startCollecting()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     {
       using span = log.span("a")
@@ -86,7 +75,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
 
   test("nested spans are all collected", () => {
     startCollecting()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     const parent = log.span("parent")
     const child = parent.span("child")
@@ -99,7 +88,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
 
   test("stopCollecting returns collected spans and stops collection", () => {
     startCollecting()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     {
       using span = log.span("before")
@@ -118,7 +107,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
 
   test("collected spans have correct attributes", () => {
     startCollecting()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     {
       using span = log.span("work")
@@ -132,9 +121,9 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
   })
 
   test("collection works even when spans output is disabled", () => {
-    disableSpans() // spans output disabled, but collection should still work
+    // No TRACE env var — spans output disabled, but collection should still work
     startCollecting()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     {
       using span = log.span("silent")
@@ -146,7 +135,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
 
   test("clearCollectedSpans empties the array", () => {
     startCollecting()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     {
       using span = log.span("work")
@@ -166,7 +155,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
 
 describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   test("bigint in data does not throw (console format)", () => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     expect(() => {
       log.info?.("bigint test", { value: BigInt(12345678901234567890n) })
     }).not.toThrow()
@@ -176,8 +165,7 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("bigint in data does not throw (JSON format)", () => {
-    setLogFormat("json")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
     expect(() => {
       log.info?.("bigint test", { value: BigInt(42n) })
     }).not.toThrow()
@@ -187,7 +175,7 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("symbol in data does not throw (console format)", () => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     expect(() => {
       log.info?.("symbol test", { key: Symbol("mySymbol") })
     }).not.toThrow()
@@ -196,15 +184,14 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("symbol in data does not throw (JSON format)", () => {
-    setLogFormat("json")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
     expect(() => {
       log.info?.("symbol test", { key: Symbol("mySymbol") })
     }).not.toThrow()
   })
 
   test("circular reference in data does not throw (console format)", () => {
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
     const obj: Record<string, unknown> = { a: 1 }
     obj.self = obj
 
@@ -217,8 +204,7 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("circular reference in data does not throw (JSON format)", () => {
-    setLogFormat("json")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
     const obj: Record<string, unknown> = { a: 1 }
     obj.self = obj
 
@@ -230,8 +216,7 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("Error object in data is serialized with message and stack", () => {
-    setLogFormat("json")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
     const err = new Error("test error")
 
     expect(() => {
@@ -246,8 +231,7 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("nested circular references are handled", () => {
-    setLogFormat("json")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
     const a: Record<string, unknown> = { name: "a" }
     const b: Record<string, unknown> = { name: "b", ref: a }
     a.ref = b
@@ -258,8 +242,7 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("mixed problematic types in one data object", () => {
-    setLogFormat("json")
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
     const circular: Record<string, unknown> = { x: 1 }
     circular.self = circular
 
@@ -289,7 +272,7 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
 describe("span context non-LIFO end (km-loggily.span-context-corrupt)", () => {
   test("ending inner span before outer restores outer context", () => {
     enableContextPropagation()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     const outer = log.span("outer")
     const inner = outer.span("inner")
@@ -308,7 +291,7 @@ describe("span context non-LIFO end (km-loggily.span-context-corrupt)", () => {
 
   test("non-LIFO end order does not corrupt context", () => {
     enableContextPropagation()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     const A = log.span("A")
     const B = A.span("B")
@@ -335,7 +318,7 @@ describe("span context non-LIFO end (km-loggily.span-context-corrupt)", () => {
 
   test("three-level LIFO correctly restores each level", () => {
     enableContextPropagation()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     const A = log.span("A")
     expect(getCurrentSpan()!.spanId).toBe(A.spanData.id)
@@ -361,7 +344,7 @@ describe("span context non-LIFO end (km-loggily.span-context-corrupt)", () => {
 
   test("sibling spans maintain correct context", () => {
     enableContextPropagation()
-    const log = createLogger("test")
+    const log = createLogger("test", [{ level: "trace" }, console])
 
     const parent = log.span("parent")
 

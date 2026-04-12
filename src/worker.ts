@@ -43,8 +43,6 @@
 import {
   createLogger,
   createSpanDataProxy,
-  enableSpans,
-  writeSpan,
   type ConditionalLogger,
   type LazyMessage,
   type Logger,
@@ -453,31 +451,41 @@ export function createWorkerLogger(
     debug: (msg, data) => log("debug", msg, data),
     info: (msg, data) => log("info", msg, data),
     warn: (msg, data) => log("warn", msg, data),
-    error: (msgOrError: LazyMessage | Error, data?: Record<string, unknown>) => {
+    error: (msgOrError: LazyMessage | Error, dataOrMsg?: Record<string, unknown> | string, extraData?: Record<string, unknown>) => {
       if (msgOrError instanceof Error) {
-        log("error", msgOrError.message, {
-          ...data,
-          error_type: msgOrError.name,
-          error_stack: msgOrError.stack,
-          error_code: (msgOrError as NodeJS.ErrnoException).code,
-        })
+        if (typeof dataOrMsg === "string") {
+          log("error", dataOrMsg, {
+            ...extraData,
+            error_type: msgOrError.name,
+            error_message: msgOrError.message,
+            error_stack: msgOrError.stack,
+            error_code: (msgOrError as NodeJS.ErrnoException).code,
+          })
+        } else {
+          log("error", msgOrError.message, {
+            ...(dataOrMsg as Record<string, unknown>),
+            error_type: msgOrError.name,
+            error_stack: msgOrError.stack,
+            error_code: (msgOrError as NodeJS.ErrnoException).code,
+          })
+        }
       } else {
-        log("error", msgOrError, data)
+        log("error", msgOrError, dataOrMsg as Record<string, unknown>)
       }
     },
 
-    logger(childNamespace?: string, childProps?: Record<string, unknown>): Logger {
+    logger(childNamespace?: string, childProps?: Record<string, unknown>): ConditionalLogger {
       const fullNamespace = childNamespace ? `${namespace}:${childNamespace}` : namespace
-      return createWorkerLogger(postMessage, fullNamespace, { ...props, ...childProps }, options)
+      return createWorkerLogger(postMessage, fullNamespace, { ...props, ...childProps }, options) as unknown as ConditionalLogger
     },
 
     span: createSpan,
 
-    child(context: Record<string, unknown> | string): Logger {
+    child(context: Record<string, unknown> | string): ConditionalLogger {
       if (typeof context === "string") {
         return this.logger(context)
       }
-      return createWorkerLogger(postMessage, namespace, { ...props, ...context }, options)
+      return createWorkerLogger(postMessage, namespace, { ...props, ...context }, options) as unknown as ConditionalLogger
     },
 
     end(): void {
@@ -602,7 +610,7 @@ export function createWorkerConsoleHandler(
 // ============ Full Logger Handler ============
 
 export interface WorkerLogHandlerOptions {
-  /** Enable span output (default: uses spansAreEnabled()) */
+  /** @deprecated Span output is now controlled by TRACE env var */
   enableSpans?: boolean
 }
 
@@ -633,11 +641,6 @@ export interface WorkerLogHandlerOptions {
 export function createWorkerLogHandler(options: WorkerLogHandlerOptions = {}): (message: WorkerMessage) => void {
   const loggers = new Map<string, ConditionalLogger>()
 
-  // Enable spans if requested
-  if (options.enableSpans) {
-    enableSpans()
-  }
-
   function getLogger(namespace: string): ConditionalLogger {
     let logger = loggers.get(namespace)
     if (!logger) {
@@ -656,16 +659,10 @@ export function createWorkerLogHandler(options: WorkerLogHandlerOptions = {}): (
       const logger = getLogger(message.namespace)
       dispatchToLogger(logger, message.level, message.message, message.data)
     } else if (isWorkerSpanMessage(message)) {
-      // Handle span events
-      // For span end events, output the span with original worker timing data
       if (message.event === "end") {
-        writeSpan(message.namespace, message.duration ?? 0, {
-          span_id: message.spanId,
-          trace_id: message.traceId,
-          parent_id: message.parentId,
-          ...message.props,
-          ...message.spanData,
-        })
+        const logger = getLogger(message.namespace)
+        const span = logger.span?.(undefined, { ...message.props, ...message.spanData })
+        span?.end()
       }
       // Start events are informational only on main thread
       // (the actual timing happens in the worker)

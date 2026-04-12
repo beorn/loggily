@@ -10,14 +10,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
 import {
   createLogger,
-  enableSpans,
-  disableSpans,
-  setLogLevel,
-  setLogFormat,
-  setOutputMode,
   resetIds,
-  setTraceFilter,
-  setDebugFilter,
   setIdFormat,
   getIdFormat,
   traceparent,
@@ -38,14 +31,26 @@ const parseJSON = (s: string): Record<string, any> => JSON.parse(s) as Record<st
 
 let consoleMock: ReturnType<typeof createConsoleMock>
 
+// Save/restore env vars
+let savedEnv: Record<string, string | undefined>
+
 beforeEach(() => {
   resetIds()
-  setLogLevel("trace")
-  disableSpans()
-  setTraceFilter(null)
-  setDebugFilter(null)
-  setOutputMode("console")
-  setLogFormat("console")
+  savedEnv = {
+    TRACE: process.env.TRACE,
+    DEBUG: process.env.DEBUG,
+    LOG_LEVEL: process.env.LOG_LEVEL,
+    LOG_FORMAT: process.env.LOG_FORMAT,
+    TRACE_FORMAT: process.env.TRACE_FORMAT,
+    NODE_ENV: process.env.NODE_ENV,
+  }
+  // Clean env so tests start from a known state
+  delete process.env.TRACE
+  delete process.env.DEBUG
+  delete process.env.LOG_FORMAT
+  delete process.env.TRACE_FORMAT
+  delete process.env.NODE_ENV
+  process.env.LOG_LEVEL = "trace"
   setIdFormat("simple")
   setSampleRate(1.0)
   disableContextPropagation()
@@ -54,6 +59,14 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  // Restore env
+  for (const [key, val] of Object.entries(savedEnv)) {
+    if (val === undefined) {
+      delete process.env[key]
+    } else {
+      process.env[key] = val
+    }
+  }
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -352,7 +365,7 @@ describe("sampling", () => {
   })
 
   test("sample rate 0.0 suppresses all span output", () => {
-    enableSpans()
+    process.env.TRACE = "1"
     setSampleRate(0.0)
     const log = createLogger("test")
 
@@ -364,7 +377,7 @@ describe("sampling", () => {
   })
 
   test("sample rate 1.0 keeps all span output", () => {
-    enableSpans()
+    process.env.TRACE = "1"
     setSampleRate(1.0)
     const log = createLogger("test")
 
@@ -376,7 +389,7 @@ describe("sampling", () => {
   })
 
   test("sampling is head-based: decided at trace creation", () => {
-    enableSpans()
+    process.env.TRACE = "1"
     setSampleRate(0.0)
     const log = createLogger("test")
 
@@ -395,7 +408,7 @@ describe("sampling", () => {
   })
 
   test("child spans are always sampled when parent is sampled", () => {
-    enableSpans()
+    process.env.TRACE = "1"
     setSampleRate(1.0)
     const log = createLogger("test")
 
@@ -412,7 +425,7 @@ describe("sampling", () => {
   })
 
   test("partial sample rate produces some output", () => {
-    enableSpans()
+    process.env.TRACE = "1"
     setSampleRate(0.5)
 
     // Use seeded random for deterministic test
@@ -456,7 +469,7 @@ describe("sampling", () => {
 describe("auto-tagging with context", () => {
   test("logs include trace_id and span_id when context is active", () => {
     enableContextPropagation()
-    setLogFormat("json")
+    process.env.LOG_FORMAT = "json"
     const log = createLogger("test")
 
     {
@@ -481,7 +494,7 @@ describe("auto-tagging with context", () => {
 
   test("logs do NOT include trace_id/span_id without context propagation", () => {
     // Context propagation disabled by default
-    setLogFormat("json")
+    process.env.LOG_FORMAT = "json"
     const log = createLogger("test")
 
     {
@@ -506,7 +519,7 @@ describe("auto-tagging with context", () => {
 
   test("logs outside a span have no trace tags", () => {
     enableContextPropagation()
-    setLogFormat("json")
+    process.env.LOG_FORMAT = "json"
     const log = createLogger("test")
 
     log.info?.("outside span")
@@ -533,7 +546,7 @@ describe("auto-tagging with context", () => {
 
   test("per-call data overrides context tags", () => {
     enableContextPropagation()
-    setLogFormat("json")
+    process.env.LOG_FORMAT = "json"
     const log = createLogger("test")
 
     {
@@ -582,9 +595,9 @@ describe("integration", () => {
 
   test("sampling + context propagation", () => {
     enableContextPropagation()
-    enableSpans()
+    process.env.TRACE = "1"
     setSampleRate(1.0)
-    setLogFormat("json")
+    process.env.LOG_FORMAT = "json"
     const log = createLogger("test")
 
     {

@@ -1,30 +1,48 @@
 /**
- * loggily browser entry point.
+ * loggily v2 browser entry point.
  *
  * Re-exports the full logger API except createFileWriter (which requires node:fs).
  * Bundlers resolve this via the "browser" condition in package.json exports.
  */
 
-// Re-export everything from core logger
 export {
+  // Core API
+  createLogger,
+
   // Types
-  type OutputLogLevel,
-  type LogLevel,
-  type LazyMessage,
-  type SpanData,
+  type ConditionalLogger,
   type Logger,
   type SpanLogger,
-  type OutputMode,
+  type SpanData,
+  type LazyMessage,
+  type LazyProps,
+  type Event,
+  type LogEvent,
+  type SpanEvent,
+  type Stage,
+  type LogLevel,
+  type OutputLogLevel,
   type LogFormat,
-  type ConditionalLogger,
+  type OutputMode,
 
-  // Writers
-  addWriter,
-  setSuppressConsole,
-  setOutputMode,
-  getOutputMode,
+  // Constants
+  LOG_LEVEL_PRIORITY,
 
-  // Configuration
+  // Utilities
+  safeStringify,
+  resetIds,
+
+  // Span collection
+  startCollecting,
+  stopCollecting,
+  getCollectedSpans,
+  clearCollectedSpans,
+
+  // Span metrics
+  type SpanRecord,
+  type SpanRecorder,
+
+  // Deprecated v1 API (throws with migration instructions)
   setLogLevel,
   getLogLevel,
   enableSpans,
@@ -36,18 +54,11 @@ export {
   getDebugFilter,
   setLogFormat,
   getLogFormat,
-
-  // ID management
-  resetIds,
-
-  // Span collection
-  startCollecting,
-  stopCollecting,
-  getCollectedSpans,
-  clearCollectedSpans,
-
-  // Logger creation
-  createLogger,
+  setSuppressConsole,
+  setOutputMode,
+  getOutputMode,
+  addWriter,
+  writeSpan,
 } from "./core.js"
 
 // Tracing utilities (runtime-agnostic, work in browser)
@@ -61,12 +72,15 @@ export {
   getSampleRate,
 } from "./tracing.js"
 
+// Pipeline builder for power users
+export { buildPipeline, defaultPipeline, type Pipeline } from "./pipeline.js"
+
 // File writer types (exported for type compatibility, but the function throws)
 export type { FileWriterOptions, FileWriter } from "./file-writer.js"
 
 /** @throws Always — createFileWriter is not available in browser environments */
 export function createFileWriter(): never {
   throw new Error(
-    "createFileWriter is not available in browser environments. Use addWriter() with a custom transport instead.",
+    "createFileWriter is not available in browser environments. Use a writable sink in the config array instead.",
   )
 }
