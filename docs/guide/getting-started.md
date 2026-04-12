@@ -32,6 +32,20 @@ const log = createLogger("myapp")
 
 The string argument is the **namespace** -- it appears in every log message and is used for filtering.
 
+The optional second argument is a **config array** that controls output and behavior:
+
+```typescript
+const log = createLogger("myapp", [
+  { level: "debug" },
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
+```
+
+In the config array: objects configure (`{ level, ns, format }`), arrays branch into sub-pipelines, and values write output. Pass `console` for terminal output, or `{ file: "/path" }` for file output.
+
+When no config array is provided, loggily reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, and `NODE_ENV` from the environment.
+
 ## Log Messages
 
 Every log method accepts a message string and optional structured data:
@@ -41,9 +55,12 @@ log.info?.("server started", { port: 3000 })
 log.debug?.("cache hit", { key: "user:42", ttl: 300 })
 log.warn?.("rate limited", { remaining: 0, resetIn: 60 })
 log.error?.(new Error("connection lost"))
+log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 ```
 
 Notice the `?.` -- this is intentional. When a log level is disabled, the method returns `undefined`, and optional chaining skips the entire call including argument evaluation. This is the core performance feature of Loggily.
+
+The `error` method has an overload: `log.error?.(err, "message", data?)` lets you provide a custom message alongside an Error object.
 
 ## Log Levels
 
@@ -58,7 +75,7 @@ From most to least verbose:
 | `error`  | Failures              | On      |
 | `silent` | Disable all output    | --      |
 
-Control via environment variable or programmatically:
+Control via environment variable or in the config array:
 
 ```bash
 LOG_LEVEL=debug bun run app     # Enable debug and above
@@ -66,8 +83,7 @@ LOG_LEVEL=error bun run app     # Only errors
 ```
 
 ```typescript
-import { setLogLevel } from "loggily"
-setLogLevel("debug")
+const log = createLogger("myapp", [{ level: "debug" }, console])
 ```
 
 ## Child Loggers
@@ -83,13 +99,7 @@ db.info?.("connected", { host: "localhost" })
 // 14:32:15 INFO myapp:db connected {host: "localhost"}
 ```
 
-Props are inherited by children:
-
-```typescript
-const log = createLogger("myapp", { version: "2.1" })
-const db = log.logger("db")
-// db.props includes { version: "2.1" }
-```
+Both `.logger()` and `.child()` return `ConditionalLogger`, which supports the same `?.` pattern.
 
 ## Context Loggers
 
@@ -126,12 +136,21 @@ See [Spans](/guide/spans) for the full guide.
 
 ## Namespace Filtering
 
-Filter output by namespace, just like the `debug` package:
+Filter output by namespace, compatible with the same patterns as the `debug` package:
 
 ```bash
 DEBUG=myapp bun run app                  # Only myapp and children
 DEBUG='myapp,-myapp:noisy' bun run app   # Exclude noisy sub-namespace
 DEBUG='*' bun run app                    # Everything
+```
+
+You can also use the `ns` key in the config array:
+
+```typescript
+const log = createLogger("myapp", [
+  { ns: "myapp:db,-myapp:db:verbose" },
+  console,
+])
 ```
 
 ## Output Format
@@ -150,6 +169,33 @@ NODE_ENV=production bun run app
 # Explicit
 LOG_FORMAT=json bun run app
 ```
+
+Or set the format in the config array:
+
+```typescript
+const log = createLogger("myapp", [{ format: "json" }, console])
+```
+
+## Pipeline Model
+
+The v2 config array is a composable pipeline. Elements are processed in order:
+
+- **Objects** (`{ level, ns, format }`) configure the scope for subsequent elements
+- **`console`** adds console output at the current scope
+- **`{ file: "/path" }`** adds file output (with optional `level`, `ns`, `format` overrides)
+- **Functions** `(event) => event | null | void` are custom stages (transform, filter, or enrich events)
+- **Arrays** create branches with their own scope
+
+```typescript
+const log = createLogger("myapp", [
+  { level: "debug" },
+  console,
+  { file: "/tmp/errors.log", level: "error", format: "json" },
+  [{ ns: "myapp:metrics" }, { file: "/tmp/metrics.log", format: "json" }],
+])
+```
+
+For power users, `buildPipeline()` and `defaultPipeline()` are exported for direct pipeline construction.
 
 ## Next Steps
 

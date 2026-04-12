@@ -15,17 +15,17 @@ hero:
 
 features:
   - title: One Unified Pipeline
-    details: "Most projects juggle debug for dev output, Pino for production logs, and a tracing SDK for timings — three configs, three formats, three APIs. Loggily integrates all three: one namespace tree, one output pipeline, one import."
+    details: "Most projects juggle debug for dev output, a JSON logger for production, and a tracing SDK for timings — three configs, three formats, three APIs. Loggily integrates all three: one namespace tree, one output pipeline, one import."
   - title: "Near-Zero Cost via ?."
     details: "Optional chaining skips the entire call — including argument evaluation — when a level is disabled. In benchmarks with expensive disabled log arguments, ~22x faster than a conventional noop logger."
   - title: "Debug-Style Namespaces"
-    details: "Namespace filtering with DEBUG=myapp,-myapp:noisy. Uses native console methods so source lines stay clickable in DevTools. Same patterns as the debug package."
+    details: "Namespace filtering with DEBUG=myapp,-myapp:noisy. Uses native console methods so source lines stay clickable in DevTools. Compatible with the same patterns as the debug package."
   - title: "Structured Logs"
     details: "Colorized console with timestamps and clickable source lines in development. Structured JSON in production. Same code, same API — output format switches automatically."
   - title: "Lightweight Spans"
     details: "Built-in spans with automatic timing, parent-child tracking, and trace IDs. Uses TC39 Explicit Resource Management (using) for automatic cleanup."
-  - title: "Automatic Async Context"
-    details: "Enable AsyncLocalStorage-based propagation and every log in a request's async chain inherits trace and span IDs — no need to pass loggers through every function."
+  - title: "Composable Config Pipeline"
+    details: "Configure with a single array: objects set options, arrays branch, values write. Pass console for terminal output, { file } for file output, or functions for custom stages."
   - title: "~3KB, Zero Dependencies"
     details: "No external dependencies. Native TypeScript, ESM-only. Runs on Node.js 23.6+, Bun 1.0+, and browsers."
 ---
@@ -57,7 +57,7 @@ yarn add loggily
 ```typescript
 import { createLogger } from "loggily"
 
-const log = createLogger("myapp")
+const log = createLogger("myapp", [{ level: "debug" }, console])
 
 // ?. skips the entire call — including argument evaluation — when the level is disabled
 log.info?.("server started", { port: 3000 })

@@ -33,7 +33,7 @@ log.debug?.(() => {
   const state = gatherComplexState()
   return `state: ${JSON.stringify(state)}`
 })
-// Function only called when debug is enabled
+// Function never called when debug is disabled
 ```
 
 Type: `LazyMessage = string | (() => string)`
@@ -46,20 +46,24 @@ log.trace?.(() => `verbose: ${expensiveComputation()}`, { extra: "data" })
 
 ## Dynamic Levels
 
-The logger responds to level changes in real-time:
+The logger responds to level changes via the pipeline. With the default pipeline (no config array), levels are read from environment variables dynamically:
 
 ```typescript
-import { createLogger, setLogLevel } from "loggily"
+import { createLogger } from "loggily"
 
+// Default pipeline reads LOG_LEVEL from env
 const log = createLogger("myapp")
+```
 
-setLogLevel("error")
-log.debug // undefined
-log.info // undefined
+With a config array, the level is set at creation time:
 
-setLogLevel("debug")
-log.debug // function (now available)
-log.info // function
+```typescript
+const log = createLogger("myapp", [{ level: "debug" }, console])
+log.debug // function (available)
+
+const log2 = createLogger("myapp", [{ level: "error" }, console])
+log2.debug // undefined
+log2.info  // undefined
 ```
 
 ## TypeScript Enforcement

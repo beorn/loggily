@@ -1,28 +1,48 @@
-# Writers
+# Output
 
-## addWriter
+## v2 Config Array (recommended)
+
+In v2, output destinations are configured in the config array passed to `createLogger`:
 
 ```typescript
-function addWriter(writer: (formatted: string, level: string) => void): () => void
+import { createLogger } from "loggily"
+
+// Console + file output
+const log = createLogger("myapp", [
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
+
+// Errors-only file + console for everything
+const log = createLogger("myapp", [
+  console,
+  { file: "/tmp/errors.log", level: "error", format: "json" },
+])
+
+// Custom writable stream
+const log = createLogger("myapp", [
+  { write: (s: string) => process.stderr.write(s + "\n") },
+])
 ```
 
-Subscribe to all formatted log output. Returns an unsubscribe function.
+### File Sink Options
+
+When using `{ file: "/path" }` in the config array, you can override scope settings:
+
+| Key      | Type                   | Description                 |
+| -------- | ---------------------- | --------------------------- |
+| `file`   | `string`               | Output file path (required) |
+| `level`  | `LogLevel` (optional)  | Override level for this sink|
+| `ns`     | `string` (optional)    | Override namespace filter   |
+| `format` | `LogFormat` (optional) | Override format for this sink|
+
+## createFileWriter (low-level)
+
+For direct file writing outside the config array:
 
 ```typescript
-const lines: string[] = []
-const unsub = addWriter((formatted, level) => {
-  lines.push(formatted)
-})
+import { createFileWriter } from "loggily"
 
-// Later:
-unsub()
-```
-
-Writers receive output regardless of `setOutputMode()` or `setSuppressConsole()` settings.
-
-## createFileWriter
-
-```typescript
 function createFileWriter(path: string, options?: FileWriterOptions): FileWriter
 ```
 
@@ -43,23 +63,6 @@ Create a buffered file writer that flushes automatically.
 | `flush()`     | Write buffer to disk immediately      |
 | `close()`     | Flush remaining buffer and close file |
 
-### Example
-
-```typescript
-import { createFileWriter, addWriter } from "loggily"
-
-const writer = createFileWriter("/tmp/app.log", {
-  bufferSize: 8192,
-  flushInterval: 200,
-})
-
-const unsub = addWriter((formatted) => writer.write(formatted))
-
-// On shutdown:
-unsub()
-writer.close()
-```
-
 ### Safety
 
 - The flush interval timer is `unref()`'d so it won't keep the process alive
@@ -67,3 +70,17 @@ writer.close()
 - `close()` removes the exit handler and clears the interval
 - Multiple `close()` calls are safe (idempotent)
 - `write()` after `close()` is silently ignored
+
+## Deprecated v1 Writer API
+
+```typescript
+// Deprecated — use { file } in config array or custom stage functions instead
+import { addWriter } from "loggily"
+
+const unsub = addWriter((formatted: string, level: string) => {
+  // receives formatted output
+})
+unsub() // unsubscribe
+```
+
+The `addWriter` function still works but is deprecated. Use `{ file }` in the config array for file output, or custom stage functions for custom routing.

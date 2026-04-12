@@ -3,14 +3,23 @@
 ## createLogger
 
 ```typescript
-function createLogger(name: string, props?: Record<string, unknown>): ConditionalLogger
+function createLogger(name: string, config?: unknown[]): ConditionalLogger
 ```
 
 Create a conditional logger. Disabled log levels return `undefined` -- use `?.` to skip argument evaluation when disabled.
 
+The optional second argument is a config array: objects configure (`{ level, ns, format }`), arrays branch, values write.
+
 ```typescript
-const log = createLogger("myapp", { version: "2.1" })
-log.info?.("started")
+// Zero config (reads LOG_LEVEL, DEBUG, LOG_FORMAT from env)
+const log = createLogger("myapp")
+
+// With config array
+const log = createLogger("myapp", [
+  { level: "debug" },
+  console,
+  { file: "/tmp/app.log", level: "error", format: "json" },
+])
 ```
 
 ## Logger Methods
@@ -25,15 +34,16 @@ log.debug?.("debugging", { state: "..." })
 log.info?.("normal operation")
 log.warn?.("recoverable issue")
 log.error?.(new Error("failed"))
+log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 log.error?.("manual error", { code: "ETIMEOUT" })
 ```
 
 ### Child Creation
 
 ```typescript
-// Extend namespace, inherit props
+// Extend namespace
 const db = log.logger("db", { pool: "primary" })
-// namespace: "myapp:db", props: { version: "2.1", pool: "primary" }
+// namespace: "myapp:db"
 
 // Add context to every message (same namespace)
 const req = log.child({ requestId: "abc" })
@@ -44,6 +54,8 @@ const req = log.child({ requestId: "abc" })
   span.spanData.count = 42
 }
 ```
+
+Both `.logger()` and `.child()` return `ConditionalLogger`.
 
 ### Manual Span End
 
@@ -58,7 +70,7 @@ try {
 
 ## ConditionalLogger
 
-The return type of `createLogger()`. Log methods are possibly `undefined`:
+The return type of `createLogger()`, `.logger()`, and `.child()`. Log methods are possibly `undefined`:
 
 ```typescript
 interface ConditionalLogger {
@@ -68,10 +80,14 @@ interface ConditionalLogger {
   debug?: (msg: LazyMessage, data?: Record<string, unknown>) => void
   info?: (msg: LazyMessage, data?: Record<string, unknown>) => void
   warn?: (msg: LazyMessage, data?: Record<string, unknown>) => void
-  error?: (msg: LazyMessage | Error, data?: Record<string, unknown>) => void
-  logger(ns?: string, props?: Record<string, unknown>): Logger
-  span(ns?: string, props?: Record<string, unknown>): SpanLogger
-  child(context: Record<string, unknown>): Logger
+  error?: {
+    (msg: LazyMessage, data?: Record<string, unknown>): void
+    (error: Error, data?: Record<string, unknown>): void
+    (error: Error, message: string, data?: Record<string, unknown>): void
+  }
+  logger(ns?: string, props?: Record<string, unknown>): ConditionalLogger
+  span(ns?: string, props?: LazyProps): SpanLogger
+  child(context: Record<string, unknown>): ConditionalLogger
   end(): void
 }
 ```

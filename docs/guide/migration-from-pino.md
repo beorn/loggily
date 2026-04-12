@@ -4,17 +4,18 @@ Step-by-step guide for migrating from Pino to Loggily.
 
 ## Why Migrate?
 
-| Feature                   | Pino                   | Loggily                       |
-| ------------------------- | ---------------------- | ----------------------------- |
-| Log levels                | Yes (7 levels)         | Yes (5 levels + silent)       |
-| Structured data           | Yes (JSON)             | Yes (JSON + pretty console)   |
-| Disabled call overhead    | ~0.5ns (noop)          | ~2.5ns (?. proxy)             |
-| Disabled + expensive args | 129ns (args evaluated) | **3.6ns (args skipped)**      |
-| Built-in spans/tracing    | No                     | Yes (with `using` keyword)    |
-| Child loggers             | Yes                    | Yes                           |
-| Pretty print              | Via pino-pretty        | Built-in                      |
-| Bundle size               | ~14KB + transports     | ~3KB                          |
-| Browser support           | Via pino/browser       | Built-in (conditional export) |
+| Feature                   | Pino                   | Loggily                        |
+| ------------------------- | ---------------------- | ------------------------------ |
+| Log levels                | Yes (7 levels)         | Yes (5 levels + silent)        |
+| Structured data           | Yes (JSON)             | Yes (JSON + pretty console)    |
+| Disabled call overhead    | ~0.5ns (noop)          | ~2.5ns (?. proxy)              |
+| Disabled + expensive args | 129ns (args evaluated) | **3.6ns (args skipped)**       |
+| Built-in spans/tracing    | No                     | Yes (with `using` keyword)     |
+| Child loggers             | Yes                    | Yes                            |
+| Pretty print              | Via pino-pretty        | Built-in                       |
+| Bundle size               | ~14KB + transports     | ~3KB                           |
+| Browser support           | Via pino/browser       | Built-in (conditional export)  |
+| Config model              | Options object         | Composable config array        |
 
 ## Quick Migration
 
@@ -35,7 +36,7 @@ child.debug({ query: sql, params }, "executing query")
 ```typescript
 import { createLogger } from "loggily"
 
-const log = createLogger("myapp")
+const log = createLogger("myapp", [{ level: "info" }, console])
 const dbLog = log.logger("db")
 
 log.info?.("server started", { port: 3000 })
@@ -54,7 +55,7 @@ const logger = pino({ name: "myapp" })
 
 // Loggily
 const log = createLogger("myapp")
-setLogLevel("debug") // Global level
+const log = createLogger("myapp", [{ level: "debug" }, console])
 ```
 
 ### Log Calls
@@ -69,7 +70,7 @@ logger.error(err, "request failed") // Error serialization
 // Loggily — message first, then data
 log.info?.("user logged in", { userId: 42 })
 log.info?.("simple message")
-log.error?.(err, { context: "request" }) // Error object handled
+log.error?.(err, "request failed") // Error + custom message
 log.error?.(err) // Extracts message, stack, code
 ```
 
@@ -89,6 +90,8 @@ child.info?.("handling request") // includes requestId
 const dbLog = log.logger("db") // name: "myapp:db"
 ```
 
+Both `.logger()` and `.child()` return `ConditionalLogger`.
+
 ### Levels
 
 | Pino Level | Value | Loggily Level             |
@@ -99,9 +102,9 @@ const dbLog = log.logger("db") // name: "myapp:db"
 | warn       |    40 | warn                      |
 | error      |    50 | error                     |
 | fatal      |    60 | error (no separate fatal) |
-| silent     |     ∞ | silent                    |
+| silent     |     - | silent                    |
 
-### Transports / Writers
+### Transports / Output
 
 ```typescript
 // Pino transports
@@ -112,11 +115,11 @@ const logger = pino({
   },
 })
 
-// Loggily writers
-import { addWriter, createFileWriter } from "loggily"
-
-const writer = createFileWriter("/tmp/app.log")
-addWriter((formatted) => writer.write(formatted))
+// Loggily v2 — config array
+const log = createLogger("myapp", [
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
 ```
 
 ### Serializers
@@ -169,10 +172,10 @@ logger.info({ duration: Date.now() - start }, "operation complete")
 ## Migration Checklist
 
 1. **Update dependencies**: `bun remove pino pino-pretty && bun add loggily`
-2. **Update imports**: `import pino from "pino"` → `import { createLogger } from "loggily"`
+2. **Update imports**: `import pino from "pino"` to `import { createLogger } from "loggily"`
 3. **Swap argument order**: Pino uses `(data, message)`, Loggily uses `(message, data)`
 4. **Replace `logger.child()`** with `.child()` (context) or `.logger()` (namespace)
-5. **Convert transports** to writers via `addWriter()`
+5. **Convert transports** to `{ file }` in the config array or custom stage functions
 6. **Add `?.`** to all log calls for near-zero cost disabled logging
 7. **Convert manual timing** to spans with `using`
 8. **Replace `fatal`** with `error` (add a custom label in data if needed)

@@ -5,13 +5,14 @@ Step-by-step guide for migrating from the `debug` package to `loggily`.
 ## Why Migrate?
 
 | Feature            | debug               | Loggily                                     |
-| ------------------ | ------------------- | ------------------------------------------- |
-| Log levels         | No (namespace only) | Yes (trace, debug, info, warn, error)       |
-| Structured data    | No (printf-style)   | Yes (JSON objects)                          |
-| Performance        | Good                | Better (conditional logging skips arg eval) |
-| Timing/spans       | No                  | Built-in spans with auto-timing             |
-| JSON output        | No                  | Yes (production/TRACE_FORMAT=json)          |
-| Near-zero disabled | No                  | Yes (optional chaining pattern)             |
+| ------------------ | -------------------- | ------------------------------------------- |
+| Log levels         | No (namespace only)  | Yes (trace, debug, info, warn, error)       |
+| Structured data    | No (printf-style)    | Yes (JSON objects)                          |
+| Performance        | Good                 | Better (conditional logging skips arg eval) |
+| Timing/spans       | No                   | Built-in spans with auto-timing             |
+| JSON output        | No                   | Yes (production/LOG_FORMAT=json)            |
+| Near-zero disabled | No                   | Yes (optional chaining pattern)             |
+| Config pipeline    | No                   | Composable array config                     |
 
 ## Quick Migration
 
@@ -35,8 +36,8 @@ import { createLogger } from "loggily"
 const log = createLogger("myapp")
 const dbLog = log.logger("db")
 
-log.info("starting server", { port: 3000 })
-dbLog.debug("query", { sql, params })
+log.info?.("starting server", { port: 3000 })
+dbLog.debug?.("query", { sql, params })
 ```
 
 ## Pattern Mapping
@@ -52,11 +53,11 @@ debug("object: %o", obj)
 debug("json: %j", data)
 
 // Loggily
-log.debug("message")
-log.debug(`message ${value}`)
-log.debug("message", { items: count })
-log.debug("object", { obj })
-log.debug("data", { data })
+log.debug?.("message")
+log.debug?.(`message ${value}`)
+log.debug?.("message", { items: count })
+log.debug?.("object", { obj })
+log.debug?.("data", { data })
 ```
 
 ### Namespaces
@@ -85,6 +86,8 @@ const cacheLog = log.logger("cache") // myapp:cache
 | N/A              | `TRACE=1`         | Enable span timing                     |
 | N/A              | `TRACE=myapp:db`  | Enable spans for namespace             |
 
+Loggily is `DEBUG=` compatible -- the same environment variable syntax works.
+
 ### Conditional Enabling
 
 ```typescript
@@ -107,9 +110,9 @@ debug("user %s logged in from %s", username, ip)
 debug("processed %d items in %dms", count, duration)
 
 // Loggily (template literals or structured)
-log.info(`user ${username} logged in from ${ip}`)
+log.info?.(`user ${username} logged in from ${ip}`)
 // or structured (preferred)
-log.info("user logged in", { username, ip })
+log.info?.("user logged in", { username, ip })
 ```
 
 ### Objects and JSON
@@ -121,9 +124,9 @@ debug("data: %o", data) // single-line
 debug("json: %j", obj) // JSON
 
 // Loggily (always structured JSON)
-log.debug("config", { config })
-log.debug("data", { data })
-log.debug("obj", { obj })
+log.debug?.("config", { config })
+log.debug?.("data", { data })
+log.debug?.("obj", { obj })
 ```
 
 ### Error Logging
@@ -134,8 +137,8 @@ debug("error: %s", err.message)
 debug("stack: %s", err.stack)
 
 // Loggily (Error objects handled automatically)
-log.error(err) // Extracts message, stack, code
-log.error(err, { context: "additional info" })
+log.error?.(err) // Extracts message, stack, code
+log.error?.(err, "request failed", { context: "additional info" })
 ```
 
 ### Timing Operations
@@ -168,10 +171,10 @@ debug("operation took %dms", Date.now() - start)
 const debug = createDebug("myapp")
 const debugReq = createDebug("myapp:request")
 
-// Loggily - props inherited
-const log = createLogger("myapp", { version: "1.0" })
-const reqLog = log.logger("request", { requestId: "abc" })
-// reqLog has both version and requestId
+// Loggily - child loggers with inherited context
+const log = createLogger("myapp")
+const reqLog = log.logger("request")
+// reqLog inherits parent pipeline and props
 ```
 
 ## Migration Checklist
@@ -204,16 +207,19 @@ const debug = createDebug("myapp")
 
 // After
 const log = createLogger("myapp")
+
+// With explicit config
+const log = createLogger("myapp", [{ level: "debug" }, console])
 ```
 
 ### 4. Update Log Calls
 
-| Pattern     | Before                       | After                      |
-| ----------- | ---------------------------- | -------------------------- |
-| Simple      | `debug('msg')`               | `log.debug('msg')`         |
-| With values | `debug('msg %s', v)`         | `log.debug(\`msg ${v}\`)`  |
-| Structured  | `debug('data %o', d)`        | `log.debug('data', { d })` |
-| Error       | `debug('err %s', e.message)` | `log.error(e)`             |
+| Pattern     | Before                       | After                          |
+| ----------- | ---------------------------- | ------------------------------ |
+| Simple      | `debug('msg')`               | `log.debug?.('msg')`           |
+| With values | `debug('msg %s', v)`         | `log.debug?.(\`msg ${v}\`)`    |
+| Structured  | `debug('data %o', d)`        | `log.debug?.('data', { d })`   |
+| Error       | `debug('err %s', e.message)` | `log.error?.(e)`               |
 
 ### 5. Update Environment
 
@@ -221,7 +227,7 @@ const log = createLogger("myapp")
 # Before
 DEBUG=myapp* node app.js
 
-# After (DEBUG env var still works)
+# After (DEBUG env var still works -- Loggily is DEBUG= compatible)
 DEBUG=myapp node app.js
 # Or set level globally without namespace filter
 LOG_LEVEL=debug node app.js
@@ -235,11 +241,11 @@ Debug package has only on/off. Add appropriate levels:
 
 ```typescript
 // Choose appropriate level based on purpose
-log.trace("...") // Very verbose, hot paths
-log.debug("...") // Development debugging
-log.info("...") // Normal operation
-log.warn("...") // Recoverable issues
-log.error("...") // Failures
+log.trace?.("...") // Very verbose, hot paths
+log.debug?.("...") // Development debugging
+log.info?.("...") // Normal operation
+log.warn?.("...") // Recoverable issues
+log.error?.("...") // Failures
 ```
 
 ### 7. Convert Timing to Spans
@@ -259,7 +265,7 @@ debug("done in %dms", Date.now() - start)
 
 ### 8. Use Optional Chaining (Recommended)
 
-`createLogger()` returns `undefined` for disabled levels -- just use `?.`:
+`createLogger()` returns a `ConditionalLogger` where disabled levels return `undefined` -- just use `?.`:
 
 ```typescript
 const log = createLogger("myapp")
@@ -282,7 +288,16 @@ After migration, verify:
 
 ### Namespace Filtering
 
-Loggily supports `DEBUG=myapp` for namespace filtering (like the `debug` package). It also supports negative patterns: `DEBUG=myapp,-myapp:noisy`. For span-specific namespace filtering, use `TRACE=myapp:db`.
+Loggily is `DEBUG=` compatible -- the same `DEBUG=myapp` syntax works for namespace filtering. It also supports negative patterns: `DEBUG=myapp,-myapp:noisy`. For span-specific namespace filtering, use `TRACE=myapp:db`.
+
+You can also set namespace filters in the config array:
+
+```typescript
+const log = createLogger("myapp", [
+  { ns: "myapp:db,-myapp:db:verbose" },
+  console,
+])
+```
 
 ### Printf Format Strings
 
@@ -294,17 +309,12 @@ debug auto-assigns colors to namespaces. Loggily uses level-based colors. If you
 
 ### enabled Property
 
-debug has `.enabled` property. Loggily uses level comparison:
+debug has `.enabled` property. Loggily uses the `?.` pattern:
 
 ```typescript
 // debug
 if (debug.enabled) { ... }
 
-// Loggily
-import { getLogLevel } from 'loggily'
-const LEVELS = { trace: 0, debug: 1, info: 2, warn: 3, error: 4, silent: 5 }
-if (LEVELS.debug >= LEVELS[getLogLevel()]) { ... }
-
-// Or use conditional logger with optional chaining (preferred)
+// Loggily (preferred -- just use optional chaining)
 log.debug?.('msg')
 ```

@@ -1,39 +1,73 @@
 # Loggily
 
-Debugs, logs, and spans — one API. Clarity without the clutter.
+Debugs, logs, and spans -- one API. Clarity without the clutter.
 
 **Design philosophy**: Opinionated defaults, composable primitives. See [docs/guide/why.md](docs/guide/why.md#design-principles) for full principles.
 
 ## Documentation Site
 
-VitePress docs at `docs/` — deployed to beorn.github.io/loggily via GitHub Pages.
+VitePress docs at `docs/` -- deployed to beorn.github.io/loggily via GitHub Pages.
 
 - **Source**: `docs/` (edit files here)
 - **Config**: `docs/.vitepress/config.ts`
 - **Build**: `bun run docs:build` (runs `vitepress build docs`)
 - **Build output**: `docs/.vitepress/dist/` (gitignored)
 - **Logo**: `docs/public/logo.svg`
-- **CI**: `.github/workflows/docs.yml` — auto-deploys on push to main
+- **CI**: `.github/workflows/docs.yml` -- auto-deploys on push to main
 
-**Do NOT create or edit `docs/site/`** — docs live directly in `docs/`.
+**Do NOT create or edit `docs/site/`** -- docs live directly in `docs/`.
 
 ## Quick Start
 
 ```typescript
 import { createLogger } from "loggily"
+
+// Zero config (reads LOG_LEVEL, DEBUG, LOG_FORMAT from env)
 const log = createLogger("myapp")
 
-log.info("starting")
-log.error(new Error("failed"))
+// Or with explicit config array
+const log = createLogger("myapp", [
+  { level: "debug" },
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
+
+log.info?.("starting")
+log.error?.(new Error("failed"))
+log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 
 // Spans for timing (implements Disposable)
 {
   using span = log.span("import", { file: "data.csv" })
-  span.info("working...")
+  span.info?.("working...")
   span.spanData.count = 42
 }
-// → SPAN myapp:import (15ms) {count: 42, file: "data.csv"}
+// -> SPAN myapp:import (15ms) {count: 42, file: "data.csv"}
 ```
+
+## v2 Config Array
+
+The second argument to `createLogger` is an optional config array. Objects configure, arrays branch, values write:
+
+```typescript
+const log = createLogger("myapp", [
+  { level: "debug", ns: "-sql" },     // Config: set level, filter namespace
+  console,                              // Output: write to console
+  { file: "/tmp/errors.log", level: "error", format: "json" }, // Output: file sink
+  (event) => {                          // Stage: custom transform/filter
+    if (event.kind === "log" && event.message.includes("secret")) return null
+    return event
+  },
+  [{ ns: "myapp:metrics" },            // Branch: sub-pipeline
+   { file: "/tmp/metrics.log" }],
+])
+```
+
+Config keys: `level` (LogLevel), `ns` (namespace filter string/array), `format` ("console" | "json").
+
+Sink keys: `file` (path string), with optional `level`, `ns`, `format` overrides.
+
+When no config array is provided, `defaultPipeline()` reads from environment variables.
 
 ## Environment Variables
 
@@ -43,6 +77,8 @@ log.error(new Error("failed"))
 | DEBUG        | \*, namespace prefixes, -prefix         | Filter output by namespace |
 | TRACE        | 1, true, or namespace prefixes          | Enable span output         |
 | TRACE_FORMAT | json                                    | Force JSON output          |
+| LOG_FORMAT   | console, json                           | Override output format     |
+| LOG_FILE     | /path/to/file                           | File output (default pipeline only) |
 | NODE_ENV     | production                              | Auto-enable JSON format    |
 
 ### Examples
@@ -59,37 +95,42 @@ TRACE=myapp,other bun run app       # Enable spans for multiple prefixes
 
 ## API
 
-### createLogger(name, props?)
+### createLogger(name, config?)
 
-Create a logger. Props are inherited by children.
+Create a logger. Second argument is an optional config array.
 
 ```typescript
-const log = createLogger("myapp", { version: "1.0" })
+// Zero config
+const log = createLogger("myapp")
+
+// With config array
+const log = createLogger("myapp", [{ level: "debug" }, console])
 ```
 
 ### Logger Methods
 
-| Method                        | Purpose            |
-| ----------------------------- | ------------------ |
-| `.trace(msg, data?)`          | Verbose debugging  |
-| `.debug(msg, data?)`          | Debug information  |
-| `.info(msg, data?)`           | Normal operation   |
-| `.warn(msg, data?)`           | Recoverable issues |
-| `.error(msg \| Error, data?)` | Failures           |
+| Method                                | Purpose            |
+| ------------------------------------- | ------------------ |
+| `.trace?(msg, data?)`                 | Verbose debugging  |
+| `.debug?(msg, data?)`                 | Debug information  |
+| `.info?(msg, data?)`                  | Normal operation   |
+| `.warn?(msg, data?)`                  | Recoverable issues |
+| `.error?(msg \| Error, data?)`        | Failures           |
+| `.error?(error, message, data?)`      | Error + custom msg |
 
 ### Child Loggers
 
 ```typescript
-// Extend namespace, inherit props
+// Extend namespace
 const child = log.logger("import", { file: "data.csv" })
-// → namespace: "myapp:import", props: { version: "1.0", file: "data.csv" }
+// -> namespace: "myapp:import"
 
-// Create span (child with timing)
-{
-  using span = log.span("import")
-  span.info("working...")
-}
+// Context logger (same namespace, extra fields)
+const child = log.child({ requestId: "abc" })
+// -> all logs include requestId
 ```
+
+Both `.logger()` and `.child()` return `ConditionalLogger`.
 
 ### Spans
 
@@ -98,7 +139,7 @@ Spans are loggers with timing. They implement `Disposable` for use with `using`:
 ```typescript
 {
   using span = log.span("operation", { context: "value" })
-  span.debug("step 1")
+  span.debug?.("step 1")
   span.spanData.processed = 100 // Set custom attributes
 }
 // On block exit: SPAN myapp:operation (15ms) {processed: 100, context: "value"}
@@ -109,7 +150,7 @@ For environments without `using` support, call `.end()` manually:
 ```typescript
 const span = log.span("operation")
 try {
-  span.info("working...")
+  span.info?.("working...")
   span.spanData.count = 42
 } finally {
   span.end()
@@ -127,33 +168,45 @@ try {
 | `spanData.duration`  | number (readonly)         | Live duration since start             |
 | `spanData.custom`    | any (writable)            | Set custom attributes                 |
 
-### Configuration Functions
+### Key Types
 
 ```typescript
-import {
-  setLogLevel,
-  getLogLevel,
-  enableSpans,
-  disableSpans,
-  spansAreEnabled,
-  setTraceFilter,
-  getTraceFilter,
-  setDebugFilter,
-  getDebugFilter,
+import type {
+  LogEvent,         // { kind: "log", time, namespace, level, message, props? }
+  SpanEvent,        // { kind: "span", time, namespace, name, duration, spanId, traceId, parentId, props? }
+  Event,            // LogEvent | SpanEvent
+  Stage,            // (event: Event) => Event | null | void
+  Pipeline,         // { dispatch, level, dispose }
+  ConditionalLogger, // Logger with ?.  methods
 } from "loggily"
+```
 
-setLogLevel("debug") // Set minimum level
-getLogLevel() // Get current level: "debug"
-enableSpans() // Enable span output
-disableSpans() // Disable span output
-spansAreEnabled() // Check if spans are enabled
-setTraceFilter(["myapp"]) // Only output spans for "myapp" and "myapp:*"
-setTraceFilter(null) // Clear filter, output all spans
-getTraceFilter() // Get current filter: ["myapp"] or null
-setDebugFilter(["myapp"]) // Only show output for "myapp" and "myapp:*"
-setDebugFilter(["myapp", "-myapp:sql"]) // Show myapp but exclude myapp:sql
-setDebugFilter(null) // Clear filter, show all namespaces
-getDebugFilter() // Get current filter: ["myapp", "-myapp:sql"] or null
+### Pipeline Builder (power users)
+
+```typescript
+import { buildPipeline, defaultPipeline } from "loggily"
+
+const pipeline = buildPipeline([
+  { level: "debug" },
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
+
+const defaultPipe = defaultPipeline() // reads env vars
+```
+
+### Deprecated v1 API
+
+These functions still work but are deprecated. They map to environment variables internally:
+
+```typescript
+// Deprecated -- use config array or env vars instead
+setLogLevel("debug")     // -> set LOG_LEVEL env var
+enableSpans()            // -> set TRACE=1 env var
+setDebugFilter(["myapp"]) // -> set DEBUG env var
+setTraceFilter(["myapp"]) // -> set TRACE env var
+addWriter(fn)            // -> use config array
+setLogFormat("json")     // -> set LOG_FORMAT env var
 ```
 
 ## Distributed Tracing (opt-in)
@@ -174,7 +227,7 @@ import { traceparent } from "loggily"
 
 const span = log.span("http-request")
 const header = traceparent(span.spanData)
-// → "00-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6-1a2b3c4d5e6f7a8b-01"
+// -> "00-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6-1a2b3c4d5e6f7a8b-01"
 fetch(url, { headers: { traceparent: header } })
 ```
 
@@ -198,7 +251,7 @@ const log = createLogger("myapp")
 {
   using span = log.span("request")
   // Logs auto-tagged with trace_id/span_id
-  log.info("handling") // includes trace_id, span_id in output
+  log.info?.("handling") // includes trace_id, span_id in output
 
   // Child spans from ANY logger auto-parent via AsyncLocalStorage
   const other = createLogger("db")
@@ -218,7 +271,7 @@ const log = createLogger("myapp")
 14:32:16 SPAN myapp:import (1234ms) {count: 42}
 ```
 
-### JSON (production / TRACE_FORMAT=json)
+### JSON (production / LOG_FORMAT=json)
 
 ```json
 {"time":"2024-01-15T14:32:15.123Z","level":"info","name":"myapp","msg":"starting"}
@@ -227,9 +280,9 @@ const log = createLogger("myapp")
 
 ## Zero-Overhead Pattern (Optional Chaining)
 
-`createLogger` returns `undefined` for disabled log levels, enabling zero-overhead logging.
+`createLogger` returns a `ConditionalLogger` where disabled log levels return `undefined`.
 
-**Log levels** (most → least verbose): `trace < debug < info < warn < error < silent`
+**Log levels** (most to least verbose): `trace < debug < info < warn < error < silent`
 **Default level**: `info` (trace and debug disabled)
 
 ```typescript
@@ -238,14 +291,11 @@ import { createLogger } from "loggily"
 const log = createLogger("km:tui")
 
 // All methods support ?. for zero-overhead when their level is disabled
-log.trace?.(`very verbose: ${expensiveDebug()}`) // Skipped at default (warn)
-log.debug?.(`state: ${getState()}`) // Skipped at default (warn)
-log.info?.("starting") // Skipped at default (warn)
-log.warn?.("deprecated") // Enabled at default (warn)
+log.trace?.(`very verbose: ${expensiveDebug()}`) // Skipped at default (info)
+log.debug?.(`state: ${getState()}`) // Skipped at default (info)
+log.info?.("starting") // Enabled at default (info)
+log.warn?.("deprecated") // Enabled at default
 log.error?.("failed") // Enabled at default
-
-// With -v flag or LOG_LEVEL=info, info is enabled:
-log.info?.("starting") // Enabled when level=info
 ```
 
 ### Why optional chaining?
@@ -269,7 +319,7 @@ See the internal research doc for detailed methodology and external references.
 
 ## Lazy Messages
 
-Messages can be functions — only called when the log level is enabled:
+Messages can be functions -- only called when the log level is enabled:
 
 ```typescript
 log.debug?.(() => `expensive: ${JSON.stringify(bigObject)}`)
@@ -285,7 +335,7 @@ Create child loggers with additional structured context (not just namespace):
 ```typescript
 const child = log.child({ requestId: "abc-123", userId: 42 })
 child.info?.("handling request")
-// → 14:32:15 INFO myapp handling request {requestId: "abc-123", userId: 42}
+// -> 14:32:15 INFO myapp handling request {requestId: "abc-123", userId: 42}
 ```
 
 ## JSON Output Format
@@ -296,19 +346,12 @@ LOG_FORMAT=json bun run app   # Force JSON output in any environment
 
 In addition to `TRACE_FORMAT=json` and `NODE_ENV=production`, `LOG_FORMAT=json` explicitly enables structured JSON output.
 
-## File Writer
-
-```typescript
-import { createFileWriter } from "loggily"
-
-const writer = createFileWriter("/tmp/app.log")
-const log = createLogger("myapp", { writer })
-```
-
 ## Best Practices
 
-1. **Namespace hierarchy**: Use `:` to create hierarchy (`myapp:db:query`)
-2. **Props for context**: Pass structured data, not string interpolation
-3. **Spans for timing**: Wrap operations you want to measure
-4. **Level filtering**: Use `LOG_LEVEL` to control verbosity
-5. **Conditional logging**: Use `?.` pattern in hot paths to skip arg evaluation
+1. **Config array for explicit setup**: Use `createLogger("name", [config])` when you want explicit control
+2. **Env vars for runtime control**: `LOG_LEVEL`, `DEBUG`, `TRACE`, `LOG_FORMAT` for runtime tunability
+3. **Namespace hierarchy**: Use `:` to create hierarchy (`myapp:db:query`)
+4. **Props for context**: Pass structured data, not string interpolation
+5. **Spans for timing**: Wrap operations you want to measure
+6. **Conditional logging**: Use `?.` pattern in hot paths to skip arg evaluation
+7. **Custom stages**: Functions in the config array for transform/filter/enrich

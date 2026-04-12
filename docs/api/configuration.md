@@ -1,94 +1,113 @@
 # Configuration
 
-## Log Level
+## v2 Config Array (recommended)
+
+The second argument to `createLogger` is an optional config array that defines the output pipeline:
 
 ```typescript
-setLogLevel(level: LogLevel): void
-getLogLevel(): LogLevel
+import { createLogger } from "loggily"
+
+const log = createLogger("myapp", [
+  { level: "debug", ns: "-sql", format: "json" },
+  console,
+  { file: "/tmp/app.log", level: "error", format: "json" },
+])
 ```
 
-Default: `"info"`. Override with `LOG_LEVEL` env var.
+### Config Object Keys
+
+| Key      | Type                              | Description                 |
+| -------- | --------------------------------- | --------------------------- |
+| `level`  | `LogLevel`                        | Minimum log level           |
+| `ns`     | `string \| string[]`             | Namespace filter pattern    |
+| `format` | `"console" \| "json"`            | Output format               |
+
+### Sink Object Keys
+
+| Key      | Type                              | Description                 |
+| -------- | --------------------------------- | --------------------------- |
+| `file`   | `string`                          | Path for file output        |
+| `level`  | `LogLevel` (optional)             | Override level for this sink|
+| `ns`     | `string \| string[]` (optional)  | Override ns for this sink   |
+| `format` | `"console" \| "json"` (optional) | Override format for this sink|
+
+### Stage Functions
+
+Functions in the config array are called for every event:
 
 ```typescript
-setLogLevel("debug") // debug, info, warn, error
-setLogLevel("error") // error only
-setLogLevel("silent") // nothing
+type Stage = (event: Event) => Event | null | void
 ```
 
-## Log Format
+- Return the event (possibly modified) to pass it through
+- Return `null` to filter it out
+- Return `void`/`undefined` to pass the original event through
+
+### Branch Arrays
+
+Arrays in the config array create sub-pipelines with their own scope:
 
 ```typescript
-setLogFormat(format: LogFormat): void
-getLogFormat(): LogFormat
+const log = createLogger("myapp", [
+  console,
+  [{ ns: "myapp:metrics", format: "json" }, { file: "/tmp/metrics.log" }],
+])
 ```
-
-Default: `"console"`. Override with `LOG_FORMAT` env var. Also auto-enabled by `NODE_ENV=production`.
-
-```typescript
-setLogFormat("json") // {"time":"...","level":"info","name":"myapp","msg":"..."}
-setLogFormat("console") // 14:32:15 INFO myapp message
-```
-
-## Span Control
-
-```typescript
-enableSpans(): void
-disableSpans(): void
-spansAreEnabled(): boolean
-```
-
-## Trace Filter
-
-```typescript
-setTraceFilter(namespaces: string[] | null): void
-getTraceFilter(): string[] | null
-```
-
-Only emit spans matching these namespace prefixes.
-
-```typescript
-setTraceFilter(["myapp:db"]) // Only db spans
-setTraceFilter(null) // All spans
-```
-
-## Debug Filter
-
-```typescript
-setDebugFilter(namespaces: string[] | null): void
-getDebugFilter(): string[] | null
-```
-
-Filter log output by namespace. Supports negative patterns.
-
-```typescript
-setDebugFilter(["myapp"]) // Only myapp and children
-setDebugFilter(["myapp", "-myapp:sql"]) // Exclude sql
-setDebugFilter(null) // All namespaces
-```
-
-Auto-lowers log level to `debug` when set.
-
-## Output Mode
-
-```typescript
-setOutputMode(mode: OutputMode): void
-getOutputMode(): OutputMode
-setSuppressConsole(value: boolean): void
-```
-
-| Mode             | Console | Writers |
-| ---------------- | ------- | ------- |
-| `"console"`      | Yes     | Yes     |
-| `"stderr"`       | stderr  | Yes     |
-| `"writers-only"` | No      | Yes     |
 
 ## Environment Variables
+
+When no config array is provided, `createLogger` uses `defaultPipeline()` which reads from environment variables:
 
 | Variable       | Values                                  | Default   |
 | -------------- | --------------------------------------- | --------- |
 | `LOG_LEVEL`    | trace, debug, info, warn, error, silent | `info`    |
 | `LOG_FORMAT`   | console, json                           | `console` |
+| `LOG_FILE`     | file path                               | (none)    |
 | `DEBUG`        | `*`, namespace prefixes, `-prefix`      | (none)    |
 | `TRACE`        | `1`, `true`, namespace prefixes         | (none)    |
 | `TRACE_FORMAT` | json                                    | (none)    |
 | `NODE_ENV`     | production                              | (none)    |
+
+## Pipeline Builder (power users)
+
+```typescript
+import { buildPipeline, defaultPipeline } from "loggily"
+
+// Build a custom pipeline
+const pipeline = buildPipeline([
+  { level: "debug" },
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
+
+// Get the default env-var-based pipeline
+const defaultPipe = defaultPipeline()
+```
+
+## Deprecated v1 API
+
+These functions still work but are deprecated. They map to environment variables internally:
+
+```typescript
+// All deprecated — use config array or env vars instead
+setLogLevel(level: LogLevel): void     // -> LOG_LEVEL env var
+getLogLevel(): LogLevel
+
+setLogFormat(format: LogFormat): void  // -> LOG_FORMAT env var
+getLogFormat(): LogFormat
+
+enableSpans(): void                    // -> TRACE=1 env var
+disableSpans(): void
+spansAreEnabled(): boolean
+
+setTraceFilter(ns: string[] | null): void  // -> TRACE env var
+getTraceFilter(): string[] | null
+
+setDebugFilter(ns: string[] | null): void  // -> DEBUG env var
+getDebugFilter(): string[] | null
+
+setOutputMode(mode: OutputMode): void  // -> omit console from config array
+getOutputMode(): OutputMode
+
+setSuppressConsole(value: boolean): void // -> omit console from config array
+```

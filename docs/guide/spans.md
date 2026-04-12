@@ -18,19 +18,12 @@ The `using` keyword (TC39 Explicit Resource Management) calls `span[Symbol.dispo
 
 ## Enabling Spans
 
-Span output is off by default. Enable via environment or code:
+Span output is off by default. Enable via environment variables:
 
 ```bash
 TRACE=1 bun run app              # All spans
 TRACE=myapp:db bun run app       # Only db spans
 TRACE=myapp,other bun run app    # Multiple namespaces
-```
-
-```typescript
-import { enableSpans, setTraceFilter } from "loggily"
-
-enableSpans() // All spans
-setTraceFilter(["myapp:db"]) // Only db spans
 ```
 
 ## Nested Spans
@@ -121,10 +114,14 @@ Spans are full loggers -- you can call `.info?.()`, `.debug?.()`, etc:
 
 ## JSON Output
 
-Spans respect the output format:
+Spans respect the output format. Set it via environment variable or config array:
 
 ```bash
 TRACE=1 LOG_FORMAT=json bun run app
+```
+
+```typescript
+const log = createLogger("myapp", [{ format: "json" }, console])
 ```
 
 ```json

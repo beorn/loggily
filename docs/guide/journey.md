@@ -1,8 +1,8 @@
 # The Guide
 
-> Clarity without the clutter. Debugs, logs, and spans — one API.
+> Clarity without the clutter. Debugs, logs, and spans -- one API.
 
-Your first app uses `console.log`. That's enough for a script, a prototype, a small server. Then your app grows. You need structured logs for production, the `debug` package for conditional verbose output, a tracing library for timings, maybe OpenTelemetry for distributed traces — and suddenly you're juggling three tools with three APIs, three configuration schemes, and three output formats.
+Your first app uses `console.log`. That's enough for a script, a prototype, a small server. Then your app grows. You need structured logs for production, the `debug` package for conditional verbose output, a tracing library for timings, maybe OpenTelemetry for distributed traces -- and suddenly you're juggling three tools with three APIs, three configuration schemes, and three output formats.
 
 Loggily is one library where structured logging, debug-style conditional output, and timed spans all share the same namespace tree, the same output pipeline, and the same `?.` pattern for near-zero cost disabled logging. You adopt each capability when you need it. Nothing is wasted, nothing conflicts, nothing clutters your code.
 
@@ -32,7 +32,7 @@ Colorized in your terminal, with source locations:
     at server.ts:42
 ```
 
-Set `LOG_FORMAT=json` or `NODE_ENV=production` and the same calls produce structured JSON — same data, machine-parseable, ready for Datadog or Elastic or whatever your ops team uses:
+Set `LOG_FORMAT=json` or `NODE_ENV=production` and the same calls produce structured JSON -- same data, machine-parseable, ready for Datadog or Elastic or whatever your ops team uses:
 
 ```json
 { "time": "2024-01-15T14:32:15.123Z", "level": "info", "name": "myapp", "msg": "server started", "port": 3000 }
@@ -64,7 +64,16 @@ DEBUG='myapp:*,-myapp:http' bun run app   # Everything except HTTP
 LOG_LEVEL=debug bun run app               # Debug level globally, all namespaces
 ```
 
-`DEBUG` is a namespace visibility filter inspired by the `debug` package — same patterns, same muscle memory — but as part of a full logging system with levels, structured data, and JSON output. Use `LOG_LEVEL` when you want to change the verbosity floor without restricting namespaces.
+`DEBUG` is a namespace visibility filter compatible with the same patterns as the `debug` package -- same muscle memory -- but as part of a full logging system with levels, structured data, and JSON output. Use `LOG_LEVEL` when you want to change the verbosity floor without restricting namespaces.
+
+You can also set namespace filters in the config array:
+
+```typescript
+const log = createLogger("myapp", [
+  { ns: "myapp:db,-myapp:db:verbose" },
+  console,
+])
+```
 
 **The wall**: A request takes 3 seconds. You know it's slow, but you don't know which part.
 
@@ -104,40 +113,53 @@ TRACE=myapp:db bun run app           # Only database spans
 TRACE=myapp:db,myapp:cache bun run app  # Database + cache spans
 ```
 
-**The wall**: Now you need logs sent elsewhere — a file, Datadog, your tracing backend — not just the console.
+**The wall**: Now you need logs sent elsewhere -- a file, Datadog, your tracing backend -- not just the console.
 
-## Level 4: Writers
+## Level 4: Output Pipeline
 
-The writer system is a simple function interface. Write once, send anywhere:
-
-```typescript
-import { addWriter, createFileWriter } from "loggily"
-
-// File writer with buffered auto-flush
-const file = createFileWriter("/var/log/app.log")
-addWriter((formatted, level) => file.write(formatted))
-
-// Send to an HTTP endpoint
-addWriter((formatted, level) => {
-  if (level === "error") fetch("/api/alerts", { method: "POST", body: formatted })
-})
-
-// Send spans to your tracing backend
-addWriter((formatted, level) => {
-  if (level === "span") sendToJaeger(JSON.parse(formatted))
-})
-```
-
-You can attach multiple writers — each one receives every log and span. The logger doesn't care where the output goes; it just produces structured data. You decide where to send it.
-
-Output modes let you control the default output:
+The v2 config array replaces the old writer system. Configure where output goes as part of logger creation:
 
 ```typescript
-import { setOutputMode } from "loggily"
-setOutputMode("writers-only") // Only writers, no console
-setOutputMode("stderr") // Bypass Ink/React console capture
-setOutputMode("console") // Default: console.log/warn/error
+import { createLogger } from "loggily"
+
+const log = createLogger("myapp", [
+  { level: "debug" },
+  console,
+  { file: "/var/log/app.log", format: "json" },
+  { file: "/var/log/errors.log", level: "error", format: "json" },
+])
 ```
+
+Custom stage functions in the config array can transform, filter, or route events:
+
+```typescript
+const log = createLogger("myapp", [
+  // Enrich events with hostname
+  (event) => ({
+    ...event,
+    props: { ...event.props, host: hostname() },
+  }),
+  // Filter out sensitive data
+  (event) => {
+    if (event.kind === "log" && event.message.includes("password")) return null
+    return event
+  },
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
+```
+
+Branch arrays create sub-pipelines with their own scope:
+
+```typescript
+const log = createLogger("myapp", [
+  console,
+  // Only metrics go to the metrics file
+  [{ ns: "myapp:metrics" }, { file: "/tmp/metrics.log", format: "json" }],
+])
+```
+
+For power users, `buildPipeline()` and `defaultPipeline()` are exported for direct pipeline construction.
 
 **The wall**: You spawn worker threads for heavy processing, but their logs vanish from the main output.
 
@@ -168,7 +190,7 @@ worker.on("message", (msg) => handler(msg))
 
 Logs and spans from workers appear in the same output stream with the same formatting. No interleaving, no lost messages.
 
-**The wall**: You need request context (request ID, user ID) to appear in every log across a request — without threading a logger through every function call.
+**The wall**: You need request context (request ID, user ID) to appear in every log across a request -- without threading a logger through every function call.
 
 ## Level 6: Context
 
@@ -186,11 +208,11 @@ await handleAuth(reqLog)
 await handleQuery(reqLog)
 ```
 
-Every log from `reqLog` carries `requestId` and `userId`. In JSON mode, these become top-level fields — perfect for filtering in your log aggregator.
+Every log from `reqLog` carries `requestId` and `userId`. In JSON mode, these become top-level fields -- perfect for filtering in your log aggregator.
 
 ### Automatic context propagation (no passing required)
 
-When threading a logger through every function isn't practical, enable automatic context propagation. This uses Node's [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html#class-asynclocalstorage) — a built-in mechanism that carries data through `async`/`await` chains without passing it as function arguments. Logs and spans automatically inherit the current request's trace context:
+When threading a logger through every function isn't practical, enable automatic context propagation. This uses Node's [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html#class-asynclocalstorage) -- a built-in mechanism that carries data through `async`/`await` chains without passing it as function arguments. Logs and spans automatically inherit the current request's trace context:
 
 ```typescript
 import { enableContextPropagation, getCurrentSpan } from "loggily/context"
@@ -217,17 +239,17 @@ No need to pass `span` or `reqLog` down the call stack. The async context carrie
 
 ## What You Have
 
-Normally, you'd pull in one library for logs, another for debug prints, a tracing SDK for spans — and struggle to tie them together. With Loggily, these aren't separate concerns. They're modes of the same tool.
+Normally, you'd pull in one library for logs, another for debug prints, a tracing SDK for spans -- and struggle to tie them together. With Loggily, these aren't separate concerns. They're modes of the same tool.
 
 At this point you've replaced that patchwork with a single library:
 
 - **Structured logging** with levels, namespaces, colorized dev output, JSON production output, and source locations
-- **Debug output** with `DEBUG=namespace:*` filtering — the `debug` package's power, integrated
+- **Debug output** with `DEBUG=namespace:*` filtering -- compatible with the debug package's patterns, integrated
 - **Span timing** with `using` keyword, nested traces, and independent `TRACE=` control
-- **Flexible output** via writers — file, HTTP, tracing backends, anything
+- **Composable output** via the config array -- console, file, custom stages, branches
 - **Worker thread support** with automatic forwarding
 - **Context propagation** via child loggers or automatic `AsyncLocalStorage`
 
-All sharing one namespace tree. All respecting the same log levels. All using the same `?.` pattern — disabled calls are skipped entirely, including argument evaluation. There when you need it, invisible when you don't.
+All sharing one namespace tree. All respecting the same log levels. All using the same `?.` pattern -- disabled calls are skipped entirely, including argument evaluation. There when you need it, invisible when you don't.
 
 ~3KB. Zero dependencies. Modern TypeScript.

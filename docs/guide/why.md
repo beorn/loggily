@@ -7,7 +7,7 @@ Most apps end up with three logging tools: `debug` for local troubleshooting, a 
 But there's a deeper problem: most loggers waste work when logging is disabled. Even when `debug` level is off:
 
 ```typescript
-// Pino, Winston, Bunyan
+// Conventional loggers
 log.debug(`state: ${JSON.stringify(computeExpensiveState())}`)
 ```
 
@@ -36,19 +36,20 @@ When `debug` is disabled, `log.debug` is `undefined`. JavaScript's `?.` operator
 
 For cheap arguments the overhead is ~0.2ns -- negligible. For expensive arguments, **22x faster**.
 
-## Compared to Others
+## What Loggily Does
 
-| Feature            | Loggily    | Pino  | Winston | debug |
-| ------------------ | ---------- | ----- | ------- | ----- |
-| Near-zero disabled | `?.` (22x) | noop  | noop    | check |
-| Built-in spans     | Yes        | No    | No      | No    |
-| Debug namespaces   | Yes        | No    | No      | Yes   |
-| Structured JSON    | Yes        | Yes   | Yes     | No    |
-| Bundle size        | ~3KB       | ~17KB | ~200KB+ | ~2KB  |
-| TypeScript native  | Yes        | Types | Types   | Types |
-| Worker threads     | Yes        | No    | No      | No    |
+| Feature            | Loggily     |
+| ------------------ | ----------- |
+| Near-zero disabled | `?.` (22x)  |
+| Built-in spans     | Yes         |
+| Debug namespaces   | Yes         |
+| Structured JSON    | Yes         |
+| Bundle size        | ~3KB        |
+| TypeScript native  | Yes         |
+| Worker threads     | Yes         |
+| Config pipeline    | Array-based |
 
-Loggily is a superset of `debug` — same namespace patterns, same `DEBUG=` env var — plus levels, structured data, spans, and JSON output. See [Comparison](/guide/comparison) for detailed analysis.
+Loggily is a superset of `debug` -- compatible with the same `DEBUG=` env var and namespace patterns -- plus levels, structured data, spans, and JSON output. It works with Pino transports via custom stages, and is `DEBUG=` compatible with the debug package. See [Comparison](/guide/comparison) for details.
 
 ## Design Principles
 
@@ -56,22 +57,54 @@ Loggily is a superset of `debug` — same namespace patterns, same `DEBUG=` env 
 
 Every feature has two layers:
 
-- **Porcelain** — the simple, opinionated entry point that works with sensible defaults. This is what the README shows, what new users reach for, and what the docs lead with.
-- **Primitives** — the composable building blocks the porcelain is built from. Exported for power users who need full control.
+- **Porcelain** -- the simple, opinionated entry point that works with sensible defaults. This is what the README shows, what new users reach for, and what the docs lead with.
+- **Primitives** -- the composable building blocks the porcelain is built from. Exported for power users who need full control.
 
-The porcelain IS composed from the primitives — it's not a separate code path. When you outgrow the defaults, you reach for the same pieces the defaults use.
+The porcelain IS composed from the primitives -- it's not a separate code path. When you outgrow the defaults, you reach for the same pieces the defaults use.
 
 Examples:
 
-- `createLogger("myapp")` is porcelain. The Proxy-based conditional logger is the primitive.
-- `otel()` (planned) is porcelain. `createSpanWriter()` and `bridge()` are primitives.
-- Environment variables (`DEBUG=`, `LOG_LEVEL=`) are porcelain for configuration. `setLogLevel()`, `setDebugFilter()` are primitives.
+- `createLogger("myapp")` is porcelain. The Proxy-based `ConditionalLogger` and `Pipeline` are the primitives.
+- Environment variables (`DEBUG=`, `LOG_LEVEL=`) are porcelain for configuration. The config array with `{ level, ns, format }` objects is the primitive.
+- `createLogger("myapp", [console])` is porcelain. `buildPipeline()` and custom `Stage` functions are the primitives.
+
+### The v2 pipeline model
+
+The second argument to `createLogger` is a config array that defines the output pipeline:
+
+```typescript
+const log = createLogger("myapp", [
+  { level: "debug", ns: "-sql" },
+  console,
+  { file: "/tmp/app.log", level: "info", format: "json" },
+])
+```
+
+The array is read sequentially. Each element plays one of four roles:
+
+1. **Config objects** (`{ level, ns, format }`) set the scope for subsequent outputs
+2. **Output values** (`console`, `{ file }`, writables) define where events go
+3. **Stage functions** (`(event) => event | null | void`) transform or filter events in the pipeline
+4. **Branch arrays** create sub-pipelines with their own scope
+
+This replaces the v1 global setters (`setLogLevel`, `addWriter`, `enableSpans`, `setDebugFilter`) with a composable, per-logger configuration model. The v1 functions still work but are deprecated -- they map to environment variables internally.
 
 ### Core principles
 
 1. **Logger = Span**: Every logger can become a span. No separate tracing library needed.
 2. **Near-zero cost**: Disabled levels skip argument evaluation entirely via optional chaining.
 3. **Minimal surface**: Few functions, each does one thing well.
-4. **Type enforced**: TypeScript makes `?.` mandatory — you can't accidentally call a disabled level.
+4. **Type enforced**: TypeScript makes `?.` mandatory -- you can't accidentally call a disabled level.
 5. **Structured**: JSON in production, readable console in development.
-6. **Progressive disclosure**: Start with one import and one function call. Discover namespaces, spans, context, workers, and OTel as you need them — each capability is additive, not a migration.
+6. **Progressive disclosure**: Start with one import and one function call. Discover namespaces, spans, context, workers, and the pipeline model as you need them -- each capability is additive, not a migration.
+
+### Key types
+
+| Type              | Description                                     |
+| ----------------- | ----------------------------------------------- |
+| `LogEvent`        | A log message event (kind, level, namespace, message, props) |
+| `SpanEvent`       | A span timing event (kind, namespace, duration, spanId, traceId) |
+| `Event`           | `LogEvent \| SpanEvent`                          |
+| `Stage`           | `(event: Event) => Event \| null \| void`        |
+| `Pipeline`        | `{ dispatch, level, dispose }`                   |
+| `ConditionalLogger` | Logger with `?.`-compatible methods            |
