@@ -34,7 +34,10 @@
     "dist"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./worker": "./src/worker.ts",
+    "./metrics": "./src/metrics.ts",
+    "./context": "./src/context.ts"
   },
   "publishConfig": {
     "access": "public",
@@ -42,11 +45,28 @@
       ".": {
         "types": "./dist/index.d.mts",
         "import": "./dist/index.mjs"
+      },
+      "./worker": {
+        "types": "./dist/worker.d.mts",
+        "import": "./dist/worker.mjs"
+      },
+      "./metrics": {
+        "types": "./dist/metrics.d.mts",
+        "import": "./dist/metrics.mjs"
+      },
+      "./context": {
+        "types": "./dist/context.d.mts",
+        "import": "./dist/context.mjs"
       }
     }
   },
   "tsdown": {
-    "entry": "src/index.ts",
+    "entry": [
+      "src/index.ts",
+      "src/worker.ts",
+      "src/metrics.ts",
+      "src/context.ts"
+    ],
     "format": "esm",
     "dts": true,
     "clean": true
