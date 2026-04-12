@@ -71,32 +71,33 @@ worker.onmessage = (e) => {
 
 ## Message Types
 
-All messages are fully typed. Use the type guards to safely handle them:
+Worker log/span events are standard `Event` objects (same as main-thread events). Console messages use a separate `WorkerConsoleMessage` type. Use type guards to handle them:
 
 ```typescript
 import {
   isWorkerConsoleMessage,
-  isWorkerLogMessage,
-  isWorkerSpanMessage,
+  isWorkerEvent,
+  isWorkerLogEvent,
+  isWorkerSpanEvent,
   isWorkerMessage,
-  type WorkerMessage,
 } from "loggily/worker"
 ```
 
-| Type Guard               | Message Type            |
-| ------------------------ | ----------------------- |
-| `isWorkerConsoleMessage` | `console.*` forwarding  |
-| `isWorkerLogMessage`     | Structured log messages |
-| `isWorkerSpanMessage`    | Span start/end events   |
-| `isWorkerMessage`        | Any of the above        |
+| Type Guard               | Message Type               |
+| ------------------------ | -------------------------- |
+| `isWorkerConsoleMessage` | `console.*` forwarding     |
+| `isWorkerLogEvent`       | Log events (kind: "log")   |
+| `isWorkerSpanEvent`      | Span events (kind: "span") |
+| `isWorkerEvent`          | Any log or span event      |
+| `isWorkerMessage`        | Any of the above           |
 
 ## Serialization
 
-Arguments are automatically serialized for `postMessage`:
+`postMessage` uses `structuredClone`, which handles most values natively. For console forwarding, non-cloneable values are pre-sanitized:
 
 - Functions become `"[Function: name]"`
 - Symbols become their `toString()` representation
-- BigInts become `"123n"` strings
+- Errors become `{ name, message, stack }`
 - Circular references become `"[Circular]"`
 - Errors become `{ name, message, stack }` objects
 - Depth is capped at 5 levels

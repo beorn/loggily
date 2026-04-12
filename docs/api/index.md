@@ -74,7 +74,8 @@ The second argument to `createLogger` is an optional config array:
 | `LogFormat`          | `"console" \| "json"`                                               |
 | `LazyMessage`        | `string \| (() => string)`                                          |
 | `LoggerFactory`      | `(name: string, config?) => ConditionalLogger`                      |
-| `LoggerPlugin`       | `(factory: LoggerFactory) => LoggerFactory`                         |
+| `LoggerPlugin`       | `(factory: LoggerFactory, ctx: PluginCtx) => LoggerFactory`         |
+| `PluginCtx`          | Shared context for inter-plugin communication                       |
 | `ConfigElement`      | Union of all valid config array elements                            |
 | `ConfigObject`       | Scope config: `{ level?, ns?, format?, spans? }`                    |
 | `FileDescriptor`     | File output: `{ file, level?, ns?, format? }`                       |
@@ -140,14 +141,17 @@ Span metrics collection — ambient or explicit.
 
 ## Exports from `loggily/worker`
 
-| Export                                        | Description                       |
-| --------------------------------------------- | --------------------------------- |
-| `createWorkerLogger(postMessage, ns, props?)` | Logger for worker threads         |
-| `createWorkerLogHandler(opts?)`               | Main thread handler               |
-| `createWorkerConsoleHandler(opts?)`           | Console message handler           |
-| `forwardConsole(postMessage, ns?)`            | Forward console.\* from worker    |
-| `restoreConsole()`                            | Restore original console methods  |
-| `isWorkerMessage(msg)`                        | Type guard for any worker message |
-| `isWorkerConsoleMessage(msg)`                 | Type guard for console messages   |
-| `isWorkerLogMessage(msg)`                     | Type guard for log messages       |
-| `isWorkerSpanMessage(msg)`                    | Type guard for span messages      |
+| Export                                        | Description                                  |
+| --------------------------------------------- | -------------------------------------------- |
+| `createWorkerLogger(postMessage, ns, props?)` | Logger for worker threads                    |
+| `workerTransportStage(postMessage)`           | Pipeline stage that forwards via postMessage |
+| `handleWorkerEvents(logger)`                  | Route worker events to a logger              |
+| `createWorkerLogHandler()`                    | Zero-config main thread handler              |
+| `createWorkerConsoleHandler(opts?)`           | Console message handler                      |
+| `forwardConsole(postMessage, ns?)`            | Forward console.\* from worker               |
+| `restoreConsole()`                            | Restore original console methods             |
+| `isWorkerMessage(msg)`                        | Type guard for any worker message            |
+| `isWorkerConsoleMessage(msg)`                 | Type guard for console messages              |
+| `isWorkerEvent(msg)`                          | Type guard for log/span events               |
+| `isWorkerLogEvent(msg)`                       | Type guard for log events                    |
+| `isWorkerSpanEvent(msg)`                      | Type guard for span events                   |
