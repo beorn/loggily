@@ -1,4 +1,4 @@
-# Context Propagation
+# Async Context
 
 Import from `loggily/context`. Node.js/Bun only.
 

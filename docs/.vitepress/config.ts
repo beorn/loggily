@@ -73,8 +73,9 @@ export default defineConfig({
           { text: "Logger", link: "/api/logger" },
           { text: "Configuration", link: "/api/configuration" },
           { text: "Tracing", link: "/api/tracing" },
-          { text: "Context Propagation", link: "/api/context" },
+          { text: "Async Context", link: "/api/context" },
           { text: "Metrics", link: "/api/metrics" },
+          { text: "OpenTelemetry", link: "/api/otel" },
           { text: "Writers", link: "/api/writers" },
           { text: "Worker Thread", link: "/api/worker" },
         ],
@@ -107,15 +108,6 @@ export default defineConfig({
             { text: "Comparison", link: "/guide/comparison" },
           ],
         },
-        {
-          text: "Migration",
-          items: [
-            { text: "Legacy API", link: "/guide/migration-v2" },
-            { text: "From debug", link: "/guide/migration-from-debug" },
-            { text: "From Pino", link: "/guide/migration-from-pino" },
-            { text: "From Winston", link: "/guide/migration-from-winston" },
-          ],
-        },
       ],
       "/api/": [
         {
@@ -125,7 +117,7 @@ export default defineConfig({
             { text: "Logger", link: "/api/logger" },
             { text: "Configuration", link: "/api/configuration" },
             { text: "Tracing", link: "/api/tracing" },
-            { text: "Context Propagation", link: "/api/context" },
+            { text: "Async Context", link: "/api/context" },
             { text: "Metrics", link: "/api/metrics" },
             { text: "Writers", link: "/api/writers" },
             { text: "Worker Thread", link: "/api/worker" },
