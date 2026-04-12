@@ -569,7 +569,8 @@ describe("deprecated v1 global setters still work", () => {
   })
 
   test("enableSpans/disableSpans toggle TRACE env var", () => {
-    const { enableSpans, disableSpans, spansAreEnabled } = require("../src/index.ts") as typeof import("../src/index.ts")
+    const { enableSpans, disableSpans, spansAreEnabled } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
     enableSpans()
     expect(spansAreEnabled()).toBe(true)
     disableSpans()

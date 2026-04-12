@@ -26,11 +26,7 @@ import { createLogger } from "loggily"
 const log = createLogger("myapp")
 
 // Or with explicit config array
-const log = createLogger("myapp", [
-  { level: "debug" },
-  console,
-  { file: "/tmp/app.log", format: "json" },
-])
+const log = createLogger("myapp", [{ level: "debug" }, console, { file: "/tmp/app.log", format: "json" }])
 
 log.info?.("starting")
 log.error?.(new Error("failed"))
@@ -51,15 +47,18 @@ The second argument to `createLogger` is an optional config array. Objects confi
 
 ```typescript
 const log = createLogger("myapp", [
-  { level: "debug", ns: "-sql" },     // Config: set level, filter namespace
-  console,                              // Output: write to console
+  { level: "debug", ns: "-sql" }, // Config: set level, filter namespace
+  console, // Output: write to console
   { file: "/tmp/errors.log", level: "error", format: "json" }, // Output: file sink
-  (event) => {                          // Stage: custom transform/filter
+  (event) => {
+    // Stage: custom transform/filter
     if (event.kind === "log" && event.message.includes("secret")) return null
     return event
   },
-  [{ ns: "myapp:metrics" },            // Branch: sub-pipeline
-   { file: "/tmp/metrics.log" }],
+  [
+    { ns: "myapp:metrics" }, // Branch: sub-pipeline
+    { file: "/tmp/metrics.log" },
+  ],
 ])
 ```
 
@@ -71,15 +70,15 @@ When no config array is provided, `defaultPipeline()` reads from environment var
 
 ## Environment Variables
 
-| Variable     | Values                                  | Effect                     |
-| ------------ | --------------------------------------- | -------------------------- |
-| LOG_LEVEL    | trace, debug, info, warn, error, silent | Filter output by level     |
-| DEBUG        | \*, namespace prefixes, -prefix         | Filter output by namespace |
-| TRACE        | 1, true, or namespace prefixes          | Enable span output         |
-| TRACE_FORMAT | json                                    | Force JSON output          |
-| LOG_FORMAT   | console, json                           | Override output format     |
+| Variable     | Values                                  | Effect                              |
+| ------------ | --------------------------------------- | ----------------------------------- |
+| LOG_LEVEL    | trace, debug, info, warn, error, silent | Filter output by level              |
+| DEBUG        | \*, namespace prefixes, -prefix         | Filter output by namespace          |
+| TRACE        | 1, true, or namespace prefixes          | Enable span output                  |
+| TRACE_FORMAT | json                                    | Force JSON output                   |
+| LOG_FORMAT   | console, json                           | Override output format              |
 | LOG_FILE     | /path/to/file                           | File output (default pipeline only) |
-| NODE_ENV     | production                              | Auto-enable JSON format    |
+| NODE_ENV     | production                              | Auto-enable JSON format             |
 
 ### Examples
 
@@ -109,14 +108,14 @@ const log = createLogger("myapp", [{ level: "debug" }, console])
 
 ### Logger Methods
 
-| Method                                | Purpose            |
-| ------------------------------------- | ------------------ |
-| `.trace?(msg, data?)`                 | Verbose debugging  |
-| `.debug?(msg, data?)`                 | Debug information  |
-| `.info?(msg, data?)`                  | Normal operation   |
-| `.warn?(msg, data?)`                  | Recoverable issues |
-| `.error?(msg \| Error, data?)`        | Failures           |
-| `.error?(error, message, data?)`      | Error + custom msg |
+| Method                           | Purpose            |
+| -------------------------------- | ------------------ |
+| `.trace?(msg, data?)`            | Verbose debugging  |
+| `.debug?(msg, data?)`            | Debug information  |
+| `.info?(msg, data?)`             | Normal operation   |
+| `.warn?(msg, data?)`             | Recoverable issues |
+| `.error?(msg \| Error, data?)`   | Failures           |
+| `.error?(error, message, data?)` | Error + custom msg |
 
 ### Child Loggers
 
@@ -172,11 +171,11 @@ try {
 
 ```typescript
 import type {
-  LogEvent,         // { kind: "log", time, namespace, level, message, props? }
-  SpanEvent,        // { kind: "span", time, namespace, name, duration, spanId, traceId, parentId, props? }
-  Event,            // LogEvent | SpanEvent
-  Stage,            // (event: Event) => Event | null | void
-  Pipeline,         // { dispatch, level, dispose }
+  LogEvent, // { kind: "log", time, namespace, level, message, props? }
+  SpanEvent, // { kind: "span", time, namespace, name, duration, spanId, traceId, parentId, props? }
+  Event, // LogEvent | SpanEvent
+  Stage, // (event: Event) => Event | null | void
+  Pipeline, // { dispatch, level, dispose }
   ConditionalLogger, // Logger with ?.  methods
 } from "loggily"
 ```
@@ -186,11 +185,7 @@ import type {
 ```typescript
 import { buildPipeline, defaultPipeline } from "loggily"
 
-const pipeline = buildPipeline([
-  { level: "debug" },
-  console,
-  { file: "/tmp/app.log", format: "json" },
-])
+const pipeline = buildPipeline([{ level: "debug" }, console, { file: "/tmp/app.log", format: "json" }])
 
 const defaultPipe = defaultPipeline() // reads env vars
 ```
@@ -201,12 +196,12 @@ These functions still work but are deprecated. They map to environment variables
 
 ```typescript
 // Deprecated -- use config array or env vars instead
-setLogLevel("debug")     // -> set LOG_LEVEL env var
-enableSpans()            // -> set TRACE=1 env var
+setLogLevel("debug") // -> set LOG_LEVEL env var
+enableSpans() // -> set TRACE=1 env var
 setDebugFilter(["myapp"]) // -> set DEBUG env var
 setTraceFilter(["myapp"]) // -> set TRACE env var
-addWriter(fn)            // -> use config array
-setLogFormat("json")     // -> set LOG_FORMAT env var
+addWriter(fn) // -> use config array
+setLogFormat("json") // -> set LOG_FORMAT env var
 ```
 
 ## Distributed Tracing (opt-in)

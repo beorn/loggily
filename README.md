@@ -121,12 +121,12 @@ try {
 
 ### Common configuration
 
-| Variable     | Example                   | Effect                                                |
-| ------------ | ------------------------- | ----------------------------------------------------- |
+| Variable     | Example                   | Effect                                                 |
+| ------------ | ------------------------- | ------------------------------------------------------ |
 | `DEBUG`      | `myapp:db,-myapp:sql`     | Namespace filter (compatible with the `debug` package) |
-| `LOG_LEVEL`  | `debug`, `info`, `warn`   | Minimum output level                                  |
-| `LOG_FORMAT` | `console`, `json`         | Override output format                                |
-| `TRACE`      | `1` or namespace prefixes | Enable span output                                    |
+| `LOG_LEVEL`  | `debug`, `info`, `warn`   | Minimum output level                                   |
+| `LOG_FORMAT` | `console`, `json`         | Override output format                                 |
+| `TRACE`      | `1` or namespace prefixes | Enable span output                                     |
 
 See the [full environment variable reference](https://beorn.codes/loggily/api/configuration).
 
@@ -134,14 +134,14 @@ See the [full environment variable reference](https://beorn.codes/loggily/api/co
 
 Key types exported for power users:
 
-| Type               | Description                                              |
-| ------------------ | -------------------------------------------------------- |
-| `LogEvent`         | A log message event (kind, level, namespace, message, props) |
-| `SpanEvent`        | A span timing event (kind, namespace, duration, spanId, traceId) |
-| `Event`            | `LogEvent \| SpanEvent`                                   |
-| `Stage`            | `(event: Event) => Event \| null \| void`                 |
-| `Pipeline`         | `{ dispatch, level, dispose }`                            |
-| `ConditionalLogger`| Logger with `?.`-compatible methods                       |
+| Type                | Description                                                      |
+| ------------------- | ---------------------------------------------------------------- |
+| `LogEvent`          | A log message event (kind, level, namespace, message, props)     |
+| `SpanEvent`         | A span timing event (kind, namespace, duration, spanId, traceId) |
+| `Event`             | `LogEvent \| SpanEvent`                                          |
+| `Stage`             | `(event: Event) => Event \| null \| void`                        |
+| `Pipeline`          | `{ dispatch, level, dispose }`                                   |
+| `ConditionalLogger` | Logger with `?.`-compatible methods                              |
 
 `buildPipeline()` and `defaultPipeline()` are exported for direct pipeline construction.
 

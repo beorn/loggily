@@ -8,33 +8,25 @@ In v2, output destinations are configured in the config array passed to `createL
 import { createLogger } from "loggily"
 
 // Console + file output
-const log = createLogger("myapp", [
-  console,
-  { file: "/tmp/app.log", format: "json" },
-])
+const log = createLogger("myapp", [console, { file: "/tmp/app.log", format: "json" }])
 
 // Errors-only file + console for everything
-const log = createLogger("myapp", [
-  console,
-  { file: "/tmp/errors.log", level: "error", format: "json" },
-])
+const log = createLogger("myapp", [console, { file: "/tmp/errors.log", level: "error", format: "json" }])
 
 // Custom writable stream
-const log = createLogger("myapp", [
-  { write: (s: string) => process.stderr.write(s + "\n") },
-])
+const log = createLogger("myapp", [{ write: (s: string) => process.stderr.write(s + "\n") }])
 ```
 
 ### File Sink Options
 
 When using `{ file: "/path" }` in the config array, you can override scope settings:
 
-| Key      | Type                   | Description                 |
-| -------- | ---------------------- | --------------------------- |
-| `file`   | `string`               | Output file path (required) |
-| `level`  | `LogLevel` (optional)  | Override level for this sink|
-| `ns`     | `string` (optional)    | Override namespace filter   |
-| `format` | `LogFormat` (optional) | Override format for this sink|
+| Key      | Type                   | Description                   |
+| -------- | ---------------------- | ----------------------------- |
+| `file`   | `string`               | Output file path (required)   |
+| `level`  | `LogLevel` (optional)  | Override level for this sink  |
+| `ns`     | `string` (optional)    | Override namespace filter     |
+| `format` | `LogFormat` (optional) | Override format for this sink |
 
 ## createFileWriter (low-level)
 

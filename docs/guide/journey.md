@@ -69,10 +69,7 @@ LOG_LEVEL=debug bun run app               # Debug level globally, all namespaces
 You can also set namespace filters in the config array:
 
 ```typescript
-const log = createLogger("myapp", [
-  { ns: "myapp:db,-myapp:db:verbose" },
-  console,
-])
+const log = createLogger("myapp", [{ ns: "myapp:db,-myapp:db:verbose" }, console])
 ```
 
 **The wall**: A request takes 3 seconds. You know it's slow, but you don't know which part.

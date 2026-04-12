@@ -53,13 +53,13 @@ Restore original `console.*` methods.
 ### createWorkerLogHandler
 
 ```typescript
-function createWorkerLogHandler(options?: { enableSpans?: boolean }): (message: WorkerMessage) => void
+function createWorkerLogHandler(): (message: WorkerMessage) => void
 ```
 
-Handle all worker messages (logs, spans, console). Creates loggers per namespace automatically.
+Handle all worker messages (logs, spans, console). Creates loggers per namespace automatically. Span output is controlled by the `TRACE` environment variable.
 
 ```typescript
-const handle = createWorkerLogHandler({ enableSpans: true })
+const handle = createWorkerLogHandler()
 worker.onmessage = (e) => handle(e.data)
 ```
 

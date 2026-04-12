@@ -4,18 +4,18 @@ Step-by-step guide for migrating from Pino to Loggily.
 
 ## Why Migrate?
 
-| Feature                   | Pino                   | Loggily                        |
-| ------------------------- | ---------------------- | ------------------------------ |
-| Log levels                | Yes (7 levels)         | Yes (5 levels + silent)        |
-| Structured data           | Yes (JSON)             | Yes (JSON + pretty console)    |
-| Disabled call overhead    | ~0.5ns (noop)          | ~2.5ns (?. proxy)              |
-| Disabled + expensive args | 129ns (args evaluated) | **3.6ns (args skipped)**       |
-| Built-in spans/tracing    | No                     | Yes (with `using` keyword)     |
-| Child loggers             | Yes                    | Yes                            |
-| Pretty print              | Via pino-pretty        | Built-in                       |
-| Bundle size               | ~14KB + transports     | ~3KB                           |
-| Browser support           | Via pino/browser       | Built-in (conditional export)  |
-| Config model              | Options object         | Composable config array        |
+| Feature                   | Pino                   | Loggily                       |
+| ------------------------- | ---------------------- | ----------------------------- |
+| Log levels                | Yes (7 levels)         | Yes (5 levels + silent)       |
+| Structured data           | Yes (JSON)             | Yes (JSON + pretty console)   |
+| Disabled call overhead    | ~0.5ns (noop)          | ~2.5ns (?. proxy)             |
+| Disabled + expensive args | 129ns (args evaluated) | **3.6ns (args skipped)**      |
+| Built-in spans/tracing    | No                     | Yes (with `using` keyword)    |
+| Child loggers             | Yes                    | Yes                           |
+| Pretty print              | Via pino-pretty        | Built-in                      |
+| Bundle size               | ~14KB + transports     | ~3KB                          |
+| Browser support           | Via pino/browser       | Built-in (conditional export) |
+| Config model              | Options object         | Composable config array       |
 
 ## Quick Migration
 
@@ -116,10 +116,7 @@ const logger = pino({
 })
 
 // Loggily v2 — config array
-const log = createLogger("myapp", [
-  console,
-  { file: "/tmp/app.log", format: "json" },
-])
+const log = createLogger("myapp", [console, { file: "/tmp/app.log", format: "json" }])
 ```
 
 ### Serializers

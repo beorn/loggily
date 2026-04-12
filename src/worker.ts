@@ -451,7 +451,11 @@ export function createWorkerLogger(
     debug: (msg, data) => log("debug", msg, data),
     info: (msg, data) => log("info", msg, data),
     warn: (msg, data) => log("warn", msg, data),
-    error: (msgOrError: LazyMessage | Error, dataOrMsg?: Record<string, unknown> | string, extraData?: Record<string, unknown>) => {
+    error: (
+      msgOrError: LazyMessage | Error,
+      dataOrMsg?: Record<string, unknown> | string,
+      extraData?: Record<string, unknown>,
+    ) => {
       if (msgOrError instanceof Error) {
         if (typeof dataOrMsg === "string") {
           log("error", dataOrMsg, {
@@ -476,7 +480,12 @@ export function createWorkerLogger(
 
     logger(childNamespace?: string, childProps?: Record<string, unknown>): ConditionalLogger {
       const fullNamespace = childNamespace ? `${namespace}:${childNamespace}` : namespace
-      return createWorkerLogger(postMessage, fullNamespace, { ...props, ...childProps }, options) as unknown as ConditionalLogger
+      return createWorkerLogger(
+        postMessage,
+        fullNamespace,
+        { ...props, ...childProps },
+        options,
+      ) as unknown as ConditionalLogger
     },
 
     span: createSpan,
@@ -485,7 +494,12 @@ export function createWorkerLogger(
       if (typeof context === "string") {
         return this.logger(context)
       }
-      return createWorkerLogger(postMessage, namespace, { ...props, ...context }, options) as unknown as ConditionalLogger
+      return createWorkerLogger(
+        postMessage,
+        namespace,
+        { ...props, ...context },
+        options,
+      ) as unknown as ConditionalLogger
     },
 
     end(): void {

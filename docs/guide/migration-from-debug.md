@@ -5,14 +5,14 @@ Step-by-step guide for migrating from the `debug` package to `loggily`.
 ## Why Migrate?
 
 | Feature            | debug               | Loggily                                     |
-| ------------------ | -------------------- | ------------------------------------------- |
-| Log levels         | No (namespace only)  | Yes (trace, debug, info, warn, error)       |
-| Structured data    | No (printf-style)    | Yes (JSON objects)                          |
-| Performance        | Good                 | Better (conditional logging skips arg eval) |
-| Timing/spans       | No                   | Built-in spans with auto-timing             |
-| JSON output        | No                   | Yes (production/LOG_FORMAT=json)            |
-| Near-zero disabled | No                   | Yes (optional chaining pattern)             |
-| Config pipeline    | No                   | Composable array config                     |
+| ------------------ | ------------------- | ------------------------------------------- |
+| Log levels         | No (namespace only) | Yes (trace, debug, info, warn, error)       |
+| Structured data    | No (printf-style)   | Yes (JSON objects)                          |
+| Performance        | Good                | Better (conditional logging skips arg eval) |
+| Timing/spans       | No                  | Built-in spans with auto-timing             |
+| JSON output        | No                  | Yes (production/LOG_FORMAT=json)            |
+| Near-zero disabled | No                  | Yes (optional chaining pattern)             |
+| Config pipeline    | No                  | Composable array config                     |
 
 ## Quick Migration
 
@@ -214,12 +214,12 @@ const log = createLogger("myapp", [{ level: "debug" }, console])
 
 ### 4. Update Log Calls
 
-| Pattern     | Before                       | After                          |
-| ----------- | ---------------------------- | ------------------------------ |
-| Simple      | `debug('msg')`               | `log.debug?.('msg')`           |
-| With values | `debug('msg %s', v)`         | `log.debug?.(\`msg ${v}\`)`    |
-| Structured  | `debug('data %o', d)`        | `log.debug?.('data', { d })`   |
-| Error       | `debug('err %s', e.message)` | `log.error?.(e)`               |
+| Pattern     | Before                       | After                        |
+| ----------- | ---------------------------- | ---------------------------- |
+| Simple      | `debug('msg')`               | `log.debug?.('msg')`         |
+| With values | `debug('msg %s', v)`         | `log.debug?.(\`msg ${v}\`)`  |
+| Structured  | `debug('data %o', d)`        | `log.debug?.('data', { d })` |
+| Error       | `debug('err %s', e.message)` | `log.error?.(e)`             |
 
 ### 5. Update Environment
 
@@ -293,10 +293,7 @@ Loggily is `DEBUG=` compatible -- the same `DEBUG=myapp` syntax works for namesp
 You can also set namespace filters in the config array:
 
 ```typescript
-const log = createLogger("myapp", [
-  { ns: "myapp:db,-myapp:db:verbose" },
-  console,
-])
+const log = createLogger("myapp", [{ ns: "myapp:db,-myapp:db:verbose" }, console])
 ```
 
 ### Printf Format Strings

@@ -100,11 +100,11 @@ This replaces the v1 global setters (`setLogLevel`, `addWriter`, `enableSpans`, 
 
 ### Key types
 
-| Type              | Description                                     |
-| ----------------- | ----------------------------------------------- |
-| `LogEvent`        | A log message event (kind, level, namespace, message, props) |
-| `SpanEvent`       | A span timing event (kind, namespace, duration, spanId, traceId) |
-| `Event`           | `LogEvent \| SpanEvent`                          |
-| `Stage`           | `(event: Event) => Event \| null \| void`        |
-| `Pipeline`        | `{ dispatch, level, dispose }`                   |
-| `ConditionalLogger` | Logger with `?.`-compatible methods            |
+| Type                | Description                                                      |
+| ------------------- | ---------------------------------------------------------------- |
+| `LogEvent`          | A log message event (kind, level, namespace, message, props)     |
+| `SpanEvent`         | A span timing event (kind, namespace, duration, spanId, traceId) |
+| `Event`             | `LogEvent \| SpanEvent`                                          |
+| `Stage`             | `(event: Event) => Event \| null \| void`                        |
+| `Pipeline`          | `{ dispatch, level, dispose }`                                   |
+| `ConditionalLogger` | Logger with `?.`-compatible methods                              |

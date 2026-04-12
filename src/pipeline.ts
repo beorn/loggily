@@ -89,11 +89,21 @@ function formatConsoleEvent(event: Event): string {
 
   let levelStr: string
   switch (event.level) {
-    case "trace": levelStr = pc.dim("TRACE"); break
-    case "debug": levelStr = pc.dim("DEBUG"); break
-    case "info": levelStr = pc.blue("INFO"); break
-    case "warn": levelStr = pc.yellow("WARN"); break
-    case "error": levelStr = pc.red("ERROR"); break
+    case "trace":
+      levelStr = pc.dim("TRACE")
+      break
+    case "debug":
+      levelStr = pc.dim("DEBUG")
+      break
+    case "info":
+      levelStr = pc.blue("INFO")
+      break
+    case "warn":
+      levelStr = pc.yellow("WARN")
+      break
+    case "error":
+      levelStr = pc.red("ERROR")
+      break
   }
 
   let output = `${time} ${levelStr} ${ns} ${event.message}`
@@ -191,10 +201,7 @@ function createConsoleSink(format: LogFormat): (event: Event) => void {
   }
 }
 
-function createFileSink(
-  path: string,
-  format: LogFormat,
-): { write: (event: Event) => void; dispose: () => void } {
+function createFileSink(path: string, format: LogFormat): { write: (event: Event) => void; dispose: () => void } {
   const writer = createFileWriter(path)
   const formatter = format === "json" ? formatJSONEvent : formatConsoleEvent
   return {
@@ -203,10 +210,7 @@ function createFileSink(
   }
 }
 
-function createWritableSink(
-  writable: { write: (s: string) => unknown },
-  format: LogFormat,
-): (event: Event) => void {
+function createWritableSink(writable: { write: (s: string) => unknown }, format: LogFormat): (event: Event) => void {
   const formatter = format === "json" ? formatJSONEvent : formatConsoleEvent
   return (event: Event) => writable.write(formatter(event) + "\n")
 }
@@ -311,15 +315,15 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
 
       if (hasUnknownKey) {
         const unknown = keys.find((k) => !VALID_CONFIG_KEYS.has(k) && !SINK_KEYS.has(k))
-        throw new Error(`loggily: unknown config key "${unknown}" in config object. Valid keys: ${[...VALID_CONFIG_KEYS, ...SINK_KEYS].join(", ")}`)
+        throw new Error(
+          `loggily: unknown config key "${unknown}" in config object. Valid keys: ${[...VALID_CONFIG_KEYS, ...SINK_KEYS].join(", ")}`,
+        )
       }
 
       if (hasSinkKey) {
         if (typeof obj.file === "string") {
           const outputLevel = isValidLogLevel(obj.level) ? obj.level : config.level
-          const outputNs = obj.ns
-            ? parseNsFilter(obj.ns as string | string[])
-            : config.ns
+          const outputNs = obj.ns ? parseNsFilter(obj.ns as string | string[]) : config.ns
           const outputFormat = (obj.format as LogFormat) ?? config.format
           const sink = createFileSink(obj.file, outputFormat)
           disposables.push(sink.dispose)
@@ -430,10 +434,18 @@ export function defaultPipeline(): Pipeline {
     } else {
       switch (event.level) {
         case "trace":
-        case "debug": console.debug(text); break
-        case "info": console.info(text); break
-        case "warn": console.warn(text); break
-        case "error": console.error(text); break
+        case "debug":
+          console.debug(text)
+          break
+        case "info":
+          console.info(text)
+          break
+        case "warn":
+          console.warn(text)
+          break
+        case "error":
+          console.error(text)
+          break
       }
     }
     fileSink?.(event)
@@ -441,7 +453,9 @@ export function defaultPipeline(): Pipeline {
 
   return {
     dispatch,
-    get level() { return readEnvLevel() },
+    get level() {
+      return readEnvLevel()
+    },
     dispose: () => {
       for (const d of disposables) d()
     },

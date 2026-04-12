@@ -230,7 +230,12 @@ function createLoggerImpl(
   traceId: string | null,
   traceSampled: boolean = true,
 ): Logger {
-  const emitLog = (level: OutputLogLevel, msgOrError: LazyMessage | Error, dataOrMsg?: Record<string, unknown> | string, extraData?: Record<string, unknown>): void => {
+  const emitLog = (
+    level: OutputLogLevel,
+    msgOrError: LazyMessage | Error,
+    dataOrMsg?: Record<string, unknown> | string,
+    extraData?: Record<string, unknown>,
+  ): void => {
     let message: string
     let data: Record<string, unknown> | undefined
 
@@ -259,11 +264,12 @@ function createLoggerImpl(
     } else {
       message = resolveMessage(msgOrError)
       const contextTags = _getContextTags?.()
-      data = contextTags && Object.keys(contextTags).length > 0
-        ? { ...contextTags, ...props, ...(dataOrMsg as Record<string, unknown>) }
-        : Object.keys(props).length > 0 || dataOrMsg
-          ? { ...props, ...(dataOrMsg as Record<string, unknown>) }
-          : undefined
+      data =
+        contextTags && Object.keys(contextTags).length > 0
+          ? { ...contextTags, ...props, ...(dataOrMsg as Record<string, unknown>) }
+          : Object.keys(props).length > 0 || dataOrMsg
+            ? { ...props, ...(dataOrMsg as Record<string, unknown>) }
+            : undefined
     }
 
     const event: LogEvent = {
@@ -300,8 +306,11 @@ function createLoggerImpl(
     debug: (msg, data) => emitLog("debug", msg, data),
     info: (msg, data) => emitLog("info", msg, data),
     warn: (msg, data) => emitLog("warn", msg, data),
-    error: (msgOrError: LazyMessage | Error, dataOrMsg?: Record<string, unknown> | string, extraData?: Record<string, unknown>) =>
-      emitLog("error", msgOrError, dataOrMsg, extraData),
+    error: (
+      msgOrError: LazyMessage | Error,
+      dataOrMsg?: Record<string, unknown> | string,
+      extraData?: Record<string, unknown>,
+    ) => emitLog("error", msgOrError, dataOrMsg, extraData),
 
     logger(namespace?: string, childProps?: Record<string, unknown>): ConditionalLogger {
       const childName = namespace ? `${name}:${namespace}` : name
@@ -491,24 +500,37 @@ const _process = typeof process !== "undefined" ? process : undefined
 const _env = _process?.env ?? ({} as Record<string, string | undefined>)
 
 /** @deprecated Use createLogger config array: createLogger("x", [{ level }, console]) */
-export function setLogLevel(level: LogLevel): void { _env.LOG_LEVEL = level }
+export function setLogLevel(level: LogLevel): void {
+  _env.LOG_LEVEL = level
+}
 
 /** @deprecated Level is per-logger in v2 */
-export function getLogLevel(): LogLevel { return (_env.LOG_LEVEL as LogLevel) ?? "info" }
+export function getLogLevel(): LogLevel {
+  return (_env.LOG_LEVEL as LogLevel) ?? "info"
+}
 
 /** @deprecated Use TRACE=1 env var */
-export function enableSpans(): void { _env.TRACE = "1" }
+export function enableSpans(): void {
+  _env.TRACE = "1"
+}
 
 /** @deprecated */
-export function disableSpans(): void { delete _env.TRACE }
+export function disableSpans(): void {
+  delete _env.TRACE
+}
 
 /** @deprecated */
-export function spansAreEnabled(): boolean { return !!_env.TRACE }
+export function spansAreEnabled(): boolean {
+  return !!_env.TRACE
+}
 
 /** @deprecated Use TRACE=namespace env var */
 export function setTraceFilter(namespaces: string[] | null): void {
-  if (!namespaces || namespaces.length === 0) { delete _env.TRACE }
-  else { _env.TRACE = namespaces.join(",") }
+  if (!namespaces || namespaces.length === 0) {
+    delete _env.TRACE
+  } else {
+    _env.TRACE = namespaces.join(",")
+  }
 }
 
 /** @deprecated */
@@ -518,8 +540,11 @@ export function getTraceFilter(): string[] | null {
 
 /** @deprecated Use DEBUG=namespace env var or { ns } in config array */
 export function setDebugFilter(namespaces: string[] | null): void {
-  if (!namespaces || namespaces.length === 0) { delete _env.DEBUG }
-  else { _env.DEBUG = namespaces.join(",") }
+  if (!namespaces || namespaces.length === 0) {
+    delete _env.DEBUG
+  } else {
+    _env.DEBUG = namespaces.join(",")
+  }
 }
 
 /** @deprecated */
@@ -528,13 +553,19 @@ export function getDebugFilter(): string[] | null {
 }
 
 /** @deprecated Use { format } in config array */
-export function setLogFormat(format: LogFormat): void { _env.LOG_FORMAT = format }
+export function setLogFormat(format: LogFormat): void {
+  _env.LOG_FORMAT = format
+}
 
 /** @deprecated */
-export function getLogFormat(): LogFormat { return (_env.LOG_FORMAT as LogFormat) ?? "console" }
+export function getLogFormat(): LogFormat {
+  return (_env.LOG_FORMAT as LogFormat) ?? "console"
+}
 
 /** @deprecated Omit console from config array instead */
-export function setSuppressConsole(value: boolean): void { runtimeState.suppressConsole = value }
+export function setSuppressConsole(value: boolean): void {
+  runtimeState.suppressConsole = value
+}
 
 export type OutputMode = "console" | "stderr" | "writers-only"
 
@@ -542,7 +573,9 @@ export type OutputMode = "console" | "stderr" | "writers-only"
 export function setOutputMode(_mode: OutputMode): void {}
 
 /** @deprecated */
-export function getOutputMode(): OutputMode { return "console" }
+export function getOutputMode(): OutputMode {
+  return "console"
+}
 
 /** @deprecated Pass writers in config array instead */
 export function addWriter(writer: (formatted: string, level: string) => void): () => void {

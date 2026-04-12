@@ -63,7 +63,7 @@ log.debug // function (available)
 
 const log2 = createLogger("myapp", [{ level: "error" }, console])
 log2.debug // undefined
-log2.info  // undefined
+log2.info // undefined
 ```
 
 ## TypeScript Enforcement

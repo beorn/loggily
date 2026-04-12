@@ -26,23 +26,23 @@ Objects configure (`{ level, ns, format }`), arrays branch, values write. Custom
 
 ## Feature Overview
 
-| Feature                | Loggily                               |
-| ---------------------- | ------------------------------------- |
-| Log Levels             | 5 levels (trace through error)        |
-| Structured Logging     | JSON + pretty console                 |
-| Near-zero Disabled     | `?.` skips arg evaluation entirely    |
-| Built-in Spans         | `using` keyword, auto timing          |
-| Namespace Filtering    | `DEBUG=` compatible patterns          |
+| Feature                | Loggily                                                  |
+| ---------------------- | -------------------------------------------------------- |
+| Log Levels             | 5 levels (trace through error)                           |
+| Structured Logging     | JSON + pretty console                                    |
+| Near-zero Disabled     | `?.` skips arg evaluation entirely                       |
+| Built-in Spans         | `using` keyword, auto timing                             |
+| Namespace Filtering    | `DEBUG=` compatible patterns                             |
 | Child / Context Logger | `.logger()`, `.child()`, both return `ConditionalLogger` |
-| Output Pipeline        | Config array: objects, arrays, values |
-| Pretty Print           | Built-in (auto in dev)                |
-| JSON Output            | Built-in (auto in production)         |
-| File Output            | `{ file: "/path" }` in config array   |
-| Custom Stages          | `(event) => event \| null \| void`    |
-| Worker Threads         | `loggily/worker` with typed protocol  |
-| Bundle Size            | ~3KB                                  |
-| TypeScript             | Native, ESM-only                      |
-| Error Handling         | `log.error?.(err, "msg", data?)`      |
+| Output Pipeline        | Config array: objects, arrays, values                    |
+| Pretty Print           | Built-in (auto in dev)                                   |
+| JSON Output            | Built-in (auto in production)                            |
+| File Output            | `{ file: "/path" }` in config array                      |
+| Custom Stages          | `(event) => event \| null \| void`                       |
+| Worker Threads         | `loggily/worker` with typed protocol                     |
+| Bundle Size            | ~3KB                                                     |
+| TypeScript             | Native, ESM-only                                         |
+| Error Handling         | `log.error?.(err, "msg", data?)`                         |
 
 ## Compatibility
 
@@ -122,10 +122,7 @@ log.debug(`state: ${computeState()}`)
 
 ```typescript
 // Loggily v2 -- config array
-const log = createLogger("myapp", [
-  console,
-  { file: "/tmp/app.log", format: "json" },
-])
+const log = createLogger("myapp", [console, { file: "/tmp/app.log", format: "json" }])
 ```
 
 ### Error logging

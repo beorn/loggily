@@ -5,13 +5,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
-import {
-  createLogger,
-  resetIds,
-  type Logger,
-  type SpanLogger,
-  type ConditionalLogger,
-} from "../src/index.ts"
+import { createLogger, resetIds, type Logger, type SpanLogger, type ConditionalLogger } from "../src/index.ts"
 import { createConsoleMock } from "./helpers.ts"
 
 // Console mock instance for all tests

@@ -112,10 +112,7 @@ const logger = winston.createLogger({
 })
 
 // Loggily v2 — config array
-const log = createLogger("myapp", [
-  console,
-  { file: "/tmp/app.log", format: "json" },
-])
+const log = createLogger("myapp", [console, { file: "/tmp/app.log", format: "json" }])
 ```
 
 ### Custom Output

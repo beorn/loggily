@@ -35,11 +35,7 @@ The string argument is the **namespace** -- it appears in every log message and 
 The optional second argument is a **config array** that controls output and behavior:
 
 ```typescript
-const log = createLogger("myapp", [
-  { level: "debug" },
-  console,
-  { file: "/tmp/app.log", format: "json" },
-])
+const log = createLogger("myapp", [{ level: "debug" }, console, { file: "/tmp/app.log", format: "json" }])
 ```
 
 In the config array: objects configure (`{ level, ns, format }`), arrays branch into sub-pipelines, and values write output. Pass `console` for terminal output, or `{ file: "/path" }` for file output.
@@ -147,10 +143,7 @@ DEBUG='*' bun run app                    # Everything
 You can also use the `ns` key in the config array:
 
 ```typescript
-const log = createLogger("myapp", [
-  { ns: "myapp:db,-myapp:db:verbose" },
-  console,
-])
+const log = createLogger("myapp", [{ ns: "myapp:db,-myapp:db:verbose" }, console])
 ```
 
 ## Output Format
