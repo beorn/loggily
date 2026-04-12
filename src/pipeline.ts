@@ -232,7 +232,7 @@ interface Output {
 
 // ============ Discrimination ============
 
-const VALID_CONFIG_KEYS = new Set(["level", "ns", "format"])
+const VALID_CONFIG_KEYS = new Set(["level", "ns", "format", "spans"])
 const SINK_KEYS = new Set(["file", "otel"])
 
 function isPojo(obj: unknown): obj is Record<string, unknown> {
@@ -246,8 +246,7 @@ function isWritable(obj: unknown): obj is { write: (s: string) => unknown } {
     typeof obj === "object" &&
     obj !== null &&
     "write" in obj &&
-    typeof (obj as Record<string, unknown>).write === "function" &&
-    !isPojo(obj)
+    typeof (obj as Record<string, unknown>).write === "function"
   )
 }
 
@@ -269,6 +268,9 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
     ns: parentConfig?.ns ?? readEnvNs(),
     format: parentConfig?.format ?? readEnvFormat(),
   }
+  // Spans always pass through explicit pipelines. { spans: false } to opt out.
+  // The defaultPipeline handles TRACE env var gating separately.
+  let spansEnabled = true
 
   const stages: Stage[] = []
   const outputs: Output[] = []
@@ -276,6 +278,7 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
   const disposables: (() => void)[] = []
 
   for (const element of elements) {
+    // 1. Array → branch
     if (Array.isArray(element)) {
       const branch = buildPipeline(element, { ...config })
       branches.push(branch)
@@ -283,12 +286,14 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
       continue
     }
 
+    // 2. Function → stage (but not console which is also a function-like object)
     if (typeof element === "function" && element !== (console as unknown)) {
       stages.push(element as Stage)
       continue
     }
 
-    if (element === console) {
+    // 3. console (literal or "console" string) → console sink
+    if (element === console || element === "console") {
       outputs.push({
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
         nsFilter: config.ns,
@@ -297,6 +302,7 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
       continue
     }
 
+    // 4. Writable ({ write }) → writable sink (checked BEFORE POJO so { write: fn } works)
     if (isWritable(element)) {
       outputs.push({
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
@@ -306,6 +312,7 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
       continue
     }
 
+    // 5. POJO → scope config or output descriptor
     if (isPojo(element)) {
       const obj = element
       const keys = Object.keys(obj)
@@ -337,19 +344,35 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
         continue
       }
 
+      // Scope config — update inherited config
       if (isValidLogLevel(obj.level)) config.level = obj.level
       if (obj.ns !== undefined) config.ns = parseNsFilter(obj.ns as string | string[])
       if (obj.format === "console" || obj.format === "json") config.format = obj.format
+      if (obj.spans === true) spansEnabled = true
+      if (obj.spans === false) spansEnabled = false
+      continue
+    }
+
+    // 6. String "stderr" → stderr sink
+    if (element === "stderr" && typeof process !== "undefined") {
+      outputs.push({
+        levelPriority: LOG_LEVEL_PRIORITY[config.level],
+        nsFilter: config.ns,
+        write: createWritableSink(process.stderr as unknown as { write: (s: string) => unknown }, config.format),
+      })
       continue
     }
 
     throw new Error(
       `loggily: unsupported config element of type "${typeof element}". ` +
-        "Config arrays accept: objects (config), arrays (branches), functions (stages), console, or writables ({ write }).",
+        'Config arrays accept: objects (config), arrays (branches), functions (stages), console, "console", or writables ({ write }).',
     )
   }
 
   const dispatch = (event: Event): void => {
+    // Span gate: { spans: false } disables span output for this pipeline
+    if (event.kind === "span" && !spansEnabled) return
+
     let e: Event = event
     for (const stage of stages) {
       const result = stage(e)
@@ -389,7 +412,6 @@ export const runtimeState: RuntimeState = {
 
 export function defaultPipeline(): Pipeline {
   const rt = runtimeState
-
   const disposables: (() => void)[] = []
 
   let fileSink: ((event: Event) => void) | null = null
@@ -400,12 +422,11 @@ export function defaultPipeline(): Pipeline {
     disposables.push(sink.dispose)
   }
 
+  // Dynamic dispatch — re-reads env vars each time for legacy setter compat
   const dispatch = (event: Event): void => {
-    // Re-read level dynamically so legacy setters (setLogLevel etc.) work on existing loggers
     const currentLevel = readEnvLevel()
-    if (event.kind === "log") {
-      if (LOG_LEVEL_PRIORITY[event.level] < LOG_LEVEL_PRIORITY[currentLevel]) return
-    } else if (event.kind === "span") {
+    if (event.kind === "log" && LOG_LEVEL_PRIORITY[event.level] < LOG_LEVEL_PRIORITY[currentLevel]) return
+    if (event.kind === "span") {
       const trace = readEnvTrace()
       if (!trace.enabled) return
       if (trace.filter && !trace.filter(event.namespace)) return
@@ -413,39 +434,38 @@ export function defaultPipeline(): Pipeline {
     const currentNs = readEnvNs()
     if (currentNs && !currentNs(event.namespace)) return
 
+    // Dynamic format selection
     const currentFormat = readEnvFormat()
     const useJson = currentFormat === "json" || getEnv("NODE_ENV") === "production" || getEnv("TRACE_FORMAT") === "json"
     const formatter = useJson ? formatJSONEvent : formatConsoleEvent
 
+    // Legacy writers
     if (rt.writers.length > 0) {
       const formatted = formatter(event)
       const lvl = event.kind === "log" ? event.level : "span"
       for (const w of rt.writers) w(formatted, lvl)
     }
 
-    if (rt.suppressConsole) {
-      fileSink?.(event)
-      return
-    }
-
-    const text = formatter(event)
-    if (event.kind === "span") {
-      writeStderr(text)
-    } else {
-      switch (event.level) {
-        case "trace":
-        case "debug":
-          console.debug(text)
-          break
-        case "info":
-          console.info(text)
-          break
-        case "warn":
-          console.warn(text)
-          break
-        case "error":
-          console.error(text)
-          break
+    if (!rt.suppressConsole) {
+      const text = formatter(event)
+      if (event.kind === "span") {
+        writeStderr(text)
+      } else {
+        switch (event.level) {
+          case "trace":
+          case "debug":
+            console.debug(text)
+            break
+          case "info":
+            console.info(text)
+            break
+          case "warn":
+            console.warn(text)
+            break
+          case "error":
+            console.error(text)
+            break
+        }
       }
     }
     fileSink?.(event)

@@ -452,11 +452,15 @@ function wrapConditional(logger: Logger, getLevel: () => LogLevel): ConditionalL
  * Create a logger.
  *
  * @param name - Logger namespace (e.g., 'myapp', 'myapp:db')
- * @param config - Optional config array. Objects configure, arrays branch, values write.
+ * @param configOrProps - Config array, or props object for backwards compat
  *
  * @example
  * // Zero config (reads LOG_LEVEL, DEBUG, LOG_FORMAT from env)
  * const log = createLogger('myapp')
+ *
+ * @example
+ * // With props (backwards compat)
+ * const log = createLogger('myapp', { version: '1.0' })
  *
  * @example
  * // Configured pipeline
@@ -466,15 +470,35 @@ function wrapConditional(logger: Logger, getLevel: () => LogLevel): ConditionalL
  *   { file: '/tmp/app.log', level: 'info', format: 'json' },
  * ])
  */
-export function createLogger(name: string, config?: unknown[]): ConditionalLogger {
-  const pipeline = config ? buildPipeline(config) : defaultPipeline()
-  const logger = createLoggerImpl(name, {}, pipeline, null, null, null)
+export function createLogger(name: string, configOrProps?: unknown[] | Record<string, unknown>): ConditionalLogger {
+  let pipeline: Pipeline
+  let props: Record<string, unknown> = {}
+
+  if (Array.isArray(configOrProps)) {
+    pipeline = buildPipeline(configOrProps)
+  } else if (configOrProps && typeof configOrProps === "object" && !Array.isArray(configOrProps)) {
+    // Non-array object = props (backwards compat with v1 createLogger(name, props))
+    props = configOrProps as Record<string, unknown>
+    pipeline = defaultPipeline()
+  } else {
+    pipeline = defaultPipeline()
+  }
+
+  const logger = createLoggerImpl(name, props, pipeline, null, null, null)
   return wrapConditional(logger, () => pipeline.level)
+}
+
+/**
+ * Create a logger for tests — all levels enabled, outputs to console.
+ * Equivalent to createLogger(name, [{ level: "trace" }, console]).
+ */
+export function createTestLogger(name: string): ConditionalLogger {
+  return createLogger(name, [{ level: "trace" }, console])
 }
 
 // ============ Compose (Logger Plugin Composition) ============
 
-export type LoggerFactory = (name: string, config?: unknown[]) => ConditionalLogger
+export type LoggerFactory = (name: string, configOrProps?: unknown[] | Record<string, unknown>) => ConditionalLogger
 export type LoggerPlugin = (factory: LoggerFactory) => LoggerFactory
 
 /**
