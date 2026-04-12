@@ -47,40 +47,67 @@ The second argument to `createLogger` is an optional config array. Objects confi
 
 ```typescript
 const log = createLogger("myapp", [
-  { level: "debug", ns: "-sql" }, // Config: set level, filter namespace
+  { level: "debug", ns: "-sql" }, // Config object: set level, filter namespace
   console, // Output: write to console
-  { file: "/tmp/errors.log", level: "error", format: "json" }, // Output: file sink
+  { file: "/tmp/errors.log", level: "error", format: "json" }, // File sink
   (event) => {
     // Stage: custom transform/filter
     if (event.kind === "log" && event.message.includes("secret")) return null
     return event
   },
+  { write: (event) => sendToService(event), objectMode: true }, // Writable sink
   [
-    { ns: "myapp:metrics" }, // Branch: sub-pipeline
+    // Branch: sub-pipeline
+    { ns: "myapp:metrics" },
     { file: "/tmp/metrics.log" },
   ],
 ])
 ```
 
-Config keys: `level` (LogLevel), `ns` (namespace filter string/array), `format` ("console" | "json"), `spans` (boolean, per-pipeline span control).
+### Config Array Element Discrimination
 
-Sink keys: `file` (path string), with optional `level`, `ns`, `format` overrides.
+| Element Type   | Example                                                        | Description                         |
+| -------------- | -------------------------------------------------------------- | ----------------------------------- |
+| Config object  | `{ level: "debug", ns: "-sql", format: "json", spans: false }` | Set scope for subsequent elements   |
+| `console`      | `console` or `"console"`                                       | Console output at current scope     |
+| File sink      | `{ file: "/path", level?, ns?, format? }`                      | File output with optional overrides |
+| Stage function | `(event) => event \| null \| void`                             | Transform, filter, or enrich events |
+| Branch array   | `[{ ns: "metrics" }, { file: "/tmp/m.log" }]`                  | Sub-pipeline with own scope         |
+| Writable       | `{ write: (data) => void, objectMode?: boolean }`              | Any writable stream or transport    |
 
-`console` literal and `"console"` string are both accepted as console sinks.
+### Config Object Keys
 
-When no config array is provided, `withEnvDefaults` reads from environment variables.
+| Key      | Type                  | Description                               |
+| -------- | --------------------- | ----------------------------------------- |
+| `level`  | `LogLevel`            | Minimum log level                         |
+| `ns`     | `string \| string[]`  | Namespace filter pattern                  |
+| `format` | `"console" \| "json"` | Output format                             |
+| `spans`  | `boolean`             | Enable/disable span output (per-pipeline) |
+
+### Sink Object Keys (file sinks)
+
+| Key      | Type                             | Description                   |
+| -------- | -------------------------------- | ----------------------------- |
+| `file`   | `string`                         | Path for file output          |
+| `level`  | `LogLevel` (optional)            | Override level for this sink  |
+| `ns`     | `string \| string[]` (optional)  | Override ns for this sink     |
+| `format` | `"console" \| "json"` (optional) | Override format for this sink |
+
+### Writable Object Mode
+
+When `objectMode: true`, the writable receives raw `Event` objects instead of formatted strings. Useful for Pino transports, analytics pipelines, or custom sinks that need structured data.
 
 ## Environment Variables
 
-| Variable     | Values                                  | Effect                              |
-| ------------ | --------------------------------------- | ----------------------------------- |
-| LOG_LEVEL    | trace, debug, info, warn, error, silent | Filter output by level              |
-| DEBUG        | \*, namespace prefixes, -prefix         | Filter output by namespace          |
-| TRACE        | 1, true, or namespace prefixes          | Enable span output                  |
-| TRACE_FORMAT | json                                    | Force JSON output                   |
-| LOG_FORMAT   | console, json                           | Override output format              |
-| LOG_FILE     | /path/to/file                           | File output (default pipeline only) |
-| NODE_ENV     | production                              | Auto-enable JSON format             |
+| Variable       | Values                                  | Default   | Effect                              |
+| -------------- | --------------------------------------- | --------- | ----------------------------------- |
+| `LOG_LEVEL`    | trace, debug, info, warn, error, silent | `info`    | Filter output by level              |
+| `DEBUG`        | \*, namespace prefixes, -prefix         | (none)    | Filter output by namespace          |
+| `TRACE`        | 1, true, or namespace prefixes          | (none)    | Enable span output                  |
+| `TRACE_FORMAT` | json                                    | (none)    | Force JSON output                   |
+| `LOG_FORMAT`   | console, json                           | `console` | Override output format              |
+| `LOG_FILE`     | /path/to/file                           | (none)    | File output (default pipeline only) |
+| `NODE_ENV`     | production                              | (none)    | Auto-enable JSON format             |
 
 ### Examples
 
@@ -91,8 +118,18 @@ DEBUG='km:*,-km:sql' bun run app    # Show all km namespaces except km:sql
 DEBUG='*' bun run app               # Show all namespaces at debug level
 TRACE=1 bun run app                 # Enable all span timing output
 TRACE=myapp:import bun run app      # Enable spans for specific namespace
-TRACE=myapp,other bun run app       # Enable spans for multiple prefixes
 ```
+
+### Namespace Filter Patterns
+
+| Pattern            | Matches                                                        |
+| ------------------ | -------------------------------------------------------------- |
+| `*`                | Everything                                                     |
+| `myapp`            | Exact match + children (`myapp`, `myapp:db`, `myapp:db:query`) |
+| `myapp:*`          | Same as `myapp` -- explicit wildcard                           |
+| `myapp:db`         | Exact match + children (`myapp:db`, `myapp:db:query`)          |
+| `-myapp:sql`       | Exclude `myapp:sql` and its children                           |
+| `myapp,-myapp:sql` | Include myapp, exclude sql subtree                             |
 
 ## API
 
@@ -108,6 +145,20 @@ const log = createLogger("myapp")
 const log = createLogger("myapp", [{ level: "debug" }, console])
 ```
 
+`createLogger` = `pipe(baseCreateLogger, withEnvDefaults(), withSpans())`.
+
+### baseCreateLogger(name, config?)
+
+Base logger factory without `withEnvDefaults()` or `withSpans()`. Use for full manual control:
+
+```typescript
+import { baseCreateLogger, pipe, withSpans, withEnvDefaults } from "loggily"
+
+const myCreateLogger = pipe(baseCreateLogger, withSpans(), withEnvDefaults())
+```
+
+Loggers from `baseCreateLogger` do NOT have `.span()` capability -- calling `.span()` throws.
+
 ### Logger Methods
 
 | Method                           | Purpose            |
@@ -119,20 +170,40 @@ const log = createLogger("myapp", [{ level: "debug" }, console])
 | `.error?(msg \| Error, data?)`   | Failures           |
 | `.error?(error, message, data?)` | Error + custom msg |
 
+**Log levels** (most to least verbose): `trace < debug < info < warn < error < silent`
+
+**Default level**: `info` (trace and debug disabled)
+
+### Error Overloads
+
+```typescript
+log.error?.(new Error("timeout")) // Error only
+log.error?.(new Error("timeout"), "request failed") // Error + custom message
+log.error?.(new Error("timeout"), "request failed", { url: "/api" }) // Error + message + data
+log.error?.("manual error", { code: "ETIMEOUT" }) // String message + data
+```
+
+Error.cause chains are serialized automatically (up to 3 levels deep):
+
+```typescript
+const err = new Error("timeout")
+err.cause = new Error("DNS failed")
+log.error?.(err)
+// props includes: error_cause: { name: "Error", message: "DNS failed", stack: "..." }
+```
+
 ### Child Loggers
 
 ```typescript
 // Extend namespace
-const child = log.child("auth")
-// -> namespace: "myapp:auth"
+const child = log.child("auth") // namespace: "myapp:auth"
 
 // Context fields (same namespace, extra fields)
 const child = log.child({ requestId: "abc" })
-// -> all logs include requestId
 
 // Both at once
 const child = log.child("auth", { sso: true })
-// -> namespace: "myapp:auth", all logs include sso
+// namespace: "myapp:auth", all logs include sso
 ```
 
 `.child()` returns `ConditionalLogger`. The older `.logger()` still works but is deprecated.
@@ -145,7 +216,7 @@ Spans are loggers with timing. They implement `Disposable` for use with `using`:
 {
   using span = log.span("operation", { context: "value" })
   span.debug?.("step 1")
-  span.spanData.processed = 100 // Set custom attributes
+  span.spanData.processed = 100
 }
 // On block exit: SPAN myapp:operation (15ms) {processed: 100, context: "value"}
 ```
@@ -171,32 +242,31 @@ try {
 | `spanData.parentId`  | string \| null (readonly) | Parent span ID                        |
 | `spanData.startTime` | number (readonly)         | Start timestamp (ms)                  |
 | `spanData.duration`  | number (readonly)         | Live duration since start             |
-| `spanData.custom`    | any (writable)            | Set custom attributes                 |
+| `spanData.custom`    | any (writable)            | `span.spanData.key = value`           |
 
-### Key Types
+Control span output independently from logs:
 
-```typescript
-import type {
-  LogEvent, // { kind: "log", time, namespace, level, message, props? }
-  SpanEvent, // { kind: "span", time, namespace, name, duration, spanId, traceId, parentId, props? }
-  Event, // LogEvent | SpanEvent
-  Stage, // (event: Event) => Event | null | void
-  Pipeline, // { dispatch, level, dispose }
-  ConditionalLogger, // Logger with ?.  methods
-} from "loggily"
+```bash
+TRACE=1 bun run app                  # All spans
+TRACE=myapp:db bun run app           # Only database spans
 ```
 
-### Composition
+### Plugin Composition
 
 ```typescript
-import { createLogger, pipe, withEnvDefaults } from "loggily"
+import { baseCreateLogger, pipe, withSpans, withEnvDefaults } from "loggily"
 
-// createLogger already includes withEnvDefaults()
+// createLogger already includes withEnvDefaults() + withSpans()
 // Pipe with custom plugins:
 const myCreateLogger = pipe(createLogger, withSentry({ dsn: "..." }))
+
+// Or build from scratch:
+const customFactory = pipe(baseCreateLogger, withSpans(), myPlugin())
 ```
 
-`withEnvDefaults()` is the plugin that reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, `TRACE`, etc. from env vars. It's included by default in `createLogger`. Omit it when composing from scratch for full manual control.
+`withEnvDefaults()` reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, `TRACE`, etc. from env vars.
+
+`withSpans()` enables `.span()` capability. Without it, `.span()` throws.
 
 ### Test Helper
 
@@ -209,11 +279,104 @@ const log = createTestLogger("test") // all levels enabled, console output
 
 ```typescript
 import { buildPipeline } from "loggily"
-
 const pipeline = buildPipeline([{ level: "debug" }, console, { file: "/tmp/app.log", format: "json" }])
 ```
 
-### Deprecated v1 API
+## Subpath Exports
+
+### `loggily/context` (Node.js only)
+
+AsyncLocalStorage-based context propagation:
+
+```typescript
+import { enableContextPropagation, getCurrentSpan } from "loggily/context"
+
+enableContextPropagation()
+
+{
+  using span = log.span("request")
+  log.info?.("handling") // auto-tagged with trace_id/span_id
+  getCurrentSpan() // { spanId, traceId, parentId }
+}
+```
+
+| Export                                                       | Description                            |
+| ------------------------------------------------------------ | -------------------------------------- |
+| `enableContextPropagation()` / `disableContextPropagation()` | AsyncLocalStorage context control      |
+| `isContextPropagationEnabled()`                              | Check if context propagation is active |
+| `getCurrentSpan()`                                           | Get current span context               |
+| `runInSpanContext(ctx, fn)`                                  | Run function in specific context       |
+
+### `loggily/worker` (Node.js only)
+
+Worker thread log forwarding:
+
+```typescript
+// worker.ts
+import { createWorkerLogger } from "loggily/worker"
+const log = createWorkerLogger(postMessage, "myapp:worker")
+
+// main.ts
+import { createWorkerLogHandler } from "loggily/worker"
+worker.on("message", createWorkerLogHandler())
+```
+
+| Export                                        | Description                       |
+| --------------------------------------------- | --------------------------------- |
+| `createWorkerLogger(postMessage, ns, props?)` | Logger for worker threads         |
+| `createWorkerLogHandler(opts?)`               | Main thread handler               |
+| `createWorkerConsoleHandler(opts?)`           | Console message handler           |
+| `forwardConsole(postMessage, ns?)`            | Forward console.\* from worker    |
+| `restoreConsole()`                            | Restore original console methods  |
+| `isWorkerMessage(msg)`                        | Type guard for any worker message |
+
+### `loggily/otel`
+
+OpenTelemetry bridge -- forwards events to OTLP-compatible backends:
+
+```typescript
+import * as otelApi from "@opentelemetry/api"
+import { createLogger } from "loggily"
+import { toOtel } from "loggily/otel"
+
+const log = createLogger("myapp", [toOtel({ api: otelApi }), console])
+```
+
+| Export              | Description                                                            |
+| ------------------- | ---------------------------------------------------------------------- |
+| `toOtel(options?)`  | Stage that forwards events to OpenTelemetry (transparent pass-through) |
+| `OtelBridgeOptions` | Options: `api`, `loggerName`, `tracerName`, `logs`, `spans`            |
+
+### `loggily/metrics`
+
+Span metrics collection -- ambient or explicit:
+
+```typescript
+import { spanStats } from "loggily/metrics"
+// TRACE=myapp bun run app -> on exit: spanStats() returns aggregated p50/p95/p99
+
+import { withMetrics } from "loggily/metrics"
+const log = withMetrics()(createLogger("myapp"))
+```
+
+## Key Types
+
+```typescript
+import type {
+  LogEvent, // { kind: "log", time, namespace, level, message, props? }
+  SpanEvent, // { kind: "span", time, namespace, name, duration, spanId, traceId, parentId, props? }
+  Event, // LogEvent | SpanEvent
+  Stage, // (event: Event) => Event | null | void
+  Pipeline, // { dispatch, level, dispose }
+  ConditionalLogger, // Logger with ?. methods
+  ConfigElement, // Union of all valid config array elements
+  ConfigObject, // Scope config: { level?, ns?, format?, spans? }
+  FileDescriptor, // File output: { file, level?, ns?, format? }
+  Writable, // Any object with { write, objectMode? }
+} from "loggily"
+```
+
+## Deprecated v1 API
 
 These functions still work but are deprecated. They map to environment variables internally:
 
@@ -225,6 +388,7 @@ setDebugFilter(["myapp"]) // -> set DEBUG env var
 setTraceFilter(["myapp"]) // -> set TRACE env var
 addWriter(fn) // -> use config array
 setLogFormat("json") // -> set LOG_FORMAT env var
+  .logger("auth") // -> use .child("auth")
 ```
 
 ## Distributed Tracing (opt-in)
@@ -232,7 +396,7 @@ setLogFormat("json") // -> set LOG_FORMAT env var
 ### ID Format
 
 ```typescript
-import { setIdFormat, getIdFormat } from "loggily"
+import { setIdFormat } from "loggily"
 
 setIdFormat("simple") // sp_1, tr_1 (default)
 setIdFormat("w3c") // 16-char hex span, 32-char hex trace (W3C Trace Context)
@@ -252,31 +416,9 @@ fetch(url, { headers: { traceparent: header } })
 ### Sampling
 
 ```typescript
-import { setSampleRate, getSampleRate } from "loggily"
-
+import { setSampleRate } from "loggily"
 setSampleRate(0.1) // Sample 10% of traces (head-based)
 setSampleRate(1.0) // Sample everything (default)
-```
-
-### Context Propagation (Node.js/Bun only)
-
-```typescript
-import { enableContextPropagation, getCurrentSpan } from "loggily/context"
-
-enableContextPropagation()
-
-const log = createLogger("myapp")
-{
-  using span = log.span("request")
-  // Logs auto-tagged with trace_id/span_id
-  log.info?.("handling") // includes trace_id, span_id in output
-
-  // Child spans from ANY logger auto-parent via AsyncLocalStorage
-  const other = createLogger("db")
-  const dbSpan = other.span("query") // parentId = span.id
-
-  getCurrentSpan() // { spanId, traceId, parentId }
-}
 ```
 
 ## Output Format
@@ -292,84 +434,16 @@ const log = createLogger("myapp")
 ### JSON (production / LOG_FORMAT=json)
 
 ```json
-{"time":"2024-01-15T14:32:15.123Z","level":"info","name":"myapp","msg":"starting"}
-{"time":"2024-01-15T14:32:16.456Z","level":"span","name":"myapp:import","msg":"(1234ms)","duration":1234,"count":42}
+{ "time": "2024-01-15T14:32:15.123Z", "level": "info", "name": "myapp", "msg": "starting" }
 ```
 
-## Zero-Overhead Pattern (Optional Chaining)
+## Browser Support
 
-`createLogger` returns a `ConditionalLogger` where disabled log levels return `undefined`.
+Loggily includes a browser-optimized entry point that excludes Node.js-specific features (file writers, `node:fs`). Bundlers automatically select it via the `browser` condition in package.json exports.
 
-**Log levels** (most to least verbose): `trace < debug < info < warn < error < silent`
-**Default level**: `info` (trace and debug disabled)
+Features available in browser: logging, spans, child loggers, custom stages, tracing utilities, OpenTelemetry bridge.
 
-```typescript
-import { createLogger } from "loggily"
-
-const log = createLogger("km:tui")
-
-// All methods support ?. for zero-overhead when their level is disabled
-log.trace?.(`very verbose: ${expensiveDebug()}`) // Skipped at default (info)
-log.debug?.(`state: ${getState()}`) // Skipped at default (info)
-log.info?.("starting") // Enabled at default (info)
-log.warn?.("deprecated") // Enabled at default
-log.error?.("failed") // Enabled at default
-```
-
-### Why optional chaining?
-
-**Benchmark results** (10M iterations, Bun 1.1.x):
-
-| Scenario                  | ops/s    | ns/op   | Notes                               |
-| ------------------------- | -------- | ------- | ----------------------------------- |
-| noop (cheap args)         | 2168M    | 0.5     | Fastest for trivial args            |
-| `?.` (cheap args)         | 1406M    | 0.7     | ~0.2ns overhead - negligible        |
-| noop (expensive args)     | 17M      | 57.6    | Args still evaluated - wasted!      |
-| **`?.` (expensive args)** | **408M** | **2.5** | Args NOT evaluated - **22x faster** |
-
-**Key insight**: Optional chaining is only ~0.2ns slower for cheap args, but **22x faster** for expensive args because it skips argument evaluation entirely.
-
-- `log.debug?.()` skips the entire call including argument evaluation when debug is disabled
-- TypeScript enforces `?.` at compile time (methods are typed as possibly undefined)
-- Main benefit: expensive string formatting and function calls are completely skipped
-
-See the internal research doc for detailed methodology and external references.
-
-## Lazy Messages
-
-Messages can be functions -- only called when the log level is enabled:
-
-```typescript
-log.debug?.(() => `expensive: ${JSON.stringify(bigObject)}`)
-// Function never called when debug is disabled
-```
-
-Type: `LazyMessage = string | (() => string)`
-
-## Child Loggers
-
-`.child()` is the single method for creating child loggers:
-
-```typescript
-// Extend namespace
-const authLog = log.child("auth") // namespace: "myapp:auth"
-
-// Add context fields (same namespace)
-const reqLog = log.child({ requestId: "abc-123", userId: 42 })
-reqLog.info?.("handling request")
-// -> 14:32:15 INFO myapp handling request {requestId: "abc-123", userId: 42}
-
-// Both: extend namespace + add fields
-const dbLog = log.child("db", { pool: "main" })
-```
-
-## JSON Output Format
-
-```bash
-LOG_FORMAT=json bun run app   # Force JSON output in any environment
-```
-
-In addition to `TRACE_FORMAT=json` and `NODE_ENV=production`, `LOG_FORMAT=json` explicitly enables structured JSON output.
+Features Node.js only: file sinks (`{ file: ... }`), context propagation (`loggily/context`), worker threads (`loggily/worker`).
 
 ## Best Practices
 

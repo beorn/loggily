@@ -75,10 +75,12 @@ export interface SpanData {
   [key: string]: unknown
 }
 
-export interface Logger {
+export interface Logger extends Disposable {
   readonly name: string
   readonly props: Readonly<Record<string, unknown>>
-  readonly spanData: SpanData | null
+  readonly level: LogLevel
+
+  dispatch(event: Event): void
 
   trace(message: LazyMessage, data?: Record<string, unknown>): void
   debug(message: LazyMessage, data?: Record<string, unknown>): void
@@ -102,10 +104,12 @@ export interface SpanLogger extends ConditionalLogger, Disposable {
 
 // ============ ConditionalLogger ============
 
-export interface ConditionalLogger {
+export interface ConditionalLogger extends Disposable {
   readonly name: string
   readonly props: Readonly<Record<string, unknown>>
-  readonly spanData: SpanData | null
+  readonly level: LogLevel
+
+  dispatch(event: Event): void
 
   trace?: (message: LazyMessage, data?: Record<string, unknown>) => void
   debug?: (message: LazyMessage, data?: Record<string, unknown>) => void
@@ -119,7 +123,7 @@ export interface ConditionalLogger {
 
   /** @deprecated Use .child() */
   logger(namespace?: string, props?: Record<string, unknown>): ConditionalLogger
-  span(namespace?: string, props?: LazyProps): SpanLogger
+  span?(namespace?: string, props?: LazyProps): SpanLogger
   child(namespace: string, props?: Record<string, unknown>): ConditionalLogger
   child(context: Record<string, unknown>): ConditionalLogger
   end(): void
@@ -230,15 +234,7 @@ interface MutableSpanData {
   attrs: Record<string, unknown>
 }
 
-function createLoggerImpl(
-  name: string,
-  props: Record<string, unknown>,
-  pipeline: Pipeline,
-  spanMeta: MutableSpanData | null,
-  parentSpanId: string | null,
-  traceId: string | null,
-  traceSampled: boolean = true,
-): Logger {
+function createLoggerImpl(name: string, props: Record<string, unknown>, pipeline: Pipeline): Logger {
   const emitLog = (
     level: OutputLogLevel,
     msgOrError: LazyMessage | Error,
@@ -301,19 +297,16 @@ function createLoggerImpl(
     name,
     props: Object.freeze({ ...props }),
 
-    get spanData(): SpanData | null {
-      if (!spanMeta) return null
-      return createSpanDataProxy(
-        () => ({
-          id: spanMeta.id,
-          traceId: spanMeta.traceId,
-          parentId: spanMeta.parentId,
-          startTime: spanMeta.startTime,
-          endTime: spanMeta.endTime,
-          duration: spanMeta.endTime !== null ? spanMeta.endTime - spanMeta.startTime : Date.now() - spanMeta.startTime,
-        }),
-        spanMeta.attrs,
-      )
+    get level(): LogLevel {
+      return pipeline.level
+    },
+
+    dispatch(event: Event): void {
+      pipeline.dispatch(event)
+    },
+
+    [Symbol.dispose](): void {
+      pipeline.dispose()
     },
 
     trace: (msg, data) => emitLog("trace", msg, data),
@@ -331,99 +324,10 @@ function createLoggerImpl(
       return this.child(namespace ?? "", childProps)
     },
 
-    span(namespace?: string, childProps?: LazyProps): SpanLogger {
-      const childName = namespace ? `${name}:${namespace}` : name
-      const resolvedChildProps = typeof childProps === "function" ? childProps() : childProps
-      const mergedProps = { ...props, ...resolvedChildProps }
-      const newSpanId = generateSpanId()
-
-      let resolvedParentId = parentSpanId
-      let resolvedTraceId = traceId
-
-      if (!resolvedParentId && _getContextParent) {
-        const ctxParent = _getContextParent()
-        if (ctxParent) {
-          resolvedParentId = ctxParent.spanId
-          resolvedTraceId = resolvedTraceId || ctxParent.traceId
-        }
-      }
-
-      const isNewTrace = !resolvedTraceId
-      const finalTraceId = resolvedTraceId || generateTraceId()
-      const sampled = isNewTrace ? shouldSample() : traceSampled
-
-      const newSpanData: MutableSpanData = {
-        id: newSpanId,
-        traceId: finalTraceId,
-        parentId: resolvedParentId,
-        startTime: Date.now(),
-        endTime: null,
-        duration: null,
-        attrs: {},
-      }
-
-      const rawLogger = createLoggerImpl(
-        childName,
-        mergedProps,
-        pipeline,
-        newSpanData,
-        newSpanId,
-        finalTraceId,
-        sampled,
+    span(_namespace?: string, _childProps?: LazyProps): SpanLogger {
+      throw new Error(
+        "loggily: span() requires the withSpans() plugin. Use pipe(baseCreateLogger, withSpans()) or the default createLogger.",
       )
-
-      _enterContext?.(newSpanId, finalTraceId, resolvedParentId)
-
-      const disposeSpan = () => {
-        if (newSpanData.endTime !== null) return
-
-        newSpanData.endTime = Date.now()
-        newSpanData.duration = newSpanData.endTime - newSpanData.startTime
-
-        if (collectSpans) {
-          collectedSpans.push(
-            createSpanDataProxy(
-              () => ({
-                id: newSpanData.id,
-                traceId: newSpanData.traceId,
-                parentId: newSpanData.parentId,
-                startTime: newSpanData.startTime,
-                endTime: newSpanData.endTime,
-                duration: newSpanData.duration,
-              }),
-              { ...newSpanData.attrs },
-            ),
-          )
-        }
-
-        _exitContext?.(newSpanId)
-        _ambientRecorder?.recordSpan({ name: childName, durationMs: newSpanData.duration })
-
-        if (sampled) {
-          const spanEvent: SpanEvent = {
-            kind: "span",
-            time: newSpanData.endTime,
-            namespace: childName,
-            name: childName,
-            duration: newSpanData.duration,
-            props: {
-              ...mergedProps,
-              ...newSpanData.attrs,
-            },
-            spanId: newSpanData.id,
-            traceId: newSpanData.traceId,
-            parentId: newSpanData.parentId,
-          }
-          pipeline.dispatch(spanEvent)
-        }
-      }
-
-      // Set Symbol.dispose on the raw logger before wrapping with Proxy
-      ;(rawLogger as unknown as { [Symbol.dispose]: () => void })[Symbol.dispose] = disposeSpan
-
-      // Wrap with conditional proxy so disabled levels return undefined (span.info?.() short-circuits)
-      const spanLogger = wrapConditional(rawLogger, () => pipeline.level) as unknown as SpanLogger
-      return spanLogger
     },
 
     child(
@@ -433,30 +337,17 @@ function createLoggerImpl(
       if (typeof namespaceOrContext === "string") {
         const childName = namespaceOrContext ? `${name}:${namespaceOrContext}` : name
         const mergedProps = { ...props, ...childProps }
-        return wrapConditional(
-          createLoggerImpl(childName, mergedProps, pipeline, null, parentSpanId, traceId, traceSampled),
-          () => pipeline.level,
-        )
+        return wrapConditional(createLoggerImpl(childName, mergedProps, pipeline), () => pipeline.level)
       }
-      // Object → context fields, same namespace
+      // Object -> context fields, same namespace
       return wrapConditional(
-        createLoggerImpl(
-          name,
-          { ...props, ...namespaceOrContext },
-          pipeline,
-          null,
-          parentSpanId,
-          traceId,
-          traceSampled,
-        ),
+        createLoggerImpl(name, { ...props, ...namespaceOrContext }, pipeline),
         () => pipeline.level,
       )
     },
 
     end(): void {
-      if (spanMeta?.endTime === null) {
-        ;(this as unknown as { [Symbol.dispose]: () => void })[Symbol.dispose]?.()
-      }
+      // no-op for non-span loggers
     },
   }
 
@@ -467,15 +358,217 @@ function createLoggerImpl(
 
 function wrapConditional(logger: Logger, getLevel: () => LogLevel): ConditionalLogger {
   return new Proxy(logger as ConditionalLogger, {
-    get(target, prop: string) {
-      if (prop in LOG_LEVEL_PRIORITY && prop !== "silent") {
+    get(target, prop: string | symbol) {
+      if (typeof prop === "string" && prop in LOG_LEVEL_PRIORITY && prop !== "silent") {
         if (LOG_LEVEL_PRIORITY[prop as keyof typeof LOG_LEVEL_PRIORITY] < LOG_LEVEL_PRIORITY[getLevel()]) {
           return undefined
         }
       }
-      return (target as unknown as Record<string, unknown>)[prop]
+      // span is optional on ConditionalLogger: return undefined if base impl is the error-thrower
+      if (prop === "span") {
+        const val = (target as unknown as Record<string | symbol, unknown>)[prop]
+        // If span is the default error-throwing stub, return undefined (making it optional)
+        if (val === baseSpanStub) return undefined
+        return val
+      }
+      return (target as unknown as Record<string | symbol, unknown>)[prop]
     },
   })
+}
+
+// Sentinel reference for detecting the base span stub
+const baseSpanStub = function baseSpanStub(_namespace?: string, _childProps?: LazyProps): SpanLogger {
+  throw new Error(
+    "loggily: span() requires the withSpans() plugin. Use pipe(baseCreateLogger, withSpans()) or the default createLogger.",
+  )
+}
+
+// ============ withSpans Plugin ============
+
+/**
+ * Plugin: adds span creation capability to loggers.
+ * Without this plugin, `.span` is undefined on ConditionalLogger.
+ * Included by default in `createLogger`.
+ */
+export function withSpans(): LoggerPlugin {
+  return (factory, _ctx) => {
+    return (name, configOrProps?) => {
+      const logger = factory(name, configOrProps)
+      return augmentWithSpans(logger, null, null, true)
+    }
+  }
+}
+
+interface SpanState {
+  parentSpanId: string | null
+  traceId: string | null
+  traceSampled: boolean
+}
+
+function augmentWithSpans(
+  logger: ConditionalLogger,
+  parentSpanId: string | null,
+  traceId: string | null,
+  traceSampled: boolean,
+): ConditionalLogger {
+  const spanState: SpanState = { parentSpanId, traceId, traceSampled }
+
+  return new Proxy(logger, {
+    get(target, prop: string | symbol) {
+      if (prop === "span") {
+        return createSpanMethod(target, spanState)
+      }
+      if (prop === "child") {
+        return function child(
+          namespaceOrContext?: string | Record<string, unknown>,
+          childProps?: Record<string, unknown>,
+        ): ConditionalLogger {
+          const childLogger = target.child(namespaceOrContext as string, childProps)
+          // Child loggers inherit span state (parent/trace context)
+          return augmentWithSpans(childLogger, spanState.parentSpanId, spanState.traceId, spanState.traceSampled)
+        }
+      }
+      if (prop === "logger") {
+        return function logger(namespace?: string, childProps?: Record<string, unknown>): ConditionalLogger {
+          const childLogger = target.logger(namespace, childProps)
+          return augmentWithSpans(childLogger, spanState.parentSpanId, spanState.traceId, spanState.traceSampled)
+        }
+      }
+      return (target as unknown as Record<string | symbol, unknown>)[prop]
+    },
+  })
+}
+
+function createSpanMethod(
+  logger: ConditionalLogger,
+  spanState: SpanState,
+): (namespace?: string, childProps?: LazyProps) => SpanLogger {
+  return (namespace?: string, childProps?: LazyProps): SpanLogger => {
+    const childName = namespace ? `${logger.name}:${namespace}` : logger.name
+    const resolvedChildProps = typeof childProps === "function" ? childProps() : childProps
+    const mergedProps = { ...logger.props, ...resolvedChildProps }
+    const newSpanId = generateSpanId()
+
+    let resolvedParentId = spanState.parentSpanId
+    let resolvedTraceId = spanState.traceId
+
+    if (!resolvedParentId && _getContextParent) {
+      const ctxParent = _getContextParent()
+      if (ctxParent) {
+        resolvedParentId = ctxParent.spanId
+        resolvedTraceId = resolvedTraceId || ctxParent.traceId
+      }
+    }
+
+    const isNewTrace = !resolvedTraceId
+    const finalTraceId = resolvedTraceId || generateTraceId()
+    const sampled = isNewTrace ? shouldSample() : spanState.traceSampled
+
+    const newSpanData: MutableSpanData = {
+      id: newSpanId,
+      traceId: finalTraceId,
+      parentId: resolvedParentId,
+      startTime: Date.now(),
+      endTime: null,
+      duration: null,
+      attrs: {},
+    }
+
+    // Create a child logger for the span to emit logs through
+    const childLogger = logger.child(namespace ?? "", resolvedChildProps)
+    // Augment the child with span capability, setting this span as parent
+    const spanAugmented = augmentWithSpans(childLogger, newSpanId, finalTraceId, sampled)
+
+    _enterContext?.(newSpanId, finalTraceId, resolvedParentId)
+
+    const disposeSpan = () => {
+      if (newSpanData.endTime !== null) return
+
+      newSpanData.endTime = Date.now()
+      newSpanData.duration = newSpanData.endTime - newSpanData.startTime
+
+      if (collectSpans) {
+        collectedSpans.push(
+          createSpanDataProxy(
+            () => ({
+              id: newSpanData.id,
+              traceId: newSpanData.traceId,
+              parentId: newSpanData.parentId,
+              startTime: newSpanData.startTime,
+              endTime: newSpanData.endTime,
+              duration: newSpanData.duration,
+            }),
+            { ...newSpanData.attrs },
+          ),
+        )
+      }
+
+      _exitContext?.(newSpanId)
+      _ambientRecorder?.recordSpan({ name: childName, durationMs: newSpanData.duration })
+
+      if (sampled) {
+        const spanEvent: SpanEvent = {
+          kind: "span",
+          time: newSpanData.endTime,
+          namespace: childName,
+          name: childName,
+          duration: newSpanData.duration,
+          props: {
+            ...mergedProps,
+            ...newSpanData.attrs,
+          },
+          spanId: newSpanData.id,
+          traceId: newSpanData.traceId,
+          parentId: newSpanData.parentId,
+        }
+        logger.dispatch(spanEvent)
+      }
+    }
+
+    const spanDataProxy = createSpanDataProxy(
+      () => ({
+        id: newSpanData.id,
+        traceId: newSpanData.traceId,
+        parentId: newSpanData.parentId,
+        startTime: newSpanData.startTime,
+        endTime: newSpanData.endTime,
+        duration:
+          newSpanData.endTime !== null
+            ? newSpanData.endTime - newSpanData.startTime
+            : Date.now() - newSpanData.startTime,
+      }),
+      newSpanData.attrs,
+    )
+
+    // Build the SpanLogger by overlaying span-specific properties onto the augmented child.
+    // Allow Symbol.dispose to be overridden (withMetrics wraps it).
+    let currentDispose = disposeSpan
+    const spanLogger = new Proxy(spanAugmented as unknown as SpanLogger, {
+      get(target, prop: string | symbol) {
+        if (prop === "spanData") return spanDataProxy
+        if (prop === Symbol.dispose) return currentDispose
+        if (prop === "end") {
+          return () => {
+            if (newSpanData.endTime === null) {
+              currentDispose()
+            }
+          }
+        }
+        if (prop === "name") return childName
+        if (prop === "props") return Object.freeze({ ...mergedProps })
+        return (target as unknown as Record<string | symbol, unknown>)[prop]
+      },
+      set(_target, prop: string | symbol, value: unknown) {
+        if (prop === Symbol.dispose) {
+          currentDispose = value as () => void
+          return true
+        }
+        return false
+      },
+    })
+
+    return spanLogger
+  }
 }
 
 // ============ Public API ============
@@ -485,6 +578,9 @@ function wrapConditional(logger: Logger, getLevel: () => LogLevel): ConditionalL
 /**
  * Base createLogger — requires a config array.
  * Use the default `createLogger` export (with `withEnvDefaults`) for zero-config.
+ *
+ * Note: loggers from baseCreateLogger do NOT have `.span()` capability.
+ * Use `pipe(baseCreateLogger, withSpans())` or the default `createLogger` for spans.
  */
 export function baseCreateLogger(
   name: string,
@@ -502,7 +598,9 @@ export function baseCreateLogger(
     pipeline = buildPipeline(["console"])
   }
 
-  const logger = createLoggerImpl(name, props, pipeline, null, null, null)
+  const logger = createLoggerImpl(name, props, pipeline)
+  // Replace the span method with the sentinel stub so wrapConditional can detect it
+  ;(logger as unknown as Record<string, unknown>).span = baseSpanStub
   return wrapConditional(logger, () => pipeline.level)
 }
 
@@ -512,10 +610,16 @@ export type LoggerFactory = (
   name: string,
   configOrProps?: ConfigElement[] | Record<string, unknown>,
 ) => ConditionalLogger
-export type LoggerPlugin = (factory: LoggerFactory) => LoggerFactory
+
+export interface PluginCtx {
+  [key: string]: unknown
+}
+
+export type LoggerPlugin = (factory: LoggerFactory, ctx: PluginCtx) => LoggerFactory
 
 export function pipe(base: LoggerFactory, ...plugins: LoggerPlugin[]): LoggerFactory {
-  return plugins.reduce((factory, plugin) => plugin(factory), base)
+  const ctx: PluginCtx = {}
+  return plugins.reduce((factory, plugin) => plugin(factory, ctx), base)
 }
 
 // ============ withEnvDefaults Plugin ============
@@ -557,19 +661,29 @@ export function _setLogFileWriterFactory(factory: typeof _logFileWriterFactory):
  * Legacy setters (setLogLevel, addWriter, etc.) affect loggers created without explicit config.
  */
 export function withEnvDefaults(): LoggerPlugin {
-  return (factory) => (name, configOrProps?) => {
+  return (factory, _ctx) => (name, configOrProps?) => {
     // Explicit config array — pass through, buildPipeline reads env defaults
     if (Array.isArray(configOrProps)) return factory(name, configOrProps)
 
-    // No config array — dynamic pipeline from env vars + runtime state
-    const props =
-      configOrProps && typeof configOrProps === "object" ? (configOrProps as Record<string, unknown>) : undefined
+    // No config array — use env-dynamic pipeline.
+    // Pass a config array through the factory so all upstream plugins get applied,
+    // with a stage that delegates to the env pipeline for dynamic dispatch.
+    const envPipeline = createEnvPipeline()
+    const envStage: ConfigElement = (event: Event) => {
+      envPipeline.dispatch(event)
+      return null // consume the event (env pipeline handles all output)
+    }
 
-    const pipeline = createEnvPipeline()
-    const logger = createLoggerImpl(name, props ?? {}, pipeline, null, null, null)
-    return wrapConditional(logger, () => {
-      return currentLevel()
-    })
+    // Props are passed as the first config element to include them in log output
+    if (configOrProps && typeof configOrProps === "object") {
+      // Object props — create logger with props + env pipeline
+      // We need to pass props AND a config array. But factory only accepts one or the other.
+      // Solution: create via factory with config array, then the child() with props.
+      const logger = factory(name, [{ level: "trace" as LogLevel }, envStage])
+      return logger.child(configOrProps as Record<string, unknown>)
+    }
+
+    return factory(name, [{ level: "trace" as LogLevel }, envStage])
   }
 }
 
@@ -616,12 +730,12 @@ function createEnvPipeline(): Pipeline {
   }
 }
 
-/** Default createLogger — includes withEnvDefaults. */
-export const createLogger: LoggerFactory = pipe(baseCreateLogger, withEnvDefaults())
+/** Default createLogger — includes withEnvDefaults + withSpans. */
+export const createLogger: LoggerFactory = pipe(baseCreateLogger, withEnvDefaults(), withSpans())
 
 /** Test helper — all levels, console output. */
 export function createTestLogger(name: string): ConditionalLogger {
-  return baseCreateLogger(name, [{ level: "trace" }, "console"])
+  return pipe(baseCreateLogger, withSpans())(name, [{ level: "trace" }, "console"])
 }
 
 // ============ Legacy Setters ============

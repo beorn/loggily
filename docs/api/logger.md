@@ -38,6 +38,34 @@ log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 log.error?.("manual error", { code: "ETIMEOUT" })
 ```
 
+### Error.cause Chain Serialization
+
+When logging errors with `.cause` chains, loggily serializes the full chain (up to 3 levels deep):
+
+```typescript
+const inner = new Error("DNS failed")
+const err = new Error("timeout")
+err.cause = inner
+
+log.error?.(err)
+// props includes: error_cause: { name: "Error", message: "DNS failed", stack: "..." }
+```
+
+Nested cause chains are followed recursively. If a cause itself has a `.cause`, it is serialized as a nested `cause` property:
+
+```typescript
+const root = new Error("ECONNREFUSED")
+const mid = new Error("DNS failed")
+mid.cause = root
+const outer = new Error("request timeout")
+outer.cause = mid
+
+log.error?.(outer)
+// error_cause: { name: "Error", message: "DNS failed", cause: { name: "Error", message: "ECONNREFUSED", ... } }
+```
+
+Non-Error cause values (the spec allows any value) are included as-is.
+
 ### Child Creation
 
 `.child()` is the single method for creating child loggers:

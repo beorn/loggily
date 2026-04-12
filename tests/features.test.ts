@@ -11,7 +11,17 @@ import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
 import { existsSync, readFileSync, unlinkSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
-import { createLogger, resetIds, createFileWriter, type FileWriter } from "../src/index.ts"
+import {
+  createLogger,
+  baseCreateLogger,
+  pipe,
+  withEnvDefaults,
+  withSpans,
+  resetIds,
+  createFileWriter,
+  type FileWriter,
+  type LoggerPlugin,
+} from "../src/index.ts"
 import { createConsoleMock } from "./helpers.ts"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -557,7 +567,135 @@ describe("pipeline-based configuration", () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. Deprecated v1 API throws
+// 6. DEBUG Wildcard Patterns
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("DEBUG wildcard patterns", () => {
+  test("myapp:* matches myapp and children", () => {
+    const { lines, writer } = createCapture()
+    const log = createLogger("myapp", [{ level: "debug", ns: "myapp:*" }, writer])
+
+    log.info?.("root msg")
+    const db = log.child("db")
+    db.info?.("db msg")
+    const deep = db.child("query")
+    deep.info?.("deep msg")
+
+    expect(lines).toHaveLength(3)
+  })
+
+  test("specific:* doesn't match unrelated namespaces", () => {
+    const { lines, writer } = createCapture()
+    const log = createLogger("other", [{ level: "debug", ns: "myapp:*" }, writer])
+
+    log.info?.("should not match")
+    expect(lines).toHaveLength(0)
+  })
+
+  test("wildcard with exclusion", () => {
+    const { lines, writer } = createCapture()
+    const log = createLogger("myapp", [{ level: "debug", ns: "myapp:*,-myapp:sql" }, writer])
+
+    const db = log.child("db")
+    db.info?.("db msg")
+    const sql = log.child("sql")
+    sql.info?.("sql msg")
+
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain("db msg")
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. baseCreateLogger Standalone Usage
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("baseCreateLogger", () => {
+  test("creates logger without env defaults", () => {
+    const { lines, writer } = createCapture()
+    const log = baseCreateLogger("test", [{ level: "debug" }, writer])
+
+    log.info?.("hello")
+    expect(lines).toHaveLength(1)
+  })
+
+  test("can be composed with pipe", () => {
+    const customPlugin: LoggerPlugin = (factory) => (name, config?) => {
+      const logger = factory(name, config)
+      return logger
+    }
+
+    const myCreateLogger = pipe(baseCreateLogger, customPlugin)
+    const { lines, writer } = createCapture()
+    const log = myCreateLogger("test", [{ level: "debug" }, writer])
+    log.info?.("piped")
+
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain("piped")
+  })
+
+  test("does not have span capability without withSpans", () => {
+    const log = baseCreateLogger("test", [{ level: "trace" }, console])
+
+    // baseCreateLogger without withSpans: span is undefined on the conditional logger
+    expect(log.span).toBeUndefined()
+  })
+
+  test("gains span capability via pipe with withSpans", () => {
+    const myCreateLogger = pipe(baseCreateLogger, withSpans())
+    const log = myCreateLogger("test", [{ level: "trace" }, console])
+
+    expect(log.span).toBeDefined()
+    const span = log.span!("work")
+    expect(span.spanData).toBeDefined()
+    span.end()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. Full Composition Chain
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("full composition chain", () => {
+  test("pipe(base, withSpans, withEnvDefaults) creates working logger", () => {
+    const myCreateLogger = pipe(baseCreateLogger, withSpans(), withEnvDefaults())
+    const log = myCreateLogger("test")
+
+    expect(log.info).toBeDefined()
+    log.info?.("works")
+  })
+
+  test("pipe with custom plugin", () => {
+    const calls: string[] = []
+    const trackPlugin: LoggerPlugin = (factory) => (name, config?) => {
+      calls.push(`creating: ${name}`)
+      return factory(name, config)
+    }
+
+    const myCreateLogger = pipe(baseCreateLogger, trackPlugin, withSpans(), withEnvDefaults())
+    const log = myCreateLogger("test")
+
+    expect(calls).toEqual(["creating: test"])
+    expect(log.info).toBeDefined()
+  })
+
+  test("custom plugin can wrap factory and intercept logger creation", () => {
+    let factoryCallCount = 0
+    const countPlugin: LoggerPlugin = (factory) => (name, config?) => {
+      factoryCallCount++
+      return factory(name, config)
+    }
+
+    const myCreateLogger = pipe(baseCreateLogger, countPlugin)
+    myCreateLogger("a")
+    myCreateLogger("b")
+
+    expect(factoryCallCount).toBe(2)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. Deprecated v1 API throws
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("deprecated v1 global setters still work", () => {

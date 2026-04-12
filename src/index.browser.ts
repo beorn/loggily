@@ -11,9 +11,11 @@ export {
   baseCreateLogger,
   createTestLogger,
   pipe,
+  withSpans,
   withEnvDefaults,
   type LoggerFactory,
   type LoggerPlugin,
+  type PluginCtx,
 
   // Types
   type ConditionalLogger,

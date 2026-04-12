@@ -12,6 +12,10 @@ export {
   pipe,
   type LoggerFactory,
   type LoggerPlugin,
+  type PluginCtx,
+  // Plugins
+  withSpans,
+  withEnvDefaults,
   // Types
   type ConditionalLogger,
   type Logger,
@@ -46,8 +50,6 @@ export {
   _setContextHooks,
   _clearContextHooks,
   createSpanDataProxy,
-  // Plugin
-  withEnvDefaults,
   // Deprecated v1 API (maps to env vars for backwards compat)
   setLogLevel,
   getLogLevel,

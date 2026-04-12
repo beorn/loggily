@@ -28,6 +28,27 @@ When using `{ file: "/path" }` in the config array, you can override scope setti
 | `ns`     | `string` (optional)    | Override namespace filter     |
 | `format` | `LogFormat` (optional) | Override format for this sink |
 
+### Writable Object Mode
+
+Writables can receive raw `Event` objects instead of formatted strings by setting `objectMode: true`:
+
+```typescript
+const transport = {
+  write: (event) => sendToService(event),
+  objectMode: true,
+}
+const log = createLogger("myapp", [transport])
+```
+
+When `objectMode` is `false` (the default), the writable receives a formatted string (console or JSON, depending on the current scope's `format` setting) followed by a newline. When `objectMode` is `true`, the raw `Event` object is passed directly — useful for Pino transports, custom analytics pipelines, or any sink that needs structured data.
+
+```typescript
+interface Writable {
+  write: (data: unknown) => unknown
+  objectMode?: boolean
+}
+```
+
 ## createFileWriter (low-level)
 
 For direct file writing outside the config array:

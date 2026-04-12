@@ -82,9 +82,11 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 - **Child loggers** -- `log.child("auth")` extends namespace, `log.child({ requestId })` adds context fields, `log.child("auth", { sso: true })` does both.
 - **Automatic async context** -- enable `AsyncLocalStorage`-based propagation and every log in a request's async chain inherits trace/span IDs without passing loggers around.
 - **Lazy messages** -- `log.debug?.(() => expensiveString())` skips the function entirely when disabled.
-- **Error overloads** -- `log.error?.(err)`, `log.error?.(err, "msg")`, and `log.error?.(err, "msg", data)`.
+- **Error overloads** -- `log.error?.(err)`, `log.error?.(err, "msg")`, and `log.error?.(err, "msg", data)`. Cause chains serialized automatically (up to 3 levels).
 - **Worker threads** -- forward logs from workers to the main thread with full type safety.
-- **Composable** -- `pipe(createLogger, myPlugin)` to extend the factory with custom behavior.
+- **OpenTelemetry bridge** -- `toOtel()` stage forwards events to OTLP-compatible backends.
+- **Composable** -- `pipe(baseCreateLogger, withSpans(), withEnvDefaults())` to build custom factories.
+- **Browser support** -- bundlers auto-select the browser entry point via `browser` condition in exports.
 
 ## Usage Walkthrough
 
@@ -98,12 +100,30 @@ log.info?.("started")
 
 ### Configured pipeline
 
+The config array supports all element types:
+
 ```typescript
 const log = createLogger("myapp", [
-  { level: "debug", ns: "-sql" },
-  "console",
+  // Config object — sets scope for subsequent elements
+  { level: "debug", ns: "-sql", format: "json", spans: true },
+
+  // Console output
+  console,
+
+  // File sink — with optional level/ns/format overrides
   { file: "/tmp/app.log", level: "info", format: "json" },
+
+  // Stage function — transform, filter, or enrich events
+  (event) => {
+    if (event.kind === "log" && event.message.includes("secret")) return null
+    return { ...event, props: { ...event.props, host: hostname() } }
+  },
+
+  // Branch array — sub-pipeline with own scope
   [{ level: "error" }, { file: "/tmp/errors.log", format: "json" }],
+
+  // Writable — any object with a write method (Pino transports, streams)
+  { write: (event) => sendToService(event), objectMode: true },
 ])
 ```
 
@@ -114,6 +134,8 @@ const authLog = log.child("auth") // namespace: "myapp:auth"
 const reqLog = log.child({ requestId: "abc-123" }) // context fields
 const dbLog = log.child("db", { pool: "main" }) // both
 ```
+
+`.child()` is the canonical method. The older `.logger()` still works but is deprecated.
 
 ### Spans
 
@@ -126,27 +148,28 @@ const dbLog = log.child("db", { pool: "main" }) // both
 // SPAN myapp:import (15ms) {rows: 42, file: "data.csv"}
 ```
 
-### Shared logger across a repo
+### Error overloads
 
 ```typescript
-// app/logger.ts
-export const log = createLogger("myapp", [
-  { level: "debug", ns: "-sql" },
-  "console",
-  { file: "/var/log/myapp.log", level: "info", format: "json" },
-])
-
-// app/auth.ts
-import { log } from "./logger.ts"
-const authLog = log.child("auth")
+log.error?.(new Error("timeout")) // Error only
+log.error?.(new Error("timeout"), "request failed") // Error + custom message
+log.error?.(new Error("timeout"), "request failed", { url: "/api" }) // Error + message + data
+log.error?.("manual error", { code: "ETIMEOUT" }) // String message + data
 ```
 
-### Compose with plugins
+### Composition with plugins
+
+`createLogger` is `pipe(baseCreateLogger, withEnvDefaults(), withSpans())`. For full manual control:
 
 ```typescript
-import { createLogger, pipe } from "loggily"
-const myCreateLogger = pipe(createLogger, withSentry({ dsn: "..." }))
+import { baseCreateLogger, pipe, withSpans, withEnvDefaults } from "loggily"
+
+// Custom factory — choose exactly which plugins to include
+const myCreateLogger = pipe(baseCreateLogger, withSpans(), myPlugin())
+const log = myCreateLogger("myapp", [console])
 ```
+
+`baseCreateLogger` does NOT include `withSpans()` or `withEnvDefaults()` — loggers it creates cannot create spans and do not read environment variables.
 
 ### Test helper
 
@@ -155,16 +178,27 @@ import { createTestLogger } from "loggily"
 const log = createTestLogger("test") // all levels enabled, console output
 ```
 
-### Common configuration
+### Environment variables
 
-| Variable     | Example                   | Effect                                                 |
-| ------------ | ------------------------- | ------------------------------------------------------ |
-| `DEBUG`      | `myapp:db,-myapp:sql`     | Namespace filter (compatible with the `debug` package) |
-| `LOG_LEVEL`  | `debug`, `info`, `warn`   | Minimum output level                                   |
-| `LOG_FORMAT` | `console`, `json`         | Override output format                                 |
-| `TRACE`      | `1` or namespace prefixes | Enable span output                                     |
+| Variable       | Values                                  | Default   |
+| -------------- | --------------------------------------- | --------- |
+| `LOG_LEVEL`    | trace, debug, info, warn, error, silent | `info`    |
+| `LOG_FORMAT`   | console, json                           | `console` |
+| `LOG_FILE`     | file path                               | (none)    |
+| `DEBUG`        | `*`, namespace prefixes, `-prefix`      | (none)    |
+| `TRACE`        | `1`, `true`, namespace prefixes         | (none)    |
+| `TRACE_FORMAT` | json                                    | (none)    |
+| `NODE_ENV`     | production                              | (none)    |
 
-See the [full environment variable reference](https://beorn.codes/loggily/api/configuration).
+### Namespace filter patterns
+
+| Pattern            | Matches                                                        |
+| ------------------ | -------------------------------------------------------------- |
+| `*`                | Everything                                                     |
+| `myapp`            | Exact match + children (`myapp`, `myapp:db`, `myapp:db:query`) |
+| `myapp:*`          | Same as `myapp` — explicit wildcard                            |
+| `-myapp:sql`       | Exclude `myapp:sql` and its children                           |
+| `myapp,-myapp:sql` | Include myapp, exclude sql subtree                             |
 
 ### Types
 
@@ -178,15 +212,30 @@ Key types exported for power users:
 | `Stage`             | `(event: Event) => Event \| null \| void`                        |
 | `Pipeline`          | `{ dispatch, level, dispose }`                                   |
 | `ConditionalLogger` | Logger with `?.`-compatible methods                              |
+| `ConfigElement`     | Union of all valid config array elements                         |
+| `ConfigObject`      | Scope config: `{ level?, ns?, format?, spans? }`                 |
+| `FileDescriptor`    | File output: `{ file, level?, ns?, format? }`                    |
+| `Writable`          | Any object with `{ write, objectMode? }`                         |
 
 `buildPipeline()` is exported for direct pipeline construction.
+
+### Subpath exports
+
+| Import path       | Contents                                        |
+| ----------------- | ----------------------------------------------- |
+| `loggily`         | Core API, types, pipeline builder               |
+| `loggily/context` | AsyncLocalStorage context propagation (Node.js) |
+| `loggily/worker`  | Worker thread logger + message handlers         |
+| `loggily/otel`    | OpenTelemetry bridge (`toOtel` stage)           |
+| `loggily/metrics` | Span metrics collection (ambient + explicit)    |
 
 ## Compatibility
 
 - **`DEBUG=` compatible** -- uses the same namespace filter patterns as the `debug` package
-- **Works with Pino transports** -- custom stage functions can forward events to any sink
+- **Works with Pino transports** -- writable sinks with `objectMode: true` receive raw Event objects
 - **W3C Trace Context** -- `traceparent()` generates standard trace headers
-- **OpenTelemetry compatible** -- span events include `spanId`, `traceId`, `parentId`
+- **OpenTelemetry compatible** -- `toOtel()` stage forwards events to OTLP backends
+- **Browser ready** -- bundlers auto-select the browser entry point
 
 ## Why this exists
 

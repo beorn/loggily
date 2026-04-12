@@ -238,6 +238,14 @@ import { createTestLogger } from "loggily"
 const log = createTestLogger("test") // all levels, console output
 ```
 
+## Browser Support
+
+Loggily includes a browser-optimized entry point that excludes Node.js-specific features (file writers, `node:fs`). Bundlers automatically select it via the `browser` condition in package.json exports.
+
+Features available in browser: logging, spans, child loggers, custom stages.
+
+Features Node.js only: file sinks (`{ file: ... }`), context propagation (`loggily/context`), worker threads (`loggily/worker`).
+
 ## Next Steps
 
 - [Near-Zero Cost Logging](/guide/zero-overhead) -- How optional chaining works and benchmarks

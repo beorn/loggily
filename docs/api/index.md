@@ -4,12 +4,22 @@
 
 ### Core
 
-| Export                        | Description                                               |
-| ----------------------------- | --------------------------------------------------------- |
-| `createLogger(name, config?)` | Create a conditional logger (includes `withEnvDefaults`)  |
-| `createTestLogger(name)`      | Test helper — all levels enabled, console output          |
-| `pipe(base, ...plugins)`      | Pipe a logger factory through plugins (left-to-right)     |
-| `withEnvDefaults()`           | Plugin: read defaults from env vars (included by default) |
+| Export                            | Description                                                            |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| `createLogger(name, config?)`     | Create a conditional logger (includes `withEnvDefaults`)               |
+| `baseCreateLogger(name, config?)` | Base logger factory without `withEnvDefaults` — for manual composition |
+| `createTestLogger(name)`          | Test helper — all levels enabled, console output                       |
+| `pipe(base, ...plugins)`          | Pipe a logger factory through plugins (left-to-right)                  |
+| `withEnvDefaults()`               | Plugin: read defaults from env vars (included by default)              |
+
+`baseCreateLogger` does NOT include `withSpans()` or `withEnvDefaults()`. Use it when you want full manual control over plugin composition:
+
+```typescript
+import { baseCreateLogger, pipe, withSpans, withEnvDefaults } from "loggily"
+
+// Manual composition — choose exactly which plugins to include
+const myCreateLogger = pipe(baseCreateLogger, withSpans(), withEnvDefaults())
+```
 
 ### Config Array Elements
 
@@ -65,6 +75,10 @@ The second argument to `createLogger` is an optional config array:
 | `LazyMessage`        | `string \| (() => string)`                                          |
 | `LoggerFactory`      | `(name: string, config?) => ConditionalLogger`                      |
 | `LoggerPlugin`       | `(factory: LoggerFactory) => LoggerFactory`                         |
+| `ConfigElement`      | Union of all valid config array elements                            |
+| `ConfigObject`       | Scope config: `{ level?, ns?, format?, spans? }`                    |
+| `FileDescriptor`     | File output: `{ file, level?, ns?, format? }`                       |
+| `Writable`           | Any object with `{ write, objectMode? }`                            |
 | `FileWriter`         | `{ write, flush, close }`                                           |
 | `IdFormat`           | `"simple" \| "w3c"`                                                 |
 | `TraceparentOptions` | `{ sampled?: boolean }`                                             |
@@ -93,6 +107,36 @@ These functions still work but are deprecated. They map to environment variables
 | `isContextPropagationEnabled()`                              | Check if context propagation is active |
 | `getCurrentSpan()`                                           | Get current span context               |
 | `runInSpanContext(ctx, fn)`                                  | Run function in specific context       |
+
+## Exports from `loggily/otel`
+
+OpenTelemetry bridge — forwards loggily events to OTLP-compatible backends. Requires `@opentelemetry/api` as a peer dependency.
+
+| Export              | Description                                                                     |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `toOtel(options?)`  | Stage that forwards events to OpenTelemetry (transparent — events pass through) |
+| `OtelBridgeOptions` | Options: `api`, `loggerName`, `tracerName`, `logs`, `spans`                     |
+
+```typescript
+import * as otelApi from "@opentelemetry/api"
+import { createLogger } from "loggily"
+import { toOtel } from "loggily/otel"
+
+const log = createLogger("myapp", [toOtel({ api: otelApi }), console])
+```
+
+The stage is transparent — events pass through unchanged to subsequent pipeline elements (like `console` above). Set `logs: false` or `spans: false` to forward only one event type.
+
+## Exports from `loggily/metrics`
+
+Span metrics collection — ambient or explicit.
+
+| Export                     | Description                                      |
+| -------------------------- | ------------------------------------------------ |
+| `spanStats()`              | Get aggregated span stats (p50/p95/p99)          |
+| `withMetrics(collector?)`  | Plugin: attach metrics collection to a logger    |
+| `createMetricsCollector()` | Create a standalone metrics collector            |
+| `SpanStats`                | Stats type: count, min, max, mean, p50, p95, p99 |
 
 ## Exports from `loggily/worker`
 

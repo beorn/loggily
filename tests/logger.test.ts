@@ -67,9 +67,9 @@ describe("createLogger", () => {
     }).toThrow()
   })
 
-  test("spanData is null for regular logger", () => {
+  test("spanData is undefined for regular logger", () => {
     const log = createLogger("myapp", [{ level: "trace" }, console])
-    expect(log.spanData).toBeNull()
+    expect((log as unknown as Record<string, unknown>).spanData).toBeUndefined()
   })
 })
 
@@ -405,6 +405,38 @@ describe("createLogger", () => {
     const span = log.span("work")
     expect(span.spanData).not.toBeNull()
     span.end()
+  })
+})
+
+describe("createLogger with props object", () => {
+  test("creates logger with props (backwards compat)", () => {
+    const log = createLogger("test", { service: "api", version: "1.0" })
+    log.info?.("hello")
+
+    expect(consoleMock.output).toHaveLength(1)
+    expect(consoleMock.output[0]!.message).toContain("hello")
+    // Props should be on the logger
+    expect(log.props).toEqual({ service: "api", version: "1.0" })
+  })
+
+  test("props appear in output", () => {
+    const log = createLogger("test", { service: "api" })
+    log.info?.("msg")
+
+    expect(consoleMock.output).toHaveLength(1)
+    expect(consoleMock.output[0]!.message).toContain("service")
+    expect(consoleMock.output[0]!.message).toContain("api")
+  })
+
+  test("props appear in JSON format output", () => {
+    process.env.LOG_FORMAT = "json"
+    const log = createLogger("test", { service: "api", version: "1.0" })
+    log.info?.("hello")
+
+    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<string, unknown>
+    expect(parsed.service).toBe("api")
+    expect(parsed.version).toBe("1.0")
+    expect(parsed.msg).toBe("hello")
   })
 })
 

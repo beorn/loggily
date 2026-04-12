@@ -449,7 +449,15 @@ export function createWorkerLogger(
   const logger: Logger = {
     name: namespace,
     props: Object.freeze({ ...props }),
-    spanData: null,
+    level: "trace" as const,
+
+    dispatch(_event: import("./core.js").Event): void {
+      // Worker loggers don't dispatch events locally — they forward via postMessage
+    },
+
+    [Symbol.dispose](): void {
+      // No-op for worker loggers
+    },
 
     trace: (msg, data) => log("trace", msg, data),
     debug: (msg, data) => log("debug", msg, data),

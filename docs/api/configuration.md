@@ -52,6 +52,30 @@ Arrays in the config array create sub-pipelines with their own scope:
 const log = createLogger("myapp", [console, [{ ns: "myapp:metrics", format: "json" }, { file: "/tmp/metrics.log" }]])
 ```
 
+## Namespace Filter Patterns
+
+The `ns` config key and the `DEBUG` environment variable accept the same filter syntax:
+
+| Pattern            | Matches                                                        |
+| ------------------ | -------------------------------------------------------------- |
+| `*`                | Everything                                                     |
+| `myapp`            | Exact match + children (`myapp`, `myapp:db`, `myapp:db:query`) |
+| `myapp:*`          | Same as `myapp` — explicit wildcard                            |
+| `myapp:db`         | Exact match + children (`myapp:db`, `myapp:db:query`)          |
+| `-myapp:sql`       | Exclude `myapp:sql` and its children                           |
+| `myapp,-myapp:sql` | Include myapp, exclude sql subtree                             |
+
+Patterns are comma-separated. Include patterns are matched first; if any include pattern matches, the namespace passes. Exclude patterns (prefixed with `-`) take priority over includes.
+
+When no include patterns are specified, all namespaces pass (only excludes are applied). When include patterns are present, a namespace must match at least one include and no excludes.
+
+```bash
+DEBUG='*' bun run app                     # Everything
+DEBUG=myapp bun run app                   # myapp and all children
+DEBUG='myapp,-myapp:sql' bun run app      # myapp tree, excluding sql subtree
+DEBUG='myapp:db,myapp:cache' bun run app  # Only db and cache subtrees
+```
+
 ## Environment Variables
 
 `console` literal and `"console"` string are both accepted as console sinks.
@@ -106,3 +130,13 @@ getOutputMode(): OutputMode
 
 setSuppressConsole(value: boolean): void // -> omit console from config array
 ```
+
+## Browser Support
+
+Loggily includes a browser-optimized entry point that excludes Node.js-specific features (file writers, `node:fs`). Bundlers automatically select it via the `browser` condition in package.json exports.
+
+Features available in browser: logging, spans, child loggers, custom stages, tracing utilities, OpenTelemetry bridge (`loggily/otel`).
+
+Features Node.js only: file sinks (`{ file: ... }`), context propagation (`loggily/context`), worker threads (`loggily/worker`).
+
+Calling `createFileWriter()` in a browser environment throws an error with a descriptive message.
