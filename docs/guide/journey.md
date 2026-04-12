@@ -48,9 +48,9 @@ Loggers form a tree. Child loggers inherit their parent's namespace and props:
 
 ```typescript
 const log = createLogger("myapp")
-const db = log.logger("db") // myapp:db
-const http = log.logger("http") // myapp:http
-const query = db.logger("query") // myapp:db:query
+const db = log.child("db") // myapp:db
+const http = log.child("http") // myapp:http
+const query = db.child("query") // myapp:db:query
 
 db.debug?.("connecting") // myapp:db
 query.debug?.("SELECT * FROM...") // myapp:db:query

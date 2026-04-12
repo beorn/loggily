@@ -33,7 +33,7 @@ Objects configure (`{ level, ns, format }`), arrays branch, values write. Custom
 | Near-zero Disabled     | `?.` skips arg evaluation entirely                       |
 | Built-in Spans         | `using` keyword, auto timing                             |
 | Namespace Filtering    | `DEBUG=` compatible patterns                             |
-| Child / Context Logger | `.logger()`, `.child()`, both return `ConditionalLogger` |
+| Child / Context Logger | `.child()` — extend namespace, add context, or both    |
 | Output Pipeline        | Config array: objects, arrays, values                    |
 | Pretty Print           | Built-in (auto in dev)                                   |
 | JSON Output            | Built-in (auto in production)                            |

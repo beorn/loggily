@@ -84,18 +84,18 @@ const log = createLogger("myapp", [{ level: "debug" }, console])
 
 ## Child Loggers
 
-Build a namespace hierarchy with `.logger()`:
+Build a namespace hierarchy with `.child()`:
 
 ```typescript
 const log = createLogger("myapp")
-const db = log.logger("db") // namespace: "myapp:db"
-const cache = log.logger("cache") // namespace: "myapp:cache"
+const db = log.child("db") // namespace: "myapp:db"
+const cache = log.child("cache") // namespace: "myapp:cache"
 
 db.info?.("connected", { host: "localhost" })
 // 14:32:15 INFO myapp:db connected {host: "localhost"}
 ```
 
-Both `.logger()` and `.child()` return `ConditionalLogger`, which supports the same `?.` pattern.
+`.child()` is the single method for all child logger creation. It returns `ConditionalLogger`, which supports the same `?.` pattern.
 
 ## Context Loggers
 
@@ -105,6 +105,32 @@ Add structured context that appears in every message:
 const reqLog = log.child({ requestId: "abc-123" })
 reqLog.info?.("handling request")
 // 14:32:15 INFO myapp handling request {requestId: "abc-123"}
+```
+
+Combine namespace and context in one call:
+
+```typescript
+const dbLog = log.child("db", { pool: "main" })
+// namespace: "myapp:db", all logs include pool
+```
+
+## Shared Logger Across Modules
+
+Create one configured logger and import it everywhere:
+
+```typescript
+// app/logger.ts
+import { createLogger } from "loggily"
+export const log = createLogger("myapp", [
+  { level: "debug", ns: "-sql" },
+  "console",
+  { file: "/var/log/myapp.log", level: "info", format: "json" },
+])
+
+// app/auth.ts
+import { log } from "./logger.ts"
+const authLog = log.child("auth")
+authLog.info?.("login attempted", { user: "alice" })
 ```
 
 ## Spans
@@ -188,7 +214,29 @@ const log = createLogger("myapp", [
 ])
 ```
 
-For power users, `buildPipeline()` and `defaultPipeline()` are exported for direct pipeline construction.
+For power users, `buildPipeline()` is exported for direct pipeline construction.
+
+## Composition
+
+Extend `createLogger` with custom plugins using `compose`:
+
+```typescript
+import { createLogger, compose } from "loggily"
+
+const myCreateLogger = compose(createLogger, withSentry({ dsn: "..." }))
+const log = myCreateLogger("myapp")
+```
+
+`createLogger` already includes `withEnvDefaults()`, which reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, and `TRACE` from environment variables.
+
+## Test Helper
+
+For tests, `createTestLogger` creates a logger with all levels enabled:
+
+```typescript
+import { createTestLogger } from "loggily"
+const log = createTestLogger("test") // all levels, console output
+```
 
 ## Next Steps
 

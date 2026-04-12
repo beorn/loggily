@@ -37,7 +37,7 @@ child.debug({ query: sql, params }, "executing query")
 import { createLogger } from "loggily"
 
 const log = createLogger("myapp", [{ level: "info" }, console])
-const dbLog = log.logger("db")
+const dbLog = log.child("db")
 
 log.info?.("server started", { port: 3000 })
 dbLog.debug?.("executing query", { query: sql, params })
@@ -81,16 +81,19 @@ log.error?.(err) // Extracts message, stack, code
 const child = logger.child({ requestId: "abc" })
 child.info("handling request")
 
-// Loggily — two patterns
+// Loggily — .child() handles both patterns
 // 1. Context fields (like Pino's child)
 const child = log.child({ requestId: "abc" })
 child.info?.("handling request") // includes requestId
 
 // 2. Namespace (extends the logger name)
-const dbLog = log.logger("db") // name: "myapp:db"
+const dbLog = log.child("db") // name: "myapp:db"
+
+// 3. Both at once
+const dbLog = log.child("db", { pool: "main" })
 ```
 
-Both `.logger()` and `.child()` return `ConditionalLogger`.
+`.child()` always returns `ConditionalLogger`.
 
 ### Levels
 
@@ -171,7 +174,7 @@ logger.info({ duration: Date.now() - start }, "operation complete")
 1. **Update dependencies**: `bun remove pino pino-pretty && bun add loggily`
 2. **Update imports**: `import pino from "pino"` to `import { createLogger } from "loggily"`
 3. **Swap argument order**: Pino uses `(data, message)`, Loggily uses `(message, data)`
-4. **Replace `logger.child()`** with `.child()` (context) or `.logger()` (namespace)
+4. **Replace `logger.child()`** with `.child()` — use `.child({ ... })` for context, `.child("name")` for namespace, or `.child("name", { ... })` for both
 5. **Convert transports** to `{ file }` in the config array or custom stage functions
 6. **Add `?.`** to all log calls for near-zero cost disabled logging
 7. **Convert manual timing** to spans with `using`

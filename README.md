@@ -75,48 +75,84 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 
 ## Features
 
-- **Config pipeline** -- second arg to `createLogger` is a config array: objects configure (`{ level, ns, format }`), arrays branch, values write. Pass `console` for terminal output, `{ file: "/path" }` for file output, or functions for custom stages.
+- **Config pipeline** -- second arg to `createLogger` is a config array: objects configure (`{ level, ns, format, spans }`), arrays branch, values write. Pass `console` or `"console"` for terminal output, `{ file: "/path" }` for file output, or functions for custom stages.
 - **Namespace hierarchy** -- organize logs with `:` separators. `DEBUG=myapp:db` shows only database output, compatible with the same patterns as the `debug` package.
-- **Lightweight spans** -- time any operation with `using span = log.span("name")`. Automatic duration, parent-child tracking, and trace IDs.
+- **Lightweight spans** -- time any operation with `using span = log.span("name")`. Automatic duration, parent-child tracking, and trace IDs. Control per-pipeline with `{ spans: true/false }`.
 - **Dev & production** -- colorized console in development, structured JSON in production. Same code, zero config.
-- **Child context** -- `log.child({ requestId })` adds structured fields to every message in the chain.
+- **Child loggers** -- `log.child("auth")` extends namespace, `log.child({ requestId })` adds context fields, `log.child("auth", { sso: true })` does both.
 - **Automatic async context** -- enable `AsyncLocalStorage`-based propagation and every log in a request's async chain inherits trace/span IDs without passing loggers around.
 - **Lazy messages** -- `log.debug?.(() => expensiveString())` skips the function entirely when disabled.
 - **Error overloads** -- `log.error?.(err)`, `log.error?.(err, "msg")`, and `log.error?.(err, "msg", data)`.
 - **Worker threads** -- forward logs from workers to the main thread with full type safety.
+- **Composable** -- `compose(createLogger, myPlugin)` to extend the factory with custom behavior.
 
-### Config Array
+## Usage Walkthrough
+
+### Zero config
 
 ```typescript
 import { createLogger } from "loggily"
+const log = createLogger("myapp")
+log.info?.("started")
+```
 
-// Objects configure, arrays branch, values write
+### Configured pipeline
+
+```typescript
 const log = createLogger("myapp", [
   { level: "debug", ns: "-sql" },
-  console,
-  { file: "/tmp/app.log", level: "error", format: "json" },
+  "console",
+  { file: "/tmp/app.log", level: "info", format: "json" },
+  [{ level: "error" }, { file: "/tmp/errors.log", format: "json" }],
 ])
 ```
 
-When no config array is provided, loggily reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, and `NODE_ENV` from the environment.
+### Child loggers
+
+```typescript
+const authLog = log.child("auth")                    // namespace: "myapp:auth"
+const reqLog = log.child({ requestId: "abc-123" })   // context fields
+const dbLog = log.child("db", { pool: "main" })      // both
+```
 
 ### Spans
 
 ```typescript
 {
-  using span = log.span("db:query", { table: "users" })
-  const users = await db.query("SELECT * FROM users")
-  span.spanData.count = users.length
+  using span = log.span("import", { file: "data.csv" })
+  span.info?.("parsing")
+  span.spanData.rows = 42
 }
-// SPAN myapp:db:query (45ms) {count: 100, table: "users"}
+// SPAN myapp:import (15ms) {rows: 42, file: "data.csv"}
+```
 
-// Without `using` — call .end() manually
-const span = log.span("db:query")
-try {
-  /* ... */
-} finally {
-  span.end()
-}
+### Shared logger across a repo
+
+```typescript
+// app/logger.ts
+export const log = createLogger("myapp", [
+  { level: "debug", ns: "-sql" },
+  "console",
+  { file: "/var/log/myapp.log", level: "info", format: "json" },
+])
+
+// app/auth.ts
+import { log } from "./logger.ts"
+const authLog = log.child("auth")
+```
+
+### Compose with plugins
+
+```typescript
+import { createLogger, compose } from "loggily"
+const myCreateLogger = compose(createLogger, withSentry({ dsn: "..." }))
+```
+
+### Test helper
+
+```typescript
+import { createTestLogger } from "loggily"
+const log = createTestLogger("test") // all levels enabled, console output
 ```
 
 ### Common configuration
@@ -143,7 +179,7 @@ Key types exported for power users:
 | `Pipeline`          | `{ dispatch, level, dispose }`                                   |
 | `ConditionalLogger` | Logger with `?.`-compatible methods                              |
 
-`buildPipeline()` and `defaultPipeline()` are exported for direct pipeline construction.
+`buildPipeline()` is exported for direct pipeline construction.
 
 ## Compatibility
 
@@ -160,8 +196,8 @@ Loggily was built while developing a terminal UI where disabled debug logs insid
 
 ## When not to use Loggily
 
-- **You need worker-thread transport pipelines with log rotation and dozens of plugins.** [Pino](https://getpino.io/) has a mature transport ecosystem for this.
-- **You need distributed tracing with vendor exporters and auto-instrumentation.** [OpenTelemetry](https://opentelemetry.io/) is the industry standard.
+- **You need worker-thread transport pipelines with log rotation and dozens of plugins.** Pino has a mature transport ecosystem for this.
+- **You need distributed tracing with vendor exporters and auto-instrumentation.** OpenTelemetry is the industry standard.
 
 ## Documentation
 

@@ -62,11 +62,13 @@ const log = createLogger("myapp", [
 ])
 ```
 
-Config keys: `level` (LogLevel), `ns` (namespace filter string/array), `format` ("console" | "json").
+Config keys: `level` (LogLevel), `ns` (namespace filter string/array), `format` ("console" | "json"), `spans` (boolean, per-pipeline span control).
 
 Sink keys: `file` (path string), with optional `level`, `ns`, `format` overrides.
 
-When no config array is provided, `defaultPipeline()` reads from environment variables.
+`console` literal and `"console"` string are both accepted as console sinks.
+
+When no config array is provided, `withEnvDefaults` reads from environment variables.
 
 ## Environment Variables
 
@@ -121,15 +123,19 @@ const log = createLogger("myapp", [{ level: "debug" }, console])
 
 ```typescript
 // Extend namespace
-const child = log.logger("import", { file: "data.csv" })
-// -> namespace: "myapp:import"
+const child = log.child("auth")
+// -> namespace: "myapp:auth"
 
-// Context logger (same namespace, extra fields)
+// Context fields (same namespace, extra fields)
 const child = log.child({ requestId: "abc" })
 // -> all logs include requestId
+
+// Both at once
+const child = log.child("auth", { sso: true })
+// -> namespace: "myapp:auth", all logs include sso
 ```
 
-Both `.logger()` and `.child()` return `ConditionalLogger`.
+`.child()` returns `ConditionalLogger`. The older `.logger()` still works but is deprecated.
 
 ### Spans
 
@@ -180,14 +186,31 @@ import type {
 } from "loggily"
 ```
 
+### Composition
+
+```typescript
+import { createLogger, compose, withEnvDefaults } from "loggily"
+
+// createLogger already includes withEnvDefaults()
+// Compose with custom plugins:
+const myCreateLogger = compose(createLogger, withSentry({ dsn: "..." }))
+```
+
+`withEnvDefaults()` is the plugin that reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, `TRACE`, etc. from env vars. It's included by default in `createLogger`. Omit it when composing from scratch for full manual control.
+
+### Test Helper
+
+```typescript
+import { createTestLogger } from "loggily"
+const log = createTestLogger("test") // all levels enabled, console output
+```
+
 ### Pipeline Builder (power users)
 
 ```typescript
-import { buildPipeline, defaultPipeline } from "loggily"
+import { buildPipeline } from "loggily"
 
 const pipeline = buildPipeline([{ level: "debug" }, console, { file: "/tmp/app.log", format: "json" }])
-
-const defaultPipe = defaultPipeline() // reads env vars
 ```
 
 ### Deprecated v1 API
@@ -323,14 +346,21 @@ log.debug?.(() => `expensive: ${JSON.stringify(bigObject)}`)
 
 Type: `LazyMessage = string | (() => string)`
 
-## Child Context Loggers
+## Child Loggers
 
-Create child loggers with additional structured context (not just namespace):
+`.child()` is the single method for creating child loggers:
 
 ```typescript
-const child = log.child({ requestId: "abc-123", userId: 42 })
-child.info?.("handling request")
+// Extend namespace
+const authLog = log.child("auth")          // namespace: "myapp:auth"
+
+// Add context fields (same namespace)
+const reqLog = log.child({ requestId: "abc-123", userId: 42 })
+reqLog.info?.("handling request")
 // -> 14:32:15 INFO myapp handling request {requestId: "abc-123", userId: 42}
+
+// Both: extend namespace + add fields
+const dbLog = log.child("db", { pool: "main" })
 ```
 
 ## JSON Output Format

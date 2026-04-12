@@ -34,7 +34,7 @@ debugDb("query: %s, params: %o", sql, params)
 import { createLogger } from "loggily"
 
 const log = createLogger("myapp")
-const dbLog = log.logger("db")
+const dbLog = log.child("db")
 
 log.info?.("starting server", { port: 3000 })
 dbLog.debug?.("query", { sql, params })
@@ -68,10 +68,10 @@ const debug = createDebug("myapp")
 const debugDb = createDebug("myapp:db")
 const debugCache = createDebug("myapp:cache")
 
-// Loggily - hierarchy via .logger()
+// Loggily - hierarchy via .child()
 const log = createLogger("myapp")
-const dbLog = log.logger("db") // myapp:db
-const cacheLog = log.logger("cache") // myapp:cache
+const dbLog = log.child("db") // myapp:db
+const cacheLog = log.child("cache") // myapp:cache
 ```
 
 ### Environment Variables
@@ -173,7 +173,7 @@ const debugReq = createDebug("myapp:request")
 
 // Loggily - child loggers with inherited context
 const log = createLogger("myapp")
-const reqLog = log.logger("request")
+const reqLog = log.child("request")
 // reqLog inherits parent pipeline and props
 ```
 

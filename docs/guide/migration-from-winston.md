@@ -96,12 +96,13 @@ log.error?.(err, "startup failed", { context: "init" }) // With custom message
 const childLogger = logger.child({ requestId: "abc" })
 childLogger.info("processing")
 
-// Loggily — two patterns
+// Loggily — .child() handles both patterns
 const child = log.child({ requestId: "abc" }) // Context fields
-const dbLog = log.logger("db") // Namespace: myapp:db
+const dbLog = log.child("db") // Namespace: myapp:db
+const dbLog = log.child("db", { pool: "main" }) // Both
 ```
 
-Both return `ConditionalLogger`.
+`.child()` always returns `ConditionalLogger`.
 
 ### Transports / Output
 
@@ -192,4 +193,4 @@ logger.profile("operation") // logs duration
 6. **Add `?.`** to all log calls for near-zero cost disabled logging
 7. **Map custom levels**: http to info, verbose to debug, silly to trace
 8. **Convert `logger.profile()`** to spans with `using`
-9. **Replace `logger.child()`** with `.child()` (context) or `.logger()` (namespace)
+9. **Replace `logger.child()`** with `.child()` -- use `.child({ ... })` for context, `.child("name")` for namespace, or `.child("name", { ... })` for both

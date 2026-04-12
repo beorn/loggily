@@ -485,7 +485,7 @@ function baseCreateLogger(name: string, configOrProps?: unknown[] | Record<strin
 export type LoggerFactory = (name: string, configOrProps?: unknown[] | Record<string, unknown>) => ConditionalLogger
 export type LoggerPlugin = (factory: LoggerFactory) => LoggerFactory
 
-export function compose(base: LoggerFactory, ...plugins: LoggerPlugin[]): LoggerFactory {
+export function pipe(base: LoggerFactory, ...plugins: LoggerPlugin[]): LoggerFactory {
   return plugins.reduce((factory, plugin) => plugin(factory), base)
 }
 
@@ -588,7 +588,7 @@ function createEnvPipeline(): Pipeline {
 }
 
 /** Default createLogger — includes withEnvDefaults. */
-export const createLogger: LoggerFactory = compose(baseCreateLogger, withEnvDefaults())
+export const createLogger: LoggerFactory = pipe(baseCreateLogger, withEnvDefaults())
 
 /** Test helper — all levels, console output. */
 export function createTestLogger(name: string): ConditionalLogger {
