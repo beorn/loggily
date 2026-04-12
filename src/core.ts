@@ -86,11 +86,11 @@ export interface Logger {
   error(error: Error, data?: Record<string, unknown>): void
   error(error: Error, message: string, data?: Record<string, unknown>): void
 
+  /** @deprecated Use .child() */
   logger(namespace?: string, props?: Record<string, unknown>): ConditionalLogger
   span(namespace?: string, props?: LazyProps): SpanLogger
+  child(namespace: string, props?: Record<string, unknown>): ConditionalLogger
   child(context: Record<string, unknown>): ConditionalLogger
-  /** @deprecated Use .logger() instead for namespace-based children */
-  child(context: string): ConditionalLogger
   end(): void
 }
 
@@ -115,10 +115,11 @@ export interface ConditionalLogger {
     (error: Error, message: string, data?: Record<string, unknown>): void
   }
 
+  /** @deprecated Use .child() */
   logger(namespace?: string, props?: Record<string, unknown>): ConditionalLogger
   span(namespace?: string, props?: LazyProps): SpanLogger
+  child(namespace: string, props?: Record<string, unknown>): ConditionalLogger
   child(context: Record<string, unknown>): ConditionalLogger
-  child(context: string): ConditionalLogger
   end(): void
 }
 
@@ -318,13 +319,9 @@ function createLoggerImpl(
       extraData?: Record<string, unknown>,
     ) => emitLog("error", msgOrError, dataOrMsg, extraData),
 
+    /** @deprecated Use .child() instead */
     logger(namespace?: string, childProps?: Record<string, unknown>): ConditionalLogger {
-      const childName = namespace ? `${name}:${namespace}` : name
-      const mergedProps = { ...props, ...childProps }
-      return wrapConditional(
-        createLoggerImpl(childName, mergedProps, pipeline, null, parentSpanId, traceId, traceSampled),
-        () => pipeline.level,
-      )
+      return this.child(namespace ?? "", childProps)
     },
 
     span(namespace?: string, childProps?: LazyProps): SpanLogger {
@@ -417,12 +414,18 @@ function createLoggerImpl(
       return spanLogger
     },
 
-    child(context: string | Record<string, unknown>): ConditionalLogger {
-      if (typeof context === "string") {
-        return this.logger(context)
+    child(namespaceOrContext?: string | Record<string, unknown>, childProps?: Record<string, unknown>): ConditionalLogger {
+      if (typeof namespaceOrContext === "string") {
+        const childName = namespaceOrContext ? `${name}:${namespaceOrContext}` : name
+        const mergedProps = { ...props, ...childProps }
+        return wrapConditional(
+          createLoggerImpl(childName, mergedProps, pipeline, null, parentSpanId, traceId, traceSampled),
+          () => pipeline.level,
+        )
       }
+      // Object → context fields, same namespace
       return wrapConditional(
-        createLoggerImpl(name, { ...props, ...context }, pipeline, null, parentSpanId, traceId, traceSampled),
+        createLoggerImpl(name, { ...props, ...namespaceOrContext }, pipeline, null, parentSpanId, traceId, traceSampled),
         () => pipeline.level,
       )
     },
