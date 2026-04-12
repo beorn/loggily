@@ -141,7 +141,7 @@ import { log } from "./logger.ts"
 const authLog = log.child("auth")
 ```
 
-### Pipe with plugins
+### Compose with plugins
 
 ```typescript
 import { createLogger, pipe } from "loggily"
