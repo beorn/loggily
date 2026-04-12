@@ -41,7 +41,7 @@ log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 // -> SPAN myapp:import (15ms) {count: 42, file: "data.csv"}
 ```
 
-## v2 Config Array
+## Config Array
 
 The second argument to `createLogger` is an optional config array. Objects configure, arrays branch, values write:
 
@@ -382,7 +382,7 @@ import type {
 } from "loggily"
 ```
 
-## Deprecated v1 API
+## Deprecated API
 
 These functions still work but are deprecated. They map to environment variables internally:
 

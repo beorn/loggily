@@ -1,6 +1,6 @@
 # Configuration
 
-## v2 Config Array (recommended)
+## Config Array
 
 The second argument to `createLogger` is an optional config array that defines the output pipeline:
 
@@ -103,7 +103,7 @@ import { buildPipeline } from "loggily"
 const pipeline = buildPipeline([{ level: "debug" }, console, { file: "/tmp/app.log", format: "json" }])
 ```
 
-## Deprecated v1 API
+## Deprecated API
 
 These functions still work but are deprecated. They map to environment variables internally:
 

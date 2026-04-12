@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **v2 Pipeline API** — `createLogger(name, config?)` with a polymorphic config array. Objects configure, arrays branch, values write.
+- **Pipeline API** — `createLogger(name, config?)` with a polymorphic config array. Objects configure, arrays branch, values write.
 - **New types**: `LogEvent`, `SpanEvent`, `Event`, `Stage`, `Pipeline`, `LoggerFactory`, `LoggerPlugin`
 - **`buildPipeline()` / `defaultPipeline()`** exported for power users
 - **`compose()`** for building custom `createLogger` with plugins
@@ -25,11 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
-- All v1 global setters (`setLogLevel`, `enableSpans`, `setDebugFilter`, `setTraceFilter`, `setLogFormat`, `setOutputMode`, `setSuppressConsole`, `addWriter`, `writeSpan`). They still work — level/format/ns/trace map to env vars, writers/suppress to runtime state — but will be removed in a future major version. Migrate to config arrays.
+- Legacy global setters (`setLogLevel`, `enableSpans`, `setDebugFilter`, `setTraceFilter`, `setLogFormat`, `setOutputMode`, `setSuppressConsole`, `addWriter`, `writeSpan`). They still work — level/format/ns/trace map to env vars, writers/suppress to runtime state — but will be removed in a future major version. Migrate to config arrays.
 
 ### Documentation
 
-- Comprehensive v2 API update across 17 doc files (guide, API reference, migration guides)
+- Comprehensive API update across 17 doc files (guide, API reference, migration guides)
 - Comparison page rewritten — factual compatibility statements, no negative comparisons
 - Added `LogEvent`/`SpanEvent`/`Stage`/`Pipeline` type docs
 

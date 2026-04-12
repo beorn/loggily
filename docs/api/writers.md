@@ -1,8 +1,8 @@
 # Output
 
-## v2 Config Array (recommended)
+## Config Array
 
-In v2, output destinations are configured in the config array passed to `createLogger`:
+Output destinations are configured in the config array passed to `createLogger`:
 
 ```typescript
 import { createLogger } from "loggily"
@@ -84,7 +84,7 @@ Create a buffered file writer that flushes automatically.
 - Multiple `close()` calls are safe (idempotent)
 - `write()` after `close()` is silently ignored
 
-## Deprecated v1 Writer API
+## Deprecated Writer API
 
 ```typescript
 // Deprecated — use { file } in config array or custom stage functions instead

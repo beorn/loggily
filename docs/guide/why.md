@@ -68,7 +68,7 @@ Examples:
 - Environment variables (`DEBUG=`, `LOG_LEVEL=`) are porcelain for configuration. The config array with `{ level, ns, format }` objects is the primitive.
 - `createLogger("myapp", [console])` is porcelain. `buildPipeline()` and custom `Stage` functions are the primitives.
 
-### The v2 pipeline model
+### The pipeline model
 
 The second argument to `createLogger` is a config array that defines the output pipeline:
 
@@ -87,7 +87,7 @@ The array is read sequentially. Each element plays one of four roles:
 3. **Stage functions** (`(event) => event | null | void`) transform or filter events in the pipeline
 4. **Branch arrays** create sub-pipelines with their own scope
 
-This replaces the v1 global setters (`setLogLevel`, `addWriter`, `enableSpans`, `setDebugFilter`) with a composable, per-logger configuration model. The v1 functions still work but are deprecated -- they map to environment variables internally.
+This replaces the deprecated global setters (`setLogLevel`, `addWriter`, `enableSpans`, `setDebugFilter`) with a composable, per-logger configuration model. These functions still work but are deprecated -- they map to environment variables internally.
 
 ### Core principles
 

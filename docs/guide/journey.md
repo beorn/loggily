@@ -114,7 +114,7 @@ TRACE=myapp:db,myapp:cache bun run app  # Database + cache spans
 
 ## Level 4: Output Pipeline
 
-The v2 config array replaces the old writer system. Configure where output goes as part of logger creation:
+The config array defines where output goes as part of logger creation:
 
 ```typescript
 import { createLogger } from "loggily"

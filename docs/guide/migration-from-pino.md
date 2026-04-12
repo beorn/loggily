@@ -118,7 +118,7 @@ const logger = pino({
   },
 })
 
-// Loggily v2 — config array
+// Loggily — config array
 const log = createLogger("myapp", [console, { file: "/tmp/app.log", format: "json" }])
 ```
 

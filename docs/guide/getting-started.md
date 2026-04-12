@@ -197,7 +197,7 @@ const log = createLogger("myapp", [{ format: "json" }, console])
 
 ## Pipeline Model
 
-The v2 config array is a composable pipeline. Elements are processed in order:
+The config array is a composable pipeline. Elements are processed in order:
 
 - **Objects** (`{ level, ns, format }`) configure the scope for subsequent elements
 - **`console`** adds console output at the current scope

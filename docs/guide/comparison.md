@@ -10,7 +10,7 @@ Loggily is a structured logging library with built-in spans and near-zero cost d
 2. **Debug-style namespace filtering** -- `DEBUG=myapp:db,-myapp:sql`
 3. **Lightweight spans** -- `using span = log.span("op")` with automatic timing
 
-The v2 config array provides a composable pipeline model:
+The config array provides a composable pipeline model:
 
 ```typescript
 import { createLogger } from "loggily"
@@ -121,7 +121,7 @@ log.debug(`state: ${computeState()}`)
 ### File output
 
 ```typescript
-// Loggily v2 -- config array
+// Loggily -- config array
 const log = createLogger("myapp", [console, { file: "/tmp/app.log", format: "json" }])
 ```
 
@@ -142,7 +142,7 @@ logger.error("request failed", { error: err.message })
 ### Custom pipeline stages
 
 ```typescript
-// Loggily v2 -- functions in the config array
+// Loggily -- functions in the config array
 const log = createLogger("myapp", [
   // Enrich events
   (event) => ({ ...event, props: { ...event.props, host: hostname() } }),

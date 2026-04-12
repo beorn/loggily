@@ -1,11 +1,11 @@
-# Migrating from v1 to v2
+# Legacy API Reference
 
-Loggily v2 replaces global setters with composable config arrays. The core concept: **objects configure, arrays branch, values write**.
+The deprecated global setters are replaced by composable config arrays. The core concept: **objects configure, arrays branch, values write**.
 
 ## Quick comparison
 
 ```ts
-// v1: global setters
+// Deprecated: global setters
 import { createLogger, setLogLevel, setDebugFilter, setLogFormat, enableSpans, addWriter } from "loggily"
 
 setLogLevel("debug")
@@ -18,7 +18,7 @@ const log = createLogger("myapp")
 ```
 
 ```ts
-// v2: config array
+// Current: config array
 import { createLogger } from "loggily"
 
 const log = createLogger("myapp", [
@@ -33,7 +33,7 @@ const log = createLogger("myapp", [
 
 ## Migration table
 
-| v1 (global setter)          | v2 (config array)                          |
+| Deprecated setter           | Config array equivalent                    |
 | --------------------------- | ------------------------------------------ |
 | `setLogLevel("debug")`      | `{ level: "debug" }` in config array       |
 | `setDebugFilter(["myapp"])` | `{ ns: "myapp" }` in config array          |
@@ -133,7 +133,7 @@ const authLog = log.child("auth", { sso: true })
 
 ### 5. Use env vars for runtime control
 
-v2 reads the same environment variables as v1:
+Config arrays and environment variables coexist:
 
 | Variable     | Effect                                             |
 | ------------ | -------------------------------------------------- |
@@ -150,7 +150,7 @@ const log = createLogger("myapp") // reads LOG_LEVEL, DEBUG, etc.
 
 ### 6. Use branches for multi-destination logging
 
-v2 config arrays support branching with nested arrays:
+Config arrays support branching with nested arrays:
 
 ```ts
 const log = createLogger("myapp", [
@@ -163,13 +163,13 @@ const log = createLogger("myapp", [
 
 ## Backwards compatibility
 
-v1 global setters still work but are deprecated. They map to environment variables internally:
+The deprecated global setters still work. They map to environment variables internally:
 
 - `setLogLevel("debug")` sets `process.env.LOG_LEVEL = "debug"`
 - `enableSpans()` sets `process.env.TRACE = "1"`
 - `setDebugFilter(["ns"])` sets `process.env.DEBUG = "ns"`
 
-This means v1 setters affect loggers created **without** explicit config arrays. Loggers with explicit config arrays are self-contained.
+This means deprecated setters affect loggers created **without** explicit config arrays. Loggers with explicit config arrays are self-contained.
 
 ## Common patterns
 

@@ -112,7 +112,7 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console(), new winston.transports.File({ filename: "app.log" })],
 })
 
-// Loggily v2 — config array
+// Loggily — config array
 const log = createLogger("myapp", [console, { file: "/tmp/app.log", format: "json" }])
 ```
 
@@ -127,7 +127,7 @@ class AlertTransport extends winston.Transport {
   }
 }
 
-// Loggily v2 — stage function in config array
+// Loggily — stage function in config array
 const log = createLogger("myapp", [
   (event) => {
     if (event.kind === "log" && event.level === "error") {

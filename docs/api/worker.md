@@ -86,9 +86,7 @@ worker.on("message", (msg) => handle(msg))
 ### handleWorkerEvents
 
 ```typescript
-function handleWorkerEvents(
-  target: ConditionalLogger | { dispatch(event: Event): void },
-): (msg: unknown) => void
+function handleWorkerEvents(target: ConditionalLogger | { dispatch(event: Event): void }): (msg: unknown) => void
 ```
 
 Route worker events to a specific logger. More control than `createWorkerLogHandler`:

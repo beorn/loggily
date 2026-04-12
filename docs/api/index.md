@@ -84,11 +84,11 @@ The second argument to `createLogger` is an optional config array:
 | `IdFormat`           | `"simple" \| "w3c"`                                                 |
 | `TraceparentOptions` | `{ sampled?: boolean }`                                             |
 
-### Deprecated v1 API
+### Deprecated API
 
 These functions still work but are deprecated. They map to environment variables internally:
 
-| Export (deprecated)                                      | v2 Replacement                                   |
+| Export (deprecated)                                      | Replacement                                      |
 | -------------------------------------------------------- | ------------------------------------------------ |
 | `.logger(ns?, props?)`                                   | `.child(ns?, props?)`                            |
 | `setLogLevel(level)` / `getLogLevel()`                   | `{ level }` in config array or `LOG_LEVEL` env   |
