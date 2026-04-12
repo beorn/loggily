@@ -84,7 +84,7 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 - **Lazy messages** -- `log.debug?.(() => expensiveString())` skips the function entirely when disabled.
 - **Error overloads** -- `log.error?.(err)`, `log.error?.(err, "msg")`, and `log.error?.(err, "msg", data)`.
 - **Worker threads** -- forward logs from workers to the main thread with full type safety.
-- **Composable** -- `compose(createLogger, myPlugin)` to extend the factory with custom behavior.
+- **Composable** -- `pipe(createLogger, myPlugin)` to extend the factory with custom behavior.
 
 ## Usage Walkthrough
 
@@ -144,8 +144,8 @@ const authLog = log.child("auth")
 ### Compose with plugins
 
 ```typescript
-import { createLogger, compose } from "loggily"
-const myCreateLogger = compose(createLogger, withSentry({ dsn: "..." }))
+import { createLogger, pipe } from "loggily"
+const myCreateLogger = pipe(createLogger, withSentry({ dsn: "..." }))
 ```
 
 ### Test helper

@@ -16,11 +16,12 @@ const log = createLogger("myapp", [
 
 ### Config Object Keys
 
-| Key      | Type                  | Description              |
-| -------- | --------------------- | ------------------------ |
-| `level`  | `LogLevel`            | Minimum log level        |
-| `ns`     | `string \| string[]`  | Namespace filter pattern |
-| `format` | `"console" \| "json"` | Output format            |
+| Key      | Type                  | Description                            |
+| -------- | --------------------- | -------------------------------------- |
+| `level`  | `LogLevel`            | Minimum log level                      |
+| `ns`     | `string \| string[]`  | Namespace filter pattern               |
+| `format` | `"console" \| "json"` | Output format                          |
+| `spans`  | `boolean`             | Enable/disable span output (per-pipeline) |
 
 ### Sink Object Keys
 
@@ -53,7 +54,11 @@ const log = createLogger("myapp", [console, [{ ns: "myapp:metrics", format: "jso
 
 ## Environment Variables
 
-When no config array is provided, `createLogger` uses `defaultPipeline()` which reads from environment variables:
+`console` literal and `"console"` string are both accepted as console sinks.
+
+## withEnvDefaults
+
+`createLogger` includes the `withEnvDefaults()` plugin by default. When no config array is provided, it reads from environment variables:
 
 | Variable       | Values                                  | Default   |
 | -------------- | --------------------------------------- | --------- |
@@ -68,13 +73,10 @@ When no config array is provided, `createLogger` uses `defaultPipeline()` which 
 ## Pipeline Builder (power users)
 
 ```typescript
-import { buildPipeline, defaultPipeline } from "loggily"
+import { buildPipeline } from "loggily"
 
 // Build a custom pipeline
 const pipeline = buildPipeline([{ level: "debug" }, console, { file: "/tmp/app.log", format: "json" }])
-
-// Get the default env-var-based pipeline
-const defaultPipe = defaultPipeline()
 ```
 
 ## Deprecated v1 API

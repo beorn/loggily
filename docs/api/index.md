@@ -4,37 +4,40 @@
 
 ### Core
 
-| Export                        | Description                 |
-| ----------------------------- | --------------------------- |
-| `createLogger(name, config?)` | Create a conditional logger |
+| Export                        | Description                                              |
+| ----------------------------- | -------------------------------------------------------- |
+| `createLogger(name, config?)` | Create a conditional logger (includes `withEnvDefaults`) |
+| `createTestLogger(name)`      | Test helper — all levels enabled, console output         |
+| `pipe(base, ...plugins)`      | Pipe a logger factory through plugins (left-to-right)    |
+| `withEnvDefaults()`           | Plugin: read defaults from env vars (included by default) |
 
 ### Config Array Elements
 
 The second argument to `createLogger` is an optional config array:
 
-| Element Type   | Example                                          | Description                         |
-| -------------- | ------------------------------------------------ | ----------------------------------- |
-| Config object  | `{ level: "debug", ns: "-sql", format: "json" }` | Set scope for subsequent elements   |
-| `console`      | `console`                                        | Console output at current scope     |
-| File sink      | `{ file: "/path", level?, ns?, format? }`        | File output with optional overrides |
-| Stage function | `(event) => event \| null \| void`               | Transform, filter, or enrich events |
-| Branch array   | `[{ ns: "metrics" }, { file: "/tmp/m.log" }]`    | Sub-pipeline with own scope         |
-| Writable       | `{ write: (s: string) => void }`                 | Any writable stream                 |
+| Element Type   | Example                                                   | Description                               |
+| -------------- | --------------------------------------------------------- | ----------------------------------------- |
+| Config object  | `{ level: "debug", ns: "-sql", format: "json", spans: false }` | Set scope for subsequent elements    |
+| `console`      | `console` or `"console"`                                  | Console output at current scope           |
+| File sink      | `{ file: "/path", level?, ns?, format? }`                 | File output with optional overrides       |
+| Stage function | `(event) => event \| null \| void`                        | Transform, filter, or enrich events       |
+| Branch array   | `[{ ns: "metrics" }, { file: "/tmp/m.log" }]`             | Sub-pipeline with own scope               |
+| Writable       | `{ write: (s: string) => void }`                          | Any writable stream                       |
 
 ### Pipeline (power users)
 
 | Export                                   | Description                                 |
 | ---------------------------------------- | ------------------------------------------- |
 | `buildPipeline(elements, parentConfig?)` | Build a pipeline from config array elements |
-| `defaultPipeline()`                      | Create the default env-var-based pipeline   |
 
 ### Testing
 
-| Export                                          | Description                    |
-| ----------------------------------------------- | ------------------------------ |
-| `startCollecting()` / `stopCollecting()`        | Collect span data for analysis |
-| `getCollectedSpans()` / `clearCollectedSpans()` | Access collected spans         |
-| `resetIds()`                                    | Reset span/trace ID counters   |
+| Export                                          | Description                            |
+| ----------------------------------------------- | -------------------------------------- |
+| `createTestLogger(name)`                        | All levels, console output             |
+| `startCollecting()` / `stopCollecting()`        | Collect span data for analysis         |
+| `getCollectedSpans()` / `clearCollectedSpans()` | Access collected spans                 |
+| `resetIds()`                                    | Reset span/trace ID counters           |
 
 ### Tracing
 
@@ -60,6 +63,8 @@ The second argument to `createLogger` is an optional config array:
 | `LogLevel`           | `"trace" \| "debug" \| ... \| "silent"`                             |
 | `LogFormat`          | `"console" \| "json"`                                               |
 | `LazyMessage`        | `string \| (() => string)`                                          |
+| `LoggerFactory`      | `(name: string, config?) => ConditionalLogger`                      |
+| `LoggerPlugin`       | `(factory: LoggerFactory) => LoggerFactory`                         |
 | `FileWriter`         | `{ write, flush, close }`                                           |
 | `IdFormat`           | `"simple" \| "w3c"`                                                 |
 | `TraceparentOptions` | `{ sampled?: boolean }`                                             |
@@ -70,6 +75,7 @@ These functions still work but are deprecated. They map to environment variables
 
 | Export (deprecated)                                      | v2 Replacement                                   |
 | -------------------------------------------------------- | ------------------------------------------------ |
+| `.logger(ns?, props?)`                                   | `.child(ns?, props?)`                            |
 | `setLogLevel(level)` / `getLogLevel()`                   | `{ level }` in config array or `LOG_LEVEL` env   |
 | `setLogFormat(format)` / `getLogFormat()`                | `{ format }` in config array or `LOG_FORMAT` env |
 | `enableSpans()` / `disableSpans()` / `spansAreEnabled()` | `TRACE=1` env var                                |

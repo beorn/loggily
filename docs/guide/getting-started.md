@@ -218,12 +218,12 @@ For power users, `buildPipeline()` is exported for direct pipeline construction.
 
 ## Composition
 
-Extend `createLogger` with custom plugins using `compose`:
+Extend `createLogger` with custom plugins using `pipe`:
 
 ```typescript
-import { createLogger, compose } from "loggily"
+import { createLogger, pipe } from "loggily"
 
-const myCreateLogger = compose(createLogger, withSentry({ dsn: "..." }))
+const myCreateLogger = pipe(createLogger, withSentry({ dsn: "..." }))
 const log = myCreateLogger("myapp")
 ```
 

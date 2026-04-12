@@ -156,7 +156,7 @@ const log = createLogger("myapp", [
 ])
 ```
 
-For power users, `buildPipeline()` and `defaultPipeline()` are exported for direct pipeline construction.
+For power users, `buildPipeline()` is exported for direct pipeline construction.
 
 **The wall**: You spawn worker threads for heavy processing, but their logs vanish from the main output.
 

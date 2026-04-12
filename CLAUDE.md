@@ -189,11 +189,11 @@ import type {
 ### Composition
 
 ```typescript
-import { createLogger, compose, withEnvDefaults } from "loggily"
+import { createLogger, pipe, withEnvDefaults } from "loggily"
 
 // createLogger already includes withEnvDefaults()
-// Compose with custom plugins:
-const myCreateLogger = compose(createLogger, withSentry({ dsn: "..." }))
+// Pipe with custom plugins:
+const myCreateLogger = pipe(createLogger, withSentry({ dsn: "..." }))
 ```
 
 `withEnvDefaults()` is the plugin that reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, `TRACE`, etc. from env vars. It's included by default in `createLogger`. Omit it when composing from scratch for full manual control.

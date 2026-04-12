@@ -152,7 +152,7 @@ const log = createLogger("myapp", [
 ])
 ```
 
-For power users, `buildPipeline()` and `defaultPipeline()` are exported for direct pipeline construction.
+For power users, `buildPipeline()` is exported for direct pipeline construction.
 
 ## Migration Guides
 

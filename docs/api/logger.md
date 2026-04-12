@@ -40,13 +40,19 @@ log.error?.("manual error", { code: "ETIMEOUT" })
 
 ### Child Creation
 
+`.child()` is the single method for creating child loggers:
+
 ```typescript
 // Extend namespace
-const db = log.logger("db", { pool: "primary" })
+const db = log.child("db")
 // namespace: "myapp:db"
 
 // Add context to every message (same namespace)
 const req = log.child({ requestId: "abc" })
+
+// Both: extend namespace + add fields
+const db = log.child("db", { pool: "primary" })
+// namespace: "myapp:db", all logs include pool
 
 // Create timed span
 {
@@ -55,7 +61,11 @@ const req = log.child({ requestId: "abc" })
 }
 ```
 
-Both `.logger()` and `.child()` return `ConditionalLogger`.
+`.child()` always returns `ConditionalLogger`.
+
+::: info Deprecated
+`.logger()` still works but is deprecated. Use `.child()` instead.
+:::
 
 ### Manual Span End
 
@@ -70,7 +80,7 @@ try {
 
 ## ConditionalLogger
 
-The return type of `createLogger()`, `.logger()`, and `.child()`. Log methods are possibly `undefined`:
+The return type of `createLogger()` and `.child()`. Log methods are possibly `undefined`:
 
 ```typescript
 interface ConditionalLogger {
@@ -85,8 +95,10 @@ interface ConditionalLogger {
     (error: Error, data?: Record<string, unknown>): void
     (error: Error, message: string, data?: Record<string, unknown>): void
   }
+  /** @deprecated Use .child() */
   logger(ns?: string, props?: Record<string, unknown>): ConditionalLogger
   span(ns?: string, props?: LazyProps): SpanLogger
+  child(namespace: string, props?: Record<string, unknown>): ConditionalLogger
   child(context: Record<string, unknown>): ConditionalLogger
   end(): void
 }
