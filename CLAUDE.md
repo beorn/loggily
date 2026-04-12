@@ -309,7 +309,7 @@ enableContextPropagation()
 
 ### `loggily/worker` (Node.js only)
 
-Worker thread log forwarding:
+Pipeline-based worker logging. Worker loggers use a postMessage transport stage so events flow through the main thread's pipeline for output.
 
 ```typescript
 // worker.ts
@@ -321,14 +321,20 @@ import { createWorkerLogHandler } from "loggily/worker"
 worker.on("message", createWorkerLogHandler())
 ```
 
-| Export                                        | Description                       |
-| --------------------------------------------- | --------------------------------- |
-| `createWorkerLogger(postMessage, ns, props?)` | Logger for worker threads         |
-| `createWorkerLogHandler(opts?)`               | Main thread handler               |
-| `createWorkerConsoleHandler(opts?)`           | Console message handler           |
-| `forwardConsole(postMessage, ns?)`            | Forward console.\* from worker    |
-| `restoreConsole()`                            | Restore original console methods  |
-| `isWorkerMessage(msg)`                        | Type guard for any worker message |
+| Export                                        | Description                                  |
+| --------------------------------------------- | -------------------------------------------- |
+| `createWorkerLogger(postMessage, ns, props?)` | Logger for worker threads                    |
+| `workerTransportStage(postMessage)`           | Pipeline stage that forwards via postMessage |
+| `createWorkerLogHandler()`                    | Zero-config main thread handler              |
+| `handleWorkerEvents(logger)`                  | Dispatch worker events to a specific logger  |
+| `createWorkerConsoleHandler(opts?)`           | Console message handler                      |
+| `forwardConsole(postMessage, ns?)`            | Forward console.\* from worker               |
+| `restoreConsole()`                            | Restore original console methods             |
+| `isWorkerMessage(msg)`                        | Type guard for any worker message            |
+| `isWorkerEvent(msg)`                          | Type guard for LogEvent or SpanEvent         |
+| `isWorkerLogEvent(msg)`                       | Type guard for LogEvent                      |
+| `isWorkerSpanEvent(msg)`                      | Type guard for SpanEvent                     |
+| `isWorkerConsoleMessage(msg)`                 | Type guard for WorkerConsoleMessage          |
 
 ### `loggily/otel`
 

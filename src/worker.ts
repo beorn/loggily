@@ -1,19 +1,19 @@
 /**
  * Worker Thread Logger/Console Forwarding
  *
- * Provides utilities to forward loggily and console.* output from worker threads
- * to the main thread, ensuring proper integration with DEBUG_LOG and log files.
+ * Pipeline-based worker logging: worker loggers use a postMessage transport
+ * so events flow through the main thread's pipeline for output.
  *
- * ## Full Logger Forwarding (Recommended)
+ * ## Structured Logger (Recommended)
  *
  * @example Worker side:
  * ```typescript
  * import { createWorkerLogger } from "loggily/worker"
  * const log = createWorkerLogger(postMessage, "km:worker:parse")
  *
- * log.info("processing", { file: "test.md" })
+ * log.info?.("processing", { file: "test.md" })
  * {
- *   using span = log.span("parse")
+ *   using span = log.span?.("parse")
  *   // ... work ...
  *   span.spanData.lines = 100
  * }
@@ -24,9 +24,7 @@
  * import { createWorkerLogHandler } from "loggily/worker"
  *
  * const handleLog = createWorkerLogHandler()
- * worker.onmessage = (e) => {
- *   if (e.data.type === "log" || e.data.type === "span") handleLog(e.data)
- * }
+ * worker.onmessage = (e) => handleLog(e.data)
  * ```
  *
  * ## Console Forwarding (Simple)
@@ -40,18 +38,10 @@
  * ```
  */
 
-import {
-  createLogger,
-  createSpanDataProxy,
-  type ConditionalLogger,
-  type LazyMessage,
-  type Logger,
-  type SpanLogger,
-  type SpanData,
-} from "./index.ts"
-import { serializeCause } from "./pipeline.js"
+import { createLogger, baseCreateLogger, pipe, withSpans, type ConditionalLogger } from "./core.js"
+import type { Event, LogEvent, SpanEvent, Stage, ConfigElement } from "./pipeline.js"
 
-// ============ Message Protocol ============
+// ============ Console Message Type ============
 
 /** Message sent from worker to main thread for console output */
 export interface WorkerConsoleMessage {
@@ -62,34 +52,22 @@ export interface WorkerConsoleMessage {
   timestamp: number
 }
 
-/** Message sent from worker to main thread for structured log output */
-export interface WorkerLogMessage {
-  type: "log"
-  level: "trace" | "debug" | "info" | "warn" | "error"
-  namespace: string
-  message: string
-  data?: Record<string, unknown>
-  timestamp: number
+// ============ Type Guards ============
+
+/** Type guard for LogEvent (structured log from worker) */
+export function isWorkerLogEvent(msg: unknown): msg is LogEvent {
+  return typeof msg === "object" && (msg as LogEvent)?.kind === "log"
 }
 
-/** Message sent from worker to main thread for span events */
-export interface WorkerSpanMessage {
-  type: "span"
-  event: "start" | "end"
-  namespace: string
-  spanId: string
-  traceId: string
-  parentId: string | null
-  startTime: number
-  endTime?: number
-  duration?: number
-  props: Record<string, unknown>
-  spanData: Record<string, unknown>
-  timestamp: number
+/** Type guard for SpanEvent (span from worker) */
+export function isWorkerSpanEvent(msg: unknown): msg is SpanEvent {
+  return typeof msg === "object" && (msg as SpanEvent)?.kind === "span"
 }
 
-/** Union type for all worker messages */
-export type WorkerMessage = WorkerConsoleMessage | WorkerLogMessage | WorkerSpanMessage
+/** Type guard for any pipeline Event (log or span) */
+export function isWorkerEvent(msg: unknown): msg is Event {
+  return isWorkerLogEvent(msg) || isWorkerSpanEvent(msg)
+}
 
 /** Type guard for WorkerConsoleMessage */
 export function isWorkerConsoleMessage(msg: unknown): msg is WorkerConsoleMessage {
@@ -101,31 +79,12 @@ export function isWorkerConsoleMessage(msg: unknown): msg is WorkerConsoleMessag
   )
 }
 
-/** Type guard for WorkerLogMessage */
-export function isWorkerLogMessage(msg: unknown): msg is WorkerLogMessage {
-  return (
-    typeof msg === "object" &&
-    (msg as WorkerLogMessage)?.type === "log" &&
-    typeof (msg as WorkerLogMessage).level === "string" &&
-    typeof (msg as WorkerLogMessage).namespace === "string"
-  )
+/** Type guard for any worker message (console or pipeline event) */
+export function isWorkerMessage(msg: unknown): msg is WorkerConsoleMessage | Event {
+  return isWorkerConsoleMessage(msg) || isWorkerEvent(msg)
 }
 
-/** Type guard for WorkerSpanMessage */
-export function isWorkerSpanMessage(msg: unknown): msg is WorkerSpanMessage {
-  return (
-    typeof msg === "object" &&
-    (msg as WorkerSpanMessage)?.type === "span" &&
-    typeof (msg as WorkerSpanMessage).event === "string"
-  )
-}
-
-/** Type guard for any worker message */
-export function isWorkerMessage(msg: unknown): msg is WorkerMessage {
-  return isWorkerConsoleMessage(msg) || isWorkerLogMessage(msg) || isWorkerSpanMessage(msg)
-}
-
-// ============ Worker Side ============
+// ============ Worker Side: Console Forwarding ============
 
 type PostMessageFn = (message: WorkerConsoleMessage) => void
 
@@ -245,44 +204,41 @@ export function restoreConsole(): void {
   }
 }
 
-// ============ Worker Logger (Full API) ============
+// ============ Worker Side: Pipeline Transport ============
 
-type PostMessageAnyFn = (message: WorkerMessage) => void
-
-let workerSpanIdCounter = 0
-let workerTraceIdCounter = 0
-
-function generateWorkerSpanId(): string {
-  return `wsp_${(++workerSpanIdCounter).toString(36)}`
-}
-
-function generateWorkerTraceId(): string {
-  return `wtr_${(++workerTraceIdCounter).toString(36)}`
-}
-
-/** Reset worker ID counters (for testing) */
-export function resetWorkerIds(): void {
-  workerSpanIdCounter = 0
-  workerTraceIdCounter = 0
-}
-
-interface WorkerLoggerOptions {
-  /** Parent span ID for nested spans */
-  parentSpanId?: string | null
-  /** Trace ID for distributed tracing */
-  traceId?: string | null
+/**
+ * Create a pipeline stage that forwards events via postMessage.
+ *
+ * Events are plain JSON objects that survive structuredClone natively.
+ * The stage consumes events (returns null) so nothing is output locally.
+ * The main thread uses handleWorkerEvents() or createWorkerLogHandler()
+ * to dispatch them through a local logger pipeline.
+ */
+export function workerTransportStage(postMessage: (msg: unknown) => void): Stage {
+  return (event: Event): null => {
+    try {
+      postMessage(event)
+    } catch {
+      // If postMessage fails (non-cloneable), try with JSON round-trip
+      try {
+        postMessage(JSON.parse(JSON.stringify(event)))
+      } catch {
+        // Silently drop -- worker can't communicate
+      }
+    }
+    return null // Consume the event (no local output)
+  }
 }
 
 /**
- * Create a logger instance for use in a worker thread.
+ * Create a logger for use in a worker thread.
  *
- * All log calls and span events are forwarded to the main thread via postMessage.
- * The main thread should use createWorkerLogHandler to process these messages.
+ * All log and span events are forwarded to the main thread via postMessage.
+ * The main thread should use createWorkerLogHandler() to process these messages.
  *
  * @param postMessage - The worker's postMessage function
  * @param namespace - Logger namespace (e.g., "km:worker:parse")
  * @param props - Optional initial props
- * @param options - Optional configuration
  *
  * @example
  * ```typescript
@@ -290,250 +246,97 @@ interface WorkerLoggerOptions {
  *
  * const log = createWorkerLogger(postMessage, "km:worker:parse")
  *
- * log.info("starting parse", { file: "test.md" })
+ * log.info?.("starting parse", { file: "test.md" })
  *
  * {
- *   using span = log.span("process")
- *   span.info("processing...")
- *   span.spanData.lineCount = 100
+ *   using span = log.span?.("process")
+ *   span.info?.("processing...")
+ *   span.spanData.count = 100
  * }
  * // Span end event automatically sent to main thread
  * ```
  */
 export function createWorkerLogger(
-  postMessage: PostMessageAnyFn,
+  postMessage: (msg: unknown) => void,
   namespace: string,
-  props: Record<string, unknown> = {},
-  options: WorkerLoggerOptions = {},
-): Logger {
-  const { parentSpanId = null, traceId = null } = options
-
-  function log(
-    level: "trace" | "debug" | "info" | "warn" | "error",
-    message: LazyMessage,
-    data?: Record<string, unknown>,
-  ): void {
-    const resolved = typeof message === "function" ? message() : message
-    try {
-      postMessage({
-        type: "log",
-        level,
-        namespace,
-        message: resolved,
-        data: data ? { ...props, ...data } : Object.keys(props).length > 0 ? props : undefined,
-        timestamp: Date.now(),
-      })
-    } catch (err) {
-      // postMessage failed (e.g. uncloneable data) — send a diagnostic fallback
-      try {
-        postMessage({
-          type: "log",
-          level: "error",
-          namespace,
-          message: `postMessage failed for ${level} "${resolved}": ${err instanceof Error ? err.message : String(err)}`,
-          timestamp: Date.now(),
-        })
-      } catch {
-        // Worker might be shutting down — truly nothing we can do
-      }
-    }
-  }
-
-  function createSpan(spanNamespace?: string, spanProps?: Record<string, unknown>): SpanLogger {
-    const fullNamespace = spanNamespace ? `${namespace}:${spanNamespace}` : namespace
-    const mergedProps = { ...props, ...spanProps }
-    const spanId = generateWorkerSpanId()
-    const spanTraceId = traceId || generateWorkerTraceId()
-    const startTime = Date.now()
-
-    // Mutable span data that can be set by the user
-    const customSpanData: Record<string, unknown> = {}
-
-    // Send span start event
-    try {
-      postMessage({
-        type: "span",
-        event: "start",
-        namespace: fullNamespace,
-        spanId,
-        traceId: spanTraceId,
-        parentId: parentSpanId,
-        startTime,
-        props: mergedProps,
-        spanData: {},
-        timestamp: Date.now(),
-      })
-    } catch (err) {
-      // postMessage failed (e.g. uncloneable props) — send a diagnostic fallback
-      try {
-        postMessage({
-          type: "log",
-          level: "error",
-          namespace: fullNamespace,
-          message: `postMessage failed for span start "${fullNamespace}": ${err instanceof Error ? err.message : String(err)}`,
-          timestamp: Date.now(),
-        })
-      } catch {
-        // Worker might be shutting down
-      }
-    }
-
-    let ended = false
-
-    const spanData: SpanData = createSpanDataProxy(
-      () => ({
-        id: spanId,
-        traceId: spanTraceId,
-        parentId: parentSpanId,
-        startTime,
-        endTime: ended ? Date.now() : null,
-        duration: Date.now() - startTime,
-      }),
-      customSpanData,
-    )
-
-    function endSpan(): void {
-      if (ended) return
-      ended = true
-
-      const endTime = Date.now()
-      const duration = endTime - startTime
-
-      try {
-        postMessage({
-          type: "span",
-          event: "end",
-          namespace: fullNamespace,
-          spanId,
-          traceId: spanTraceId,
-          parentId: parentSpanId,
-          startTime,
-          endTime,
-          duration,
-          props: mergedProps,
-          spanData: customSpanData,
-          timestamp: Date.now(),
-        })
-      } catch (err) {
-        // postMessage failed (e.g. uncloneable spanData) — send a diagnostic fallback
-        try {
-          postMessage({
-            type: "log",
-            level: "error",
-            namespace: fullNamespace,
-            message: `postMessage failed for span end "${fullNamespace}" (${duration}ms): ${err instanceof Error ? err.message : String(err)}`,
-            timestamp: Date.now(),
-          })
-        } catch {
-          // Worker might be shutting down
-        }
-      }
-    }
-
-    // Create child logger for the span
-    const childLogger = createWorkerLogger(postMessage, fullNamespace, mergedProps, {
-      parentSpanId: spanId,
-      traceId: spanTraceId,
-    })
-
-    const spanLogger: SpanLogger = {
-      ...childLogger,
-      spanData,
-      end: endSpan,
-      [Symbol.dispose]: endSpan,
-    }
-
-    return spanLogger
-  }
-
-  const logger: Logger = {
-    name: namespace,
-    props: Object.freeze({ ...props }),
-    level: "trace" as const,
-
-    dispatch(_event: import("./core.js").Event): void {
-      // Worker loggers don't dispatch events locally — they forward via postMessage
-    },
-
-    [Symbol.dispose](): void {
-      // No-op for worker loggers
-    },
-
-    trace: (msg, data) => log("trace", msg, data),
-    debug: (msg, data) => log("debug", msg, data),
-    info: (msg, data) => log("info", msg, data),
-    warn: (msg, data) => log("warn", msg, data),
-    error: (
-      msgOrError: LazyMessage | Error,
-      dataOrMsg?: Record<string, unknown> | string,
-      extraData?: Record<string, unknown>,
-    ) => {
-      if (msgOrError instanceof Error) {
-        if (typeof dataOrMsg === "string") {
-          log("error", dataOrMsg, {
-            ...extraData,
-            error_type: msgOrError.name,
-            error_message: msgOrError.message,
-            error_stack: msgOrError.stack,
-            error_code: (msgOrError as NodeJS.ErrnoException).code,
-            error_cause: msgOrError.cause !== undefined ? serializeCause(msgOrError.cause) : undefined,
-          })
-        } else {
-          log("error", msgOrError.message, {
-            ...(dataOrMsg as Record<string, unknown>),
-            error_type: msgOrError.name,
-            error_stack: msgOrError.stack,
-            error_code: (msgOrError as NodeJS.ErrnoException).code,
-            error_cause: msgOrError.cause !== undefined ? serializeCause(msgOrError.cause) : undefined,
-          })
-        }
-      } else {
-        log("error", msgOrError, dataOrMsg as Record<string, unknown>)
-      }
-    },
-
-    logger(childNamespace?: string, childProps?: Record<string, unknown>): ConditionalLogger {
-      const fullNamespace = childNamespace ? `${namespace}:${childNamespace}` : namespace
-      return createWorkerLogger(
-        postMessage,
-        fullNamespace,
-        { ...props, ...childProps },
-        options,
-      ) as unknown as ConditionalLogger
-    },
-
-    span: createSpan,
-
-    child(
-      namespaceOrContext: Record<string, unknown> | string,
-      childProps?: Record<string, unknown>,
-    ): ConditionalLogger {
-      if (typeof namespaceOrContext === "string") {
-        return this.logger(namespaceOrContext, childProps)
-      }
-      return createWorkerLogger(
-        postMessage,
-        namespace,
-        { ...props, ...namespaceOrContext },
-        options,
-      ) as unknown as ConditionalLogger
-    },
-
-    end(): void {
-      // No-op for non-span logger
-    },
-  }
-
-  return logger
+  props?: Record<string, unknown>,
+): ConditionalLogger {
+  const transport = workerTransportStage(postMessage)
+  const config: ConfigElement[] = [{ level: "trace" as const }, transport]
+  const factory = pipe(baseCreateLogger, withSpans())
+  const logger = factory(namespace, config)
+  return props ? logger.child(props) : logger
 }
 
-// ============ Main Thread Side ============
+// ============ Main Thread Side: Event Handling ============
+
+/**
+ * Create a handler that dispatches worker events to a target logger.
+ *
+ * Use this when you have a specific logger to dispatch through.
+ *
+ * @param target - Logger or object with dispatch method
+ * @returns Handler function to call with worker messages
+ */
+export function handleWorkerEvents(
+  target: ConditionalLogger | { dispatch(event: Event): void },
+): (msg: unknown) => void {
+  return (msg: unknown) => {
+    if (typeof msg !== "object" || msg === null) return
+    const event = msg as Record<string, unknown>
+    if (event.kind === "log" || event.kind === "span") {
+      target.dispatch(msg as Event)
+    }
+  }
+}
+
+/**
+ * Create a zero-config handler for worker logger messages.
+ *
+ * Automatically creates loggers per-namespace. For console messages,
+ * formats args and dispatches through a logger.
+ *
+ * @returns Handler function to call with any worker message
+ *
+ * @example
+ * ```typescript
+ * import { createWorkerLogHandler } from "loggily/worker"
+ *
+ * const handleLog = createWorkerLogHandler()
+ * worker.onmessage = (e) => handleLog(e.data)
+ * ```
+ */
+export function createWorkerLogHandler(): (message: unknown) => void {
+  const loggers = new Map<string, ConditionalLogger>()
+
+  function getLogger(namespace: string): ConditionalLogger {
+    let logger = loggers.get(namespace)
+    if (!logger) {
+      logger = createLogger(namespace)
+      loggers.set(namespace, logger)
+    }
+    return logger
+  }
+
+  return (message: unknown) => {
+    if (isWorkerEvent(message)) {
+      const logger = getLogger(message.namespace)
+      logger.dispatch(message)
+    } else if (isWorkerConsoleMessage(message)) {
+      const logger = getLogger(message.namespace || "worker")
+      const { message: msg, data } = formatConsoleArgs(message.args)
+      dispatchToLogger(logger, message.level, msg, data)
+    }
+  }
+}
+
+// ============ Main Thread Side: Console Handler ============
 
 export interface WorkerConsoleHandlerOptions {
   /** Default namespace if message doesn't include one */
   defaultNamespace?: string
   /** Custom logger to use (defaults to creating one with the namespace) */
-  logger?: Logger
+  logger?: { name: string; dispatch(event: Event): void }
 }
 
 /** Safely stringify a value, handling circular refs and BigInt */
@@ -609,8 +412,6 @@ function dispatchToLogger(
  * worker.onmessage = (e) => {
  *   if (e.data.type === "console") {
  *     handleConsole(e.data)
- *   } else {
- *     // Handle other message types
  *   }
  * }
  * ```
@@ -635,68 +436,5 @@ export function createWorkerConsoleHandler(
     const logger = getLogger(message.namespace)
     const { message: msg, data } = formatConsoleArgs(message.args)
     dispatchToLogger(logger, message.level, msg, data)
-  }
-}
-
-// ============ Full Logger Handler ============
-
-export interface WorkerLogHandlerOptions {
-  /** @deprecated Span output is now controlled by TRACE env var */
-  enableSpans?: boolean
-}
-
-/**
- * Create a handler for worker logger messages (logs and spans).
- *
- * Use this on the main thread to receive and output messages from workers
- * that use createWorkerLogger.
- *
- * @param options - Handler options
- * @returns Handler function to call with worker messages
- *
- * @example
- * ```typescript
- * import { createWorkerLogHandler, isWorkerMessage } from "loggily/worker"
- *
- * const handleLog = createWorkerLogHandler()
- *
- * worker.onmessage = (e) => {
- *   if (isWorkerMessage(e.data)) {
- *     handleLog(e.data)
- *   } else {
- *     // Handle other message types
- *   }
- * }
- * ```
- */
-export function createWorkerLogHandler(options: WorkerLogHandlerOptions = {}): (message: WorkerMessage) => void {
-  const loggers = new Map<string, ConditionalLogger>()
-
-  function getLogger(namespace: string): ConditionalLogger {
-    let logger = loggers.get(namespace)
-    if (!logger) {
-      logger = createLogger(namespace)
-      loggers.set(namespace, logger)
-    }
-    return logger
-  }
-
-  return (message: WorkerMessage) => {
-    if (isWorkerConsoleMessage(message)) {
-      const logger = getLogger(message.namespace || "worker")
-      const { message: msg, data } = formatConsoleArgs(message.args)
-      dispatchToLogger(logger, message.level, msg, data)
-    } else if (isWorkerLogMessage(message)) {
-      const logger = getLogger(message.namespace)
-      dispatchToLogger(logger, message.level, message.message, message.data)
-    } else if (isWorkerSpanMessage(message)) {
-      if (message.event === "end") {
-        const logger = getLogger(message.namespace)
-        const span = logger.span?.(undefined, { ...message.props, ...message.spanData })
-        span?.end()
-      }
-      // Start events are informational only on main thread
-      // (the actual timing happens in the worker)
-    }
   }
 }

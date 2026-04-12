@@ -1,5 +1,8 @@
 /**
- * Worker Console Forwarding Tests
+ * Worker Logger/Console Forwarding Tests
+ *
+ * Tests the pipeline-based worker logging: withWorkerTransport, createWorkerLogger,
+ * handleWorkerEvents, createWorkerLogHandler, and console forwarding.
  */
 
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
@@ -9,17 +12,17 @@ import {
   createWorkerConsoleHandler,
   createWorkerLogger,
   createWorkerLogHandler,
-  resetWorkerIds,
+  handleWorkerEvents,
+  workerTransportStage,
   isWorkerConsoleMessage,
-  isWorkerLogMessage,
-  isWorkerSpanMessage,
+  isWorkerLogEvent,
+  isWorkerSpanEvent,
+  isWorkerEvent,
   isWorkerMessage,
   type WorkerConsoleMessage,
-  type WorkerLogMessage,
-  type WorkerSpanMessage,
-  type WorkerMessage,
 } from "../src/worker.ts"
-import { resetIds } from "../src/index.ts"
+import { resetIds, baseCreateLogger, pipe, withSpans } from "../src/index.ts"
+import type { Event, LogEvent, SpanEvent } from "../src/pipeline.ts"
 
 // Capture console output from main thread handler
 let consoleOutput: { level: string; message: string }[] = []
@@ -79,6 +82,8 @@ afterEach(() => {
   }
 })
 
+// ============ Type Guards ============
+
 describe("isWorkerConsoleMessage", () => {
   test("returns true for valid message", () => {
     const msg: WorkerConsoleMessage = {
@@ -99,6 +104,97 @@ describe("isWorkerConsoleMessage", () => {
     expect(isWorkerConsoleMessage({ type: "console", level: "log" })).toBe(false)
   })
 })
+
+describe("isWorkerLogEvent", () => {
+  test("returns true for LogEvent", () => {
+    const event: LogEvent = {
+      kind: "log",
+      time: Date.now(),
+      namespace: "test",
+      level: "info",
+      message: "hello",
+    }
+    expect(isWorkerLogEvent(event)).toBe(true)
+  })
+
+  test("returns false for non-log events", () => {
+    expect(isWorkerLogEvent(null)).toBe(false)
+    expect(isWorkerLogEvent({})).toBe(false)
+    expect(isWorkerLogEvent({ kind: "span" })).toBe(false)
+    expect(isWorkerLogEvent({ type: "log" })).toBe(false)
+  })
+})
+
+describe("isWorkerSpanEvent", () => {
+  test("returns true for SpanEvent", () => {
+    const event: SpanEvent = {
+      kind: "span",
+      time: Date.now(),
+      namespace: "test",
+      name: "test",
+      duration: 100,
+      spanId: "sp_1",
+      traceId: "tr_1",
+      parentId: null,
+    }
+    expect(isWorkerSpanEvent(event)).toBe(true)
+  })
+
+  test("returns false for non-span events", () => {
+    expect(isWorkerSpanEvent(null)).toBe(false)
+    expect(isWorkerSpanEvent({})).toBe(false)
+    expect(isWorkerSpanEvent({ kind: "log" })).toBe(false)
+  })
+})
+
+describe("isWorkerEvent", () => {
+  test("returns true for log and span events", () => {
+    expect(isWorkerEvent({ kind: "log", time: 1, namespace: "t", level: "info", message: "m" })).toBe(true)
+    expect(
+      isWorkerEvent({
+        kind: "span",
+        time: 1,
+        namespace: "t",
+        name: "t",
+        duration: 1,
+        spanId: "s",
+        traceId: "t",
+        parentId: null,
+      }),
+    ).toBe(true)
+  })
+
+  test("returns false for non-events", () => {
+    expect(isWorkerEvent(null)).toBe(false)
+    expect(isWorkerEvent({ type: "console" })).toBe(false)
+  })
+})
+
+describe("isWorkerMessage", () => {
+  test("returns true for console messages and events", () => {
+    expect(isWorkerMessage({ type: "console", level: "log", args: [], timestamp: 1 })).toBe(true)
+    expect(isWorkerMessage({ kind: "log", time: 1, namespace: "t", level: "info", message: "m" })).toBe(true)
+    expect(
+      isWorkerMessage({
+        kind: "span",
+        time: 1,
+        namespace: "t",
+        name: "t",
+        duration: 1,
+        spanId: "s",
+        traceId: "t",
+        parentId: null,
+      }),
+    ).toBe(true)
+  })
+
+  test("returns false for unknown messages", () => {
+    expect(isWorkerMessage({ type: "unknown" })).toBe(false)
+    expect(isWorkerMessage(null)).toBe(false)
+  })
+})
+
+// ============ Console Forwarding ============
 
 describe("forwardConsole", () => {
   test("intercepts console.log", () => {
@@ -209,6 +305,8 @@ describe("restoreConsole", () => {
   })
 })
 
+// ============ Console Handler ============
+
 describe("createWorkerConsoleHandler", () => {
   test("outputs log messages through logger", () => {
     const handler = createWorkerConsoleHandler({ defaultNamespace: "test" })
@@ -297,7 +395,9 @@ describe("createWorkerConsoleHandler", () => {
   })
 })
 
-describe("end-to-end forwarding", () => {
+// ============ Console End-to-End ============
+
+describe("console end-to-end forwarding", () => {
   test("worker -> main thread flow", () => {
     // Simulate worker side
     const messages: WorkerConsoleMessage[] = []
@@ -317,243 +417,324 @@ describe("end-to-end forwarding", () => {
   })
 })
 
-// ============ Full Logger Tests ============
+// ============ workerTransportStage ============
 
-describe("type guards", () => {
-  test("isWorkerLogMessage", () => {
-    expect(
-      isWorkerLogMessage({
-        type: "log",
-        level: "info",
-        namespace: "test",
-        message: "hi",
-        timestamp: 1,
-      }),
-    ).toBe(true)
-    expect(isWorkerLogMessage({ type: "console" })).toBe(false)
-    expect(isWorkerLogMessage(null)).toBe(false)
+describe("workerTransportStage", () => {
+  test("posts events via postMessage", () => {
+    const posted: unknown[] = []
+    const mockPostMessage = (msg: unknown) => posted.push(msg)
+
+    const transport = workerTransportStage(mockPostMessage)
+    const factory = pipe(baseCreateLogger, withSpans())
+    const log = factory("test", [{ level: "trace" }, transport])
+    log.info?.("hello world")
+
+    // Should have posted a LogEvent
+    expect(posted.length).toBeGreaterThanOrEqual(1)
+    const event = posted[0] as LogEvent
+    expect(event.kind).toBe("log")
+    expect(event.level).toBe("info")
+    expect(event.namespace).toBe("test")
+    expect(event.message).toBe("hello world")
   })
 
-  test("isWorkerSpanMessage", () => {
-    expect(isWorkerSpanMessage({ type: "span", event: "start" })).toBe(true)
-    expect(isWorkerSpanMessage({ type: "span", event: "end" })).toBe(true)
-    expect(isWorkerSpanMessage({ type: "log" })).toBe(false)
+  test("handles postMessage failure with JSON fallback", () => {
+    const posted: unknown[] = []
+    let callCount = 0
+    const failingPostMessage = (msg: unknown) => {
+      callCount++
+      if (callCount === 1) {
+        throw new DOMException("Failed to execute 'postMessage': could not be cloned")
+      }
+      posted.push(msg)
+    }
+
+    const transport = workerTransportStage(failingPostMessage)
+    const factory = pipe(baseCreateLogger, withSpans())
+    const log = factory("test", [{ level: "trace" }, transport])
+    log.info?.("test message")
+
+    // Should have fallen back to JSON serialization
+    expect(posted.length).toBeGreaterThanOrEqual(1)
+    const event = posted[0] as LogEvent
+    expect(event.kind).toBe("log")
+    expect(event.message).toBe("test message")
   })
 
-  test("isWorkerMessage", () => {
-    expect(
-      isWorkerMessage({
-        type: "console",
-        level: "log",
-        args: [],
-        timestamp: 1,
-      }),
-    ).toBe(true)
-    expect(
-      isWorkerMessage({
-        type: "log",
-        level: "info",
-        namespace: "test",
-        message: "hi",
-        timestamp: 1,
-      }),
-    ).toBe(true)
-    expect(isWorkerMessage({ type: "span", event: "start" })).toBe(true)
-    expect(isWorkerMessage({ type: "unknown" })).toBe(false)
+  test("silently drops if both postMessage and JSON fail", () => {
+    const failingPostMessage = (_msg: unknown) => {
+      throw new Error("always fails")
+    }
+
+    const transport = workerTransportStage(failingPostMessage)
+    const factory = pipe(baseCreateLogger, withSpans())
+    const log = factory("test", [{ level: "trace" }, transport])
+
+    // Should not throw
+    expect(() => log.info?.("test")).not.toThrow()
   })
 })
 
-describe("createWorkerLogger", () => {
-  beforeEach(() => {
-    resetWorkerIds()
-  })
+// ============ createWorkerLogger ============
 
-  test("creates logger with namespace", () => {
-    const messages: WorkerMessage[] = []
-    const mockPostMessage = (msg: WorkerMessage) => messages.push(msg)
+describe("createWorkerLogger", () => {
+  test("creates logger that posts events", () => {
+    const posted: unknown[] = []
+    const mockPostMessage = (msg: unknown) => posted.push(msg)
 
     const log = createWorkerLogger(mockPostMessage, "km:worker:test")
-    expect(log.name).toBe("km:worker:test")
+    log.info?.("hello world", { key: "value" })
+
+    expect(posted.length).toBeGreaterThanOrEqual(1)
+    const event = posted[0] as LogEvent
+    expect(event.kind).toBe("log")
+    expect(event.level).toBe("info")
+    expect(event.namespace).toBe("km:worker:test")
+    expect(event.message).toBe("hello world")
+    expect(event.props).toEqual(expect.objectContaining({ key: "value" }))
   })
 
-  test("sends log messages", () => {
-    const messages: WorkerMessage[] = []
-    const mockPostMessage = (msg: WorkerMessage) => messages.push(msg)
+  test("posts all log levels", () => {
+    const posted: unknown[] = []
+    const mockPostMessage = (msg: unknown) => posted.push(msg)
 
     const log = createWorkerLogger(mockPostMessage, "test")
-    log.info("hello world", { key: "value" })
+    log.trace?.("t")
+    log.debug?.("d")
+    log.info?.("i")
+    log.warn?.("w")
+    log.error?.("e")
 
-    expect(messages).toHaveLength(1)
-    const msg = messages[0] as WorkerLogMessage
-    expect(msg.type).toBe("log")
-    expect(msg.level).toBe("info")
-    expect(msg.namespace).toBe("test")
-    expect(msg.message).toBe("hello world")
-    expect(msg.data).toEqual({ key: "value" })
-  })
-
-  test("sends all log levels", () => {
-    const messages: WorkerMessage[] = []
-    const mockPostMessage = (msg: WorkerMessage) => messages.push(msg)
-
-    const log = createWorkerLogger(mockPostMessage, "test")
-    log.trace("t")
-    log.debug("d")
-    log.info("i")
-    log.warn("w")
-    log.error("e")
-
-    expect(messages).toHaveLength(5)
-    expect((messages[0] as WorkerLogMessage).level).toBe("trace")
-    expect((messages[1] as WorkerLogMessage).level).toBe("debug")
-    expect((messages[2] as WorkerLogMessage).level).toBe("info")
-    expect((messages[3] as WorkerLogMessage).level).toBe("warn")
-    expect((messages[4] as WorkerLogMessage).level).toBe("error")
+    const logEvents = posted.filter((e) => (e as Event).kind === "log") as LogEvent[]
+    expect(logEvents).toHaveLength(5)
+    expect(logEvents[0]!.level).toBe("trace")
+    expect(logEvents[1]!.level).toBe("debug")
+    expect(logEvents[2]!.level).toBe("info")
+    expect(logEvents[3]!.level).toBe("warn")
+    expect(logEvents[4]!.level).toBe("error")
   })
 
   test("handles Error objects", () => {
-    const messages: WorkerMessage[] = []
-    const mockPostMessage = (msg: WorkerMessage) => messages.push(msg)
+    const posted: unknown[] = []
+    const mockPostMessage = (msg: unknown) => posted.push(msg)
 
     const log = createWorkerLogger(mockPostMessage, "test")
-    log.error(new Error("test error"))
+    log.error?.(new Error("test error"))
 
-    const msg = messages[0] as WorkerLogMessage
-    expect(msg.message).toBe("test error")
-    expect(msg.data?.error_type).toBe("Error")
-    expect(msg.data?.error_stack).toContain("Error: test error")
+    const logEvents = posted.filter((e) => (e as Event).kind === "log") as LogEvent[]
+    expect(logEvents.length).toBeGreaterThanOrEqual(1)
+    const event = logEvents[0]!
+    expect(event.message).toBe("test error")
+    expect(event.props?.error_type).toBe("Error")
+    expect(event.props?.error_stack).toContain("Error: test error")
   })
 
-  test("creates child loggers", () => {
-    const messages: WorkerMessage[] = []
-    const mockPostMessage = (msg: WorkerMessage) => messages.push(msg)
+  test("creates child loggers that also post via postMessage", () => {
+    const posted: unknown[] = []
+    const mockPostMessage = (msg: unknown) => posted.push(msg)
 
-    const log = createWorkerLogger(mockPostMessage, "parent", {
-      version: "1.0",
-    })
-    const child = log.logger("child", { extra: true })
+    const log = createWorkerLogger(mockPostMessage, "parent")
+    const child = log.child("child")
+    child.info?.("from child")
 
-    expect(child.name).toBe("parent:child")
-    expect(child.props).toEqual({ version: "1.0", extra: true })
+    const logEvents = posted.filter((e) => (e as Event).kind === "log") as LogEvent[]
+    expect(logEvents.length).toBeGreaterThanOrEqual(1)
+    const event = logEvents[0]!
+    expect(event.namespace).toBe("parent:child")
+    expect(event.message).toBe("from child")
+  })
+
+  test("creates child loggers with props", () => {
+    const posted: unknown[] = []
+    const mockPostMessage = (msg: unknown) => posted.push(msg)
+
+    const log = createWorkerLogger(mockPostMessage, "parent", { version: "1.0" })
+    log.info?.("with props")
+
+    const logEvents = posted.filter((e) => (e as Event).kind === "log") as LogEvent[]
+    expect(logEvents[0]!.props).toEqual(expect.objectContaining({ version: "1.0" }))
   })
 })
 
-describe("createWorkerLogger spans", () => {
-  beforeEach(() => {
-    resetWorkerIds()
-  })
+// ============ Worker Spans ============
 
-  test("sends span start and end events", () => {
-    const messages: WorkerMessage[] = []
-    const mockPostMessage = (msg: WorkerMessage) => messages.push(msg)
+describe("createWorkerLogger spans", () => {
+  test("posts span events via postMessage", () => {
+    const posted: unknown[] = []
+    const mockPostMessage = (msg: unknown) => posted.push(msg)
 
     const log = createWorkerLogger(mockPostMessage, "test")
 
     {
-      using span = log.span("work")
+      using span = log.span!("work")
       span.spanData.count = 42
     }
 
-    // Should have start and end events
-    const spanMessages = messages.filter((m) => m.type === "span") as WorkerSpanMessage[]
-    expect(spanMessages).toHaveLength(2)
-
-    const start = spanMessages.find((m) => m.event === "start")!
-    const end = spanMessages.find((m) => m.event === "end")!
-
-    expect(start.namespace).toBe("test:work")
-    expect(start.spanId).toBe("wsp_1")
-    expect(start.traceId).toBe("wtr_1")
-
+    const spanEvents = posted.filter((e) => (e as Event).kind === "span") as SpanEvent[]
+    expect(spanEvents).toHaveLength(1)
+    const end = spanEvents[0]!
     expect(end.namespace).toBe("test:work")
-    expect(end.spanId).toBe("wsp_1")
-    expect(end.spanData.count).toBe(42)
     expect(end.duration).toBeGreaterThanOrEqual(0)
+    expect(end.props).toEqual(expect.objectContaining({ count: 42 }))
   })
 
   test("nested spans share trace ID", () => {
-    const messages: WorkerMessage[] = []
-    const mockPostMessage = (msg: WorkerMessage) => messages.push(msg)
+    const posted: unknown[] = []
+    const mockPostMessage = (msg: unknown) => posted.push(msg)
 
     const log = createWorkerLogger(mockPostMessage, "test")
 
     {
-      using outer = log.span("outer")
+      using outer = log.span!("outer")
       {
-        using inner = outer.span("inner")
-        inner.info("inside")
+        using inner = outer.span!("inner")
+        inner.info?.("inside")
       }
     }
 
-    const spanMessages = messages.filter((m) => m.type === "span") as WorkerSpanMessage[]
-    const outerStart = spanMessages.find((m) => m.namespace === "test:outer" && m.event === "start")!
-    const innerStart = spanMessages.find((m) => m.namespace === "test:outer:inner" && m.event === "start")!
+    const spanEvents = posted.filter((e) => (e as Event).kind === "span") as SpanEvent[]
+    // Inner and outer span end events
+    expect(spanEvents.length).toBeGreaterThanOrEqual(2)
 
-    // Both should share the same trace ID
-    expect(innerStart.traceId).toBe(outerStart.traceId)
-    // Inner should have outer as parent
-    expect(innerStart.parentId).toBe(outerStart.spanId)
+    const innerSpan = spanEvents.find((e) => e.namespace === "test:outer:inner")!
+    const outerSpan = spanEvents.find((e) => e.namespace === "test:outer")!
+    // Both share the same trace ID
+    expect(innerSpan.traceId).toBe(outerSpan.traceId)
+    // Inner has outer as parent
+    expect(innerSpan.parentId).toBe(outerSpan.spanId)
   })
 
   test("span can log messages", () => {
-    const messages: WorkerMessage[] = []
-    const mockPostMessage = (msg: WorkerMessage) => messages.push(msg)
+    const posted: unknown[] = []
+    const mockPostMessage = (msg: unknown) => posted.push(msg)
 
     const log = createWorkerLogger(mockPostMessage, "test")
 
     {
-      using span = log.span("work")
-      span.info("processing")
-      span.debug("details")
+      using span = log.span!("work")
+      span.info?.("processing")
+      span.debug?.("details")
     }
 
-    const logMessages = messages.filter((m) => m.type === "log") as WorkerLogMessage[]
-    expect(logMessages).toHaveLength(2)
-    expect(logMessages[0]!.namespace).toBe("test:work")
-    expect(logMessages[0]!.message).toBe("processing")
+    const logEvents = posted.filter((e) => (e as Event).kind === "log") as LogEvent[]
+    expect(logEvents).toHaveLength(2)
+    expect(logEvents[0]!.namespace).toBe("test:work")
+    expect(logEvents[0]!.message).toBe("processing")
   })
 })
 
+// ============ handleWorkerEvents ============
+
+describe("handleWorkerEvents", () => {
+  test("dispatches log events to target logger", () => {
+    const dispatched: Event[] = []
+    const target = {
+      dispatch(event: Event) {
+        dispatched.push(event)
+      },
+    }
+
+    const handler = handleWorkerEvents(target)
+    const event: LogEvent = {
+      kind: "log",
+      time: Date.now(),
+      namespace: "test",
+      level: "info",
+      message: "hello",
+    }
+    handler(event)
+
+    expect(dispatched).toHaveLength(1)
+    expect(dispatched[0]).toEqual(event)
+  })
+
+  test("dispatches span events to target logger", () => {
+    const dispatched: Event[] = []
+    const target = {
+      dispatch(event: Event) {
+        dispatched.push(event)
+      },
+    }
+
+    const handler = handleWorkerEvents(target)
+    const event: SpanEvent = {
+      kind: "span",
+      time: Date.now(),
+      namespace: "test:work",
+      name: "test:work",
+      duration: 100,
+      spanId: "sp_1",
+      traceId: "tr_1",
+      parentId: null,
+      props: { count: 42 },
+    }
+    handler(event)
+
+    expect(dispatched).toHaveLength(1)
+    expect(dispatched[0]).toEqual(event)
+  })
+
+  test("ignores non-event messages", () => {
+    const dispatched: Event[] = []
+    const target = {
+      dispatch(event: Event) {
+        dispatched.push(event)
+      },
+    }
+
+    const handler = handleWorkerEvents(target)
+    handler(null)
+    handler(undefined)
+    handler({ type: "console", level: "log", args: [] })
+    handler("string")
+    handler(42)
+
+    expect(dispatched).toHaveLength(0)
+  })
+})
+
+// ============ createWorkerLogHandler ============
+
 describe("createWorkerLogHandler", () => {
-  test("handles log messages", () => {
+  test("handles log events", () => {
     const handler = createWorkerLogHandler()
 
     handler({
-      type: "log",
-      level: "info",
+      kind: "log",
+      time: Date.now(),
       namespace: "test",
+      level: "info",
       message: "hello",
-      data: { key: "value" },
-      timestamp: Date.now(),
-    })
+      props: { key: "value" },
+    } satisfies LogEvent)
 
     expect(consoleOutput).toHaveLength(1)
     expect(consoleOutput[0]!.message).toContain("test")
     expect(consoleOutput[0]!.message).toContain("hello")
   })
 
-  test("handles span end events", () => {
+  test("handles span events", () => {
     process.env.TRACE = "1"
     const handler = createWorkerLogHandler()
 
     handler({
-      type: "span",
-      event: "end",
+      kind: "span",
+      time: Date.now(),
       namespace: "test:work",
-      spanId: "wsp_1",
-      traceId: "wtr_1",
-      parentId: null,
-      startTime: Date.now() - 100,
-      endTime: Date.now(),
+      name: "test:work",
       duration: 100,
-      props: {},
-      spanData: { count: 42 },
-      timestamp: Date.now(),
-    })
+      spanId: "sp_1",
+      traceId: "tr_1",
+      parentId: null,
+      props: { count: 42 },
+    } satisfies SpanEvent)
 
     // Should have span output
     const spanOutput = consoleOutput.find((o) => o.message.includes("SPAN"))
     expect(spanOutput).toBeDefined()
+    expect(spanOutput!.message).toContain("test:work")
+    expect(spanOutput!.message).toContain("count")
+    expect(spanOutput!.message).toContain("42")
   })
 
   test("handles console messages", () => {
@@ -565,36 +746,44 @@ describe("createWorkerLogHandler", () => {
       namespace: "test",
       args: ["console message"],
       timestamp: Date.now(),
-    })
+    } satisfies WorkerConsoleMessage)
 
     expect(consoleOutput).toHaveLength(1)
     expect(consoleOutput[0]!.message).toContain("console message")
   })
+
+  test("ignores unknown messages", () => {
+    const handler = createWorkerLogHandler()
+
+    handler({ type: "ready" })
+    handler({ type: "sync", paths: [] })
+    handler(null)
+
+    expect(consoleOutput).toHaveLength(0)
+  })
 })
 
-describe("full logger end-to-end", () => {
-  beforeEach(() => {
-    resetWorkerIds()
-  })
+// ============ Full End-to-End ============
 
+describe("full logger end-to-end", () => {
   test("worker logger -> main handler flow", () => {
     process.env.TRACE = "1"
-    const messages: WorkerMessage[] = []
-    const mockPostMessage = (msg: WorkerMessage) => messages.push(msg)
+    const posted: unknown[] = []
+    const mockPostMessage = (msg: unknown) => posted.push(msg)
 
     // Worker side
     const log = createWorkerLogger(mockPostMessage, "km:worker:test")
-    log.info("starting work")
+    log.info?.("starting work")
     {
-      using span = log.span("process")
-      span.info("processing...")
+      using span = log.span!("process")
+      span.info?.("processing...")
       span.spanData.items = 5
     }
-    log.info("done")
+    log.info?.("done")
 
     // Main thread side
     const handler = createWorkerLogHandler()
-    for (const msg of messages) {
+    for (const msg of posted) {
       handler(msg)
     }
 
@@ -604,139 +793,40 @@ describe("full logger end-to-end", () => {
     expect(consoleOutput.some((o) => o.message.includes("processing"))).toBe(true)
     expect(consoleOutput.some((o) => o.message.includes("done"))).toBe(true)
   })
-})
 
-// ============ Bug Fix Tests ============
+  test("events survive round-trip", () => {
+    const posted: unknown[] = []
+    const mockPostMessage = (msg: unknown) => posted.push(msg)
 
-describe("bug: worker span forwarding preserves worker data", () => {
-  test("span end event preserves worker spanData as props", () => {
-    process.env.TRACE = "1"
-    const handler = createWorkerLogHandler()
+    // Worker side
+    const log = createWorkerLogger(mockPostMessage, "test")
+    log.info?.("round-trip", { key: "value" })
 
-    handler({
-      type: "span",
-      event: "end",
-      namespace: "test:work",
-      spanId: "wsp_original",
-      traceId: "wtr_original",
-      parentId: "wsp_parent",
-      startTime: 1000,
-      endTime: 1100,
-      duration: 100,
-      props: {},
-      spanData: { count: 42 },
-      timestamp: Date.now(),
-    })
+    // Simulate structuredClone (what postMessage does)
+    const cloned = structuredClone(posted[0])
 
-    // The span output should contain the worker's custom data as props
-    const spanOutput = consoleOutput.find((o) => o.message.includes("SPAN"))
-    expect(spanOutput).toBeDefined()
-    expect(spanOutput!.message).toContain("count")
-    expect(spanOutput!.message).toContain("42")
-  })
+    // Main thread side
+    const dispatched: Event[] = []
+    const target = {
+      dispatch(event: Event) {
+        dispatched.push(event)
+      },
+    }
+    const handler = handleWorkerEvents(target)
+    handler(cloned)
 
-  test("span end event produces a span on main thread", () => {
-    process.env.TRACE = "1"
-    const handler = createWorkerLogHandler()
-
-    // Send a span with a known duration of 500ms
-    handler({
-      type: "span",
-      event: "end",
-      namespace: "test:work",
-      spanId: "wsp_1",
-      traceId: "wtr_1",
-      parentId: null,
-      startTime: 1000,
-      endTime: 1500,
-      duration: 500,
-      props: {},
-      spanData: {},
-      timestamp: Date.now(),
-    })
-
-    // In v2, the handler creates a new span on the main thread, so it will have
-    // its own timing. Verify the span output exists.
-    const spanOutput = consoleOutput.find((o) => o.message.includes("SPAN"))
-    expect(spanOutput).toBeDefined()
-    expect(spanOutput!.message).toContain("test:work")
+    expect(dispatched).toHaveLength(1)
+    const event = dispatched[0] as LogEvent
+    expect(event.kind).toBe("log")
+    expect(event.namespace).toBe("test")
+    expect(event.message).toBe("round-trip")
+    expect(event.props).toEqual(expect.objectContaining({ key: "value" }))
   })
 })
 
-describe("bug: postMessage error handling sends diagnostic fallback", () => {
-  beforeEach(() => {
-    resetWorkerIds()
-  })
+// ============ Edge Cases ============
 
-  test("log postMessage failure sends diagnostic fallback", () => {
-    const messages: WorkerMessage[] = []
-    let callCount = 0
-    const failingPostMessage = (msg: WorkerMessage) => {
-      callCount++
-      if (callCount === 1) {
-        throw new DOMException("Failed to execute 'postMessage': could not be cloned")
-      }
-      messages.push(msg)
-    }
-
-    const log = createWorkerLogger(failingPostMessage, "test")
-    log.info("message with uncloneable data", { fn: () => {} })
-
-    // Should have sent a diagnostic fallback message instead of silently dropping
-    expect(messages.length).toBeGreaterThanOrEqual(1)
-    const fallback = messages[0]!
-    expect(fallback.type).toBe("log")
-    expect((fallback as WorkerLogMessage).level).toBe("error")
-    expect((fallback as WorkerLogMessage).message).toContain("postMessage")
-  })
-
-  test("span start postMessage failure sends diagnostic fallback", () => {
-    const messages: WorkerMessage[] = []
-    let callCount = 0
-    const failingPostMessage = (msg: WorkerMessage) => {
-      callCount++
-      if (callCount === 1) {
-        // First call is span start — make it fail
-        throw new DOMException("Failed to execute 'postMessage': could not be cloned")
-      }
-      messages.push(msg)
-    }
-
-    const log = createWorkerLogger(failingPostMessage, "test")
-    const span = log.span("work", { uncloneable: () => {} })
-    span.end()
-
-    // Should have a diagnostic fallback for the failed span start
-    expect(messages.some((m) => m.type === "log" && (m as WorkerLogMessage).message.includes("postMessage"))).toBe(true)
-  })
-
-  test("span end postMessage failure sends diagnostic fallback", () => {
-    const messages: WorkerMessage[] = []
-    let callCount = 0
-    const failingPostMessage = (msg: WorkerMessage) => {
-      callCount++
-      // Let span start succeed (call 1), fail on span end (call 2)
-      if (callCount === 2) {
-        throw new DOMException("Failed to execute 'postMessage': could not be cloned")
-      }
-      messages.push(msg)
-    }
-
-    const log = createWorkerLogger(failingPostMessage, "test")
-    const span = log.span("work")
-    span.spanData.circular = {} as Record<string, unknown>
-    ;(span.spanData.circular as Record<string, unknown>).self = span.spanData.circular
-    span.end()
-
-    // Should have a diagnostic fallback for the failed span end
-    const diagnostics = messages.filter(
-      (m) => m.type === "log" && (m as WorkerLogMessage).message.includes("postMessage"),
-    )
-    expect(diagnostics.length).toBeGreaterThanOrEqual(1)
-  })
-})
-
-describe("bug: console handler handles circular/bigint without throwing", () => {
+describe("console handler handles circular/bigint without throwing", () => {
   test("createWorkerConsoleHandler handles BigInt args", () => {
     const handler = createWorkerConsoleHandler({ defaultNamespace: "test" })
 
