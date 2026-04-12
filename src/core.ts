@@ -463,6 +463,25 @@ export function createLogger(name: string, config?: unknown[]): ConditionalLogge
   return wrapConditional(logger, () => pipeline.level)
 }
 
+// ============ Compose (Logger Plugin Composition) ============
+
+export type LoggerFactory = (name: string, config?: unknown[]) => ConditionalLogger
+export type LoggerPlugin = (factory: LoggerFactory) => LoggerFactory
+
+/**
+ * Compose a custom createLogger with plugins.
+ *
+ * @example
+ * import { createLogger as base, compose } from "loggily"
+ * import withSentry from "@sentry/loggily"
+ *
+ * const createLogger = compose(base, withSentry({ dsn: "..." }))
+ * const log = createLogger("myapp")
+ */
+export function compose(base: LoggerFactory, ...plugins: LoggerPlugin[]): LoggerFactory {
+  return plugins.reduce((factory, plugin) => plugin(factory), base)
+}
+
 // ============ Legacy API ============
 // Level/format/ns/trace map to env vars (read fresh by defaultPipeline).
 // Writers/suppress are runtime state (can't be env vars).

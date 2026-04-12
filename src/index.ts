@@ -7,6 +7,9 @@
 export {
   // Core API
   createLogger,
+  compose,
+  type LoggerFactory,
+  type LoggerPlugin,
   // Types
   type ConditionalLogger,
   type Logger,
