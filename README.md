@@ -75,18 +75,22 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 
 ## Features
 
-- **Config pipeline** -- second arg to `createLogger` is a config array: objects configure (`{ level, ns, format, spans }`), arrays branch, values write. Pass `console` or `"console"` for terminal output, `{ file: "/path" }` for file output, or functions for custom stages.
-- **Namespace hierarchy** -- organize logs with `:` separators. `DEBUG=myapp:db` shows only database output, compatible with the same patterns as the `debug` package.
-- **Lightweight spans** -- time any operation with `using span = log.span("name")`. Automatic duration, parent-child tracking, and trace IDs. Control per-pipeline with `{ spans: true/false }`.
-- **Dev & production** -- colorized console in development, structured JSON in production. Same code, zero config.
-- **Child loggers** -- `log.child("auth")` extends namespace, `log.child({ requestId })` adds context fields, `log.child("auth", { sso: true })` does both.
-- **Automatic async context** -- enable `AsyncLocalStorage`-based propagation and every log in a request's async chain inherits trace/span IDs without passing loggers around.
-- **Lazy messages** -- `log.debug?.(() => expensiveString())` skips the function entirely when disabled.
-- **Error overloads** -- `log.error?.(err)`, `log.error?.(err, "msg")`, and `log.error?.(err, "msg", data)`. Cause chains serialized automatically (up to 3 levels).
-- **Worker threads** -- forward logs from workers to the main thread with full type safety.
-- **OpenTelemetry bridge** -- `toOtel()` stage forwards events to OTLP-compatible backends.
-- **Composable** -- `pipe(baseCreateLogger, withSpans(), withEnvDefaults())` to build custom factories.
-- **Browser support** -- bundlers auto-select the browser entry point via `browser` condition in exports.
+- **Zero-cost disabled logs** -- `?.` short-circuits the entire call: no string interpolation, no JSON.stringify, no function evaluation. [~22x faster](https://loggily.dev/guide/benchmarks) than noop loggers.
+- **Config pipeline** -- `createLogger("app", [config, console, { file }, stage, [branch]])`. Objects configure, arrays branch, values write.
+- **Namespace hierarchy** -- `DEBUG=myapp:db` shows only database output. Same patterns as the `debug` package.
+- **Spans** -- `using span = log.span("name")`. Duration, parent-child tracking, trace IDs, custom data. Control per-pipeline with `{ spans: true/false }`.
+- **Dev & production** -- colorized console in development, structured JSON in production. Same code.
+- **Child loggers** -- `log.child("auth")` extends namespace, `log.child({ requestId })` adds context.
+- **Async context** -- `AsyncLocalStorage` propagation: every log in a request's async chain inherits trace/span IDs automatically.
+- **Error cause chains** -- `log.error?.(err)` serializes `Error.cause` recursively (up to 3 levels).
+- **Worker threads** -- pipeline-based: `createWorkerLogger(postMessage, "ns")` on worker, `createWorkerLogHandler()` on main. Same events, same pipeline.
+- **OpenTelemetry bridge** -- `toOtel({ api })` stage forwards events to any OTLP backend. Transparent: events pass through to subsequent pipeline elements.
+- **Pino transport compatible** -- writable sinks with `objectMode: true` receive raw Event objects. Use any Pino transport as a pipeline destination.
+- **Span metrics** -- `spanStats()` gives aggregated p50/p95/p99 per span name. Ambient or explicit via `withMetrics()`.
+- **Head-based sampling** -- `setSampleRate(0.1)` to sample 10% of traces.
+- **Composable plugins** -- `pipe(baseCreateLogger, withSpans(), myPlugin())` to build custom factories.
+- **Browser support** -- bundlers auto-select the browser entry point via `browser` condition.
+- **~3 KB, zero dependencies.**
 
 ## Usage Walkthrough
 
@@ -231,11 +235,12 @@ Key types exported for power users:
 
 ## Compatibility
 
-- **`DEBUG=` compatible** -- uses the same namespace filter patterns as the `debug` package
-- **Works with Pino transports** -- writable sinks with `objectMode: true` receive raw Event objects
-- **W3C Trace Context** -- `traceparent()` generates standard trace headers
-- **OpenTelemetry compatible** -- `toOtel()` stage forwards events to OTLP backends
-- **Browser ready** -- bundlers auto-select the browser entry point
+- **`DEBUG=` patterns** -- same namespace filter syntax as the `debug` package
+- **Pino transports** -- `objectMode: true` writables receive raw Event objects
+- **W3C Trace Context** -- `traceparent()` generates standard headers, `setIdFormat("w3c")` for W3C-format IDs
+- **OpenTelemetry** -- `toOtel({ api })` forwards to any OTLP backend (logs + spans)
+- **Browser** -- bundlers auto-select the browser entry point (no Node.js APIs)
+- **Worker threads** -- pipeline-based forwarding via `postMessage` + `structuredClone`
 
 ## Why this exists
 
@@ -245,8 +250,9 @@ Loggily was built while developing a terminal UI where disabled debug logs insid
 
 ## When not to use Loggily
 
-- **You need worker-thread transport pipelines with log rotation and dozens of plugins.** Pino has a mature transport ecosystem for this.
-- **You need distributed tracing with vendor exporters and auto-instrumentation.** OpenTelemetry is the industry standard.
+- **You need auto-instrumentation** (HTTP, database, gRPC). Use OpenTelemetry's SDK directly -- Loggily's OTEL bridge forwards events but doesn't instrument frameworks.
+- **You need log rotation, file compression, or dozens of transport plugins.** Pino's transport ecosystem is deeper. (You can use Pino transports with Loggily's `objectMode` writables, but Pino owns that ecosystem.)
+- **You're not on a modern runtime.** Loggily requires Node.js >= 23.6 or Bun >= 1.0.
 
 ## Documentation
 
