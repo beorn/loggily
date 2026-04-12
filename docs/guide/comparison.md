@@ -154,8 +154,6 @@ const log = createLogger("myapp", [
 
 For power users, `buildPipeline()` is exported for direct pipeline construction.
 
-## Migration Guides
+## Coming from another logger?
 
-- [Migration from debug](/guide/migration-from-debug) -- namespace patterns, `DEBUG=` env var
-- [Migration from Pino](/guide/migration-from-pino) -- argument order, child loggers, transports
-- [Migration from Winston](/guide/migration-from-winston) -- levels, formats, transports
+Loggily is `DEBUG=` compatible (same namespace patterns as the `debug` package), accepts Pino transports via `objectMode` writables, and bridges to OpenTelemetry via `toOtel()`. Most migrations are straightforward — see the [API reference](/api/) for the full surface.
