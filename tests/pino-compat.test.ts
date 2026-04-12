@@ -49,7 +49,7 @@ describe("Pino transport compatibility", () => {
     log.info?.("structured", { count: 42 })
 
     expect(messages).toHaveLength(1)
-    const parsed = JSON.parse(messages[0]!.trim())
+    const parsed = JSON.parse(messages[0]!.trim()) as Record<string, unknown>
     expect(parsed.level).toBe("info")
     expect(parsed.msg).toBe("structured")
     expect(parsed.count).toBe(42)
@@ -94,7 +94,7 @@ describe("Pino transport compatibility", () => {
     const log = createLogger("test", [{ level: "trace" }, transport])
 
     {
-      using span = log.span("operation")
+      using span = log.span!("operation")
       span.info?.("working")
     }
 
@@ -192,7 +192,7 @@ describe("Pino transport compatibility", () => {
     const log = createLogger("test", [{ level: "trace" }, transport])
 
     {
-      using span = log.span("operation")
+      using span = log.span!("operation")
       span.info?.("working")
     }
 

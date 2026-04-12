@@ -227,7 +227,7 @@ describe("child loggers with context", () => {
     const child = log.child({ requestId: "abc" })
 
     {
-      using span = child.span("work")
+      using span = child.span!("work")
       span.info?.("working")
     }
 
@@ -304,7 +304,7 @@ describe("JSON format configuration", () => {
     const log = createLogger("test", [{ level: "trace", format: "json" }, console])
 
     {
-      using span = log.span("work")
+      using span = log.span!("work")
       span.spanData.items = 5
     }
 

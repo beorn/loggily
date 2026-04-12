@@ -252,7 +252,7 @@ console.log(`Platform: ${process.platform} ${process.arch}`)
     measure(
       "loggily: span create+dispose",
       () => {
-        using _s = loggilyLog.span("op")
+        using _s = loggilyLog.span!("op")
       },
       N / 10,
     ),

@@ -47,7 +47,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
     const log = createLogger("test", [{ level: "trace" }, console])
 
     {
-      using span = log.span("work")
+      using span = log.span!("work")
       span.spanData.count = 42
     }
 
@@ -63,13 +63,13 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
     const log = createLogger("test", [{ level: "trace" }, console])
 
     {
-      using span = log.span("a")
+      using span = log.span!("a")
     }
     {
-      using span = log.span("b")
+      using span = log.span!("b")
     }
     {
-      using span = log.span("c")
+      using span = log.span!("c")
     }
 
     const spans = getCollectedSpans()
@@ -80,8 +80,8 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
     startCollecting()
     const log = createLogger("test", [{ level: "trace" }, console])
 
-    const parent = log.span("parent")
-    const child = parent.span("child")
+    const parent = log.span!("parent")
+    const child = parent.span!("child")
     child.end()
     parent.end()
 
@@ -94,7 +94,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
     const log = createLogger("test", [{ level: "trace" }, console])
 
     {
-      using span = log.span("before")
+      using span = log.span!("before")
     }
 
     const collected = stopCollecting()
@@ -102,7 +102,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
 
     // After stopCollecting, new spans are not collected
     {
-      using span = log.span("after")
+      using span = log.span!("after")
     }
 
     expect(getCollectedSpans()).toHaveLength(1) // still 1, not 2
@@ -113,7 +113,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
     const log = createLogger("test", [{ level: "trace" }, console])
 
     {
-      using span = log.span("work")
+      using span = log.span!("work")
       span.spanData.file = "data.csv"
       span.spanData.count = 100
     }
@@ -129,7 +129,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
     const log = createLogger("test", [{ level: "trace" }, console])
 
     {
-      using span = log.span("silent")
+      using span = log.span!("silent")
     }
 
     const spans = getCollectedSpans()
@@ -141,7 +141,7 @@ describe("span collection (km-loggily.span-collection-broken)", () => {
     const log = createLogger("test", [{ level: "trace" }, console])
 
     {
-      using span = log.span("work")
+      using span = log.span!("work")
     }
 
     expect(getCollectedSpans()).toHaveLength(1)
@@ -277,8 +277,8 @@ describe("span context non-LIFO end (km-loggily.span-context-corrupt)", () => {
     enableContextPropagation()
     const log = createLogger("test", [{ level: "trace" }, console])
 
-    const outer = log.span("outer")
-    const inner = outer.span("inner")
+    const outer = log.span!("outer")
+    const inner = outer.span!("inner")
 
     // LIFO order: end inner first
     inner.end()
@@ -296,9 +296,9 @@ describe("span context non-LIFO end (km-loggily.span-context-corrupt)", () => {
     enableContextPropagation()
     const log = createLogger("test", [{ level: "trace" }, console])
 
-    const A = log.span("A")
-    const B = A.span("B")
-    const C = B.span("C")
+    const A = log.span!("A")
+    const B = A.span!("B")
+    const C = B.span!("C")
 
     // Non-LIFO: end B before C
     // Before this fix, ending B would set context to A, then ending C
@@ -323,13 +323,13 @@ describe("span context non-LIFO end (km-loggily.span-context-corrupt)", () => {
     enableContextPropagation()
     const log = createLogger("test", [{ level: "trace" }, console])
 
-    const A = log.span("A")
+    const A = log.span!("A")
     expect(getCurrentSpan()!.spanId).toBe(A.spanData.id)
 
-    const B = A.span("B")
+    const B = A.span!("B")
     expect(getCurrentSpan()!.spanId).toBe(B.spanData.id)
 
-    const C = B.span("C")
+    const C = B.span!("C")
     expect(getCurrentSpan()!.spanId).toBe(C.spanData.id)
 
     C.end()
@@ -349,14 +349,14 @@ describe("span context non-LIFO end (km-loggily.span-context-corrupt)", () => {
     enableContextPropagation()
     const log = createLogger("test", [{ level: "trace" }, console])
 
-    const parent = log.span("parent")
+    const parent = log.span!("parent")
 
-    const child1 = parent.span("child1")
+    const child1 = parent.span!("child1")
     child1.end()
     // After child1 ends, context should be back to parent
     expect(getCurrentSpan()!.spanId).toBe(parent.spanData.id)
 
-    const child2 = parent.span("child2")
+    const child2 = parent.span!("child2")
     expect(getCurrentSpan()!.spanId).toBe(child2.spanData.id)
     child2.end()
     // After child2 ends, context should be back to parent

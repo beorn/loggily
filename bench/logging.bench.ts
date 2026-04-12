@@ -91,19 +91,19 @@ group("child logger creation", () => {
 group("span lifecycle", () => {
   summary(() => {
     bench("span create + end", () => {
-      const span = noopLog.span("op")
+      const span = noopLog.span!("op")
       span.end()
     })
 
     bench("span with using", () => {
       {
-        using span = noopLog.span("op")
+        using span = noopLog.span!("op")
         void span
       }
     })
 
     bench("span with log + end", () => {
-      const span = noopLog.span("op")
+      const span = noopLog.span!("op")
       span.info?.("working")
       span.end()
     })

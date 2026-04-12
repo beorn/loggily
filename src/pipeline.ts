@@ -293,7 +293,8 @@ function isValidLogLevel(val: unknown): val is LogLevel {
 
 /** A writable sink — any object with a write method (Pino transports, streams, etc.) */
 export interface Writable {
-  write: (data: unknown) => unknown
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  write: (data: any) => any
   /** When true, raw Event objects are passed instead of formatted strings */
   objectMode?: boolean
 }

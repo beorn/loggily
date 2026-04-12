@@ -176,7 +176,7 @@ describe("logger hierarchy", () => {
 describe("spans", () => {
   test(".span() creates logger with spanData", () => {
     const log = createLogger("app", [{ level: "trace" }, console])
-    const span = log.span("import")
+    const span = log.span!("import")
 
     expect(span.spanData).not.toBeNull()
     expect(span.spanData!.id).toBe("sp_1")
@@ -185,7 +185,7 @@ describe("spans", () => {
 
   test("span extends namespace", () => {
     const log = createLogger("app", [{ level: "trace" }, console])
-    const span = log.span("import")
+    const span = log.span!("import")
 
     expect(span.name).toBe("app:import")
   })
@@ -193,14 +193,14 @@ describe("spans", () => {
   test("span inherits props", () => {
     const log = createLogger("app", [{ level: "trace" }, console])
     const withProps = log.child({ version: "1.0" })
-    const span = withProps.span("import", { file: "data.csv" })
+    const span = withProps.span!("import", { file: "data.csv" })
 
     expect(span.props).toEqual({ version: "1.0", file: "data.csv" })
   })
 
   test("span has live duration", () => {
     const log = createLogger("app", [{ level: "trace" }, console])
-    const span = log.span("import")
+    const span = log.span!("import")
 
     const d1 = span.spanData!.duration
     expect(d1).toBeGreaterThanOrEqual(0)
@@ -217,7 +217,7 @@ describe("spans", () => {
 
   test("span attributes can be set", () => {
     const log = createLogger("app", [{ level: "trace" }, console])
-    const span = log.span("import")
+    const span = log.span!("import")
 
     span.spanData.count = 42
     span.spanData.name = "test"
@@ -233,7 +233,7 @@ describe("spans", () => {
     const log = createLogger("app", [{ level: "trace" }, console])
 
     {
-      using span = log.span("import")
+      using span = log.span!("import")
       span.spanData.count = 42
     }
 
@@ -245,8 +245,8 @@ describe("spans", () => {
   test("nested spans have parent-child relationship", () => {
     const log = createLogger("app", [{ level: "trace" }, console])
 
-    const parent = log.span("import")
-    const child = parent.span("parse")
+    const parent = log.span!("import")
+    const child = parent.span!("parse")
 
     expect(child.spanData!.parentId).toBe(parent.spanData!.id)
     expect(child.spanData!.traceId).toBe(parent.spanData!.traceId)
@@ -258,9 +258,9 @@ describe("spans", () => {
   test("nested spans share trace ID", () => {
     const log = createLogger("app", [{ level: "trace" }, console])
 
-    const span1 = log.span("import")
-    const span2 = span1.span("parse")
-    const span3 = span2.span("validate")
+    const span1 = log.span!("import")
+    const span2 = span1.span!("parse")
+    const span3 = span2.span!("validate")
 
     expect(span1.spanData!.traceId).toBe("tr_1")
     expect(span2.spanData!.traceId).toBe("tr_1")
@@ -274,7 +274,7 @@ describe("spans", () => {
   test(".end() can be called manually", () => {
     process.env.TRACE = "1"
     const log = createLogger("app", [{ level: "trace" }, console])
-    const span = log.span("import")
+    const span = log.span!("import")
 
     span.end()
 
@@ -287,7 +287,7 @@ describe("spans", () => {
     const log = createLogger("app", [{ level: "trace" }, console])
 
     {
-      using span = log.span("import", { file: "data.csv" })
+      using span = log.span!("import", { file: "data.csv" })
       span.spanData.count = 42
     }
 
@@ -305,8 +305,8 @@ describe("span output control", () => {
     const log = createLogger("app")
 
     {
-      using span = log.span("import")
-      span.info("working")
+      using span = log.span!("import")
+      span.info!("working")
     }
 
     // Only the info log, no span
@@ -320,7 +320,7 @@ describe("span output control", () => {
     const log = createLogger("app")
 
     {
-      using span = log.span("import")
+      using span = log.span!("import")
     }
 
     expect(consoleMock.findSpan()).toBeDefined()
@@ -332,7 +332,7 @@ describe("span output control", () => {
     const log = createLogger("app")
 
     {
-      using span = log.span("import")
+      using span = log.span!("import")
     }
 
     expect(consoleMock.findSpan()).toBeUndefined()
@@ -345,7 +345,7 @@ describe("console method usage (patchConsole compatibility)", () => {
     const log = createLogger("test", [{ level: "trace" }, console])
 
     {
-      using span = log.span("work")
+      using span = log.span!("work")
     }
 
     const spanOutput = consoleMock.findSpan()
@@ -402,7 +402,7 @@ describe("createLogger", () => {
     const child = log.logger("child")
     expect(child.name).toBe("test:child")
 
-    const span = log.span("work")
+    const span = log.span!("work")
     expect(span.spanData).not.toBeNull()
     span.end()
   })
@@ -512,7 +512,7 @@ describe("JSON format output", () => {
     const log = createLogger("test", [{ level: "trace", format: "json" }, console])
 
     {
-      using span = log.span("work")
+      using span = log.span!("work")
       span.spanData.count = 42
     }
 
@@ -582,7 +582,7 @@ describe("console format output", () => {
     const log = createLogger("test", [{ level: "trace" }, console])
 
     {
-      using span = log.span("work")
+      using span = log.span!("work")
     }
 
     const spanOutput = consoleMock.findSpan()
@@ -598,7 +598,7 @@ describe("TRACE namespace filtering", () => {
     const log = createLogger("myapp")
 
     {
-      using span = log.span("work")
+      using span = log.span!("work")
     }
 
     expect(consoleMock.findSpan()).toBeDefined()
@@ -610,7 +610,7 @@ describe("TRACE namespace filtering", () => {
     const log = createLogger("myapp")
 
     {
-      using span = log.span("work")
+      using span = log.span!("work")
     }
 
     expect(consoleMock.findSpan()).toBeDefined()
@@ -622,7 +622,7 @@ describe("TRACE namespace filtering", () => {
     const log = createLogger("myapp")
 
     {
-      using span = log.span("import") // myapp:import
+      using span = log.span!("import") // myapp:import
     }
 
     expect(consoleMock.findSpan()).toBeDefined()
@@ -634,7 +634,7 @@ describe("TRACE namespace filtering", () => {
     const log = createLogger("other")
 
     {
-      using span = log.span("work")
+      using span = log.span!("work")
     }
 
     expect(consoleMock.findSpan()).toBeUndefined()
@@ -649,13 +649,13 @@ describe("TRACE namespace filtering", () => {
     const log3 = createLogger("blocked")
 
     {
-      using span = log1.span("work")
+      using span = log1.span!("work")
     }
     {
-      using span = log2.span("work")
+      using span = log2.span!("work")
     }
     {
-      using span = log3.span("work")
+      using span = log3.span!("work")
     }
 
     const spanOutputs = consoleMock.findSpans()
@@ -684,10 +684,10 @@ describe("TRACE namespace filtering", () => {
     const log2 = createLogger("namespace")
 
     {
-      using span = log1.span("work")
+      using span = log1.span!("work")
     }
     {
-      using span = log2.span("work")
+      using span = log2.span!("work")
     }
 
     // Both should appear
@@ -718,7 +718,7 @@ describe("DEBUG namespace filtering", () => {
     process.env.DEBUG = "myapp"
     const log = createLogger("myapp")
     const child = log.logger("db")
-    child.info("visible")
+    child.info!("visible")
 
     expect(consoleMock.output).toHaveLength(1)
     expect(consoleMock.output[0]!.message).toContain("visible")
@@ -768,8 +768,8 @@ describe("DEBUG namespace filtering", () => {
     const noisy = log.logger("noisy")
 
     log.info!("root")
-    quiet.info("db msg")
-    noisy.info("noisy msg")
+    quiet.info!("db msg")
+    noisy.info!("noisy msg")
 
     expect(consoleMock.output).toHaveLength(2)
     expect(consoleMock.output[0]!.message).toContain("root")
@@ -785,9 +785,9 @@ describe("DEBUG namespace filtering", () => {
     const sqlChild = sql.logger("detail")
 
     log.info!("visible")
-    storage.info("visible")
-    sql.info("hidden")
-    sqlChild.info("also hidden")
+    storage.info!("visible")
+    sql.info!("hidden")
+    sqlChild.info!("also hidden")
 
     expect(consoleMock.output).toHaveLength(2)
   })
@@ -800,7 +800,7 @@ describe("DEBUG namespace filtering", () => {
     const log3 = createLogger("other")
 
     log1.info!("visible")
-    log2.info("hidden")
+    log2.info!("hidden")
     log3.info!("visible")
 
     expect(consoleMock.output).toHaveLength(2)
@@ -838,10 +838,10 @@ describe("DEBUG namespace filtering", () => {
     const log2 = createLogger("other")
 
     {
-      using span = log1.span("work")
+      using span = log1.span!("work")
     }
     {
-      using span = log2.span("work")
+      using span = log2.span!("work")
     }
 
     const spans = consoleMock.findSpans()
@@ -867,7 +867,7 @@ describe("ns config in pipeline", () => {
     const noisy = log.logger("noisy")
 
     log.info!("visible")
-    noisy.info("hidden")
+    noisy.info!("hidden")
 
     expect(consoleMock.output).toHaveLength(1)
     expect(consoleMock.output[0]!.message).toContain("myapp")

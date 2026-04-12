@@ -81,7 +81,7 @@ describe("ID format", () => {
   test("simple format produces sp_N and tr_N IDs", () => {
     setIdFormat("simple")
     const log = createLogger("test")
-    const span = log.span("work")
+    const span = log.span!("work")
 
     expect(span.spanData.id).toBe("sp_1")
     expect(span.spanData.traceId).toBe("tr_1")
@@ -91,7 +91,7 @@ describe("ID format", () => {
   test("W3C format produces hex IDs of correct length", () => {
     setIdFormat("w3c")
     const log = createLogger("test")
-    const span = log.span("work")
+    const span = log.span!("work")
 
     // Span ID: 16 hex chars
     expect(span.spanData.id).toMatch(/^[0-9a-f]{16}$/)
@@ -103,8 +103,8 @@ describe("ID format", () => {
   test("W3C IDs are unique", () => {
     setIdFormat("w3c")
     const log = createLogger("test")
-    const span1 = log.span("a")
-    const span2 = log.span("b")
+    const span1 = log.span!("a")
+    const span2 = log.span!("b")
 
     expect(span1.spanData.id).not.toBe(span2.spanData.id)
     // Different root spans get different trace IDs
@@ -122,13 +122,13 @@ describe("ID format", () => {
     expect(getIdFormat()).toBe("w3c")
 
     const log = createLogger("test")
-    const span = log.span("work")
+    const span = log.span!("work")
     expect(span.spanData.id).toMatch(/^[0-9a-f]{16}$/)
     span.end()
 
     setIdFormat("simple")
     resetIds()
-    const span2 = log.span("work2")
+    const span2 = log.span!("work2")
     expect(span2.spanData.id).toBe("sp_1")
     span2.end()
   })
@@ -136,8 +136,8 @@ describe("ID format", () => {
   test("nested spans share trace ID in W3C format", () => {
     setIdFormat("w3c")
     const log = createLogger("test")
-    const parent = log.span("parent")
-    const child = parent.span("child")
+    const parent = log.span!("parent")
+    const child = parent.span!("child")
 
     expect(child.spanData.traceId).toBe(parent.spanData.traceId)
     expect(child.spanData.parentId).toBe(parent.spanData.id)
@@ -155,7 +155,7 @@ describe("traceparent()", () => {
   test("formats W3C traceparent header with W3C IDs", () => {
     setIdFormat("w3c")
     const log = createLogger("test")
-    const span = log.span("request")
+    const span = log.span!("request")
 
     const header = traceparent(span.spanData)
     // Format: 00-{32 hex}-{16 hex}-01
@@ -174,7 +174,7 @@ describe("traceparent()", () => {
   test("formats traceparent from simple IDs (zero-padded)", () => {
     setIdFormat("simple")
     const log = createLogger("test")
-    const span = log.span("request")
+    const span = log.span!("request")
 
     const header = traceparent(span.spanData)
     // Should still produce valid traceparent format
@@ -186,7 +186,7 @@ describe("traceparent()", () => {
   test("emits 01 (sampled) by default", () => {
     setIdFormat("w3c")
     const log = createLogger("test")
-    const span = log.span("request")
+    const span = log.span!("request")
 
     const header = traceparent(span.spanData)
     expect(header).toMatch(/-01$/)
@@ -197,7 +197,7 @@ describe("traceparent()", () => {
   test("emits 00 (not sampled) when sampled=false", () => {
     setIdFormat("w3c")
     const log = createLogger("test")
-    const span = log.span("request")
+    const span = log.span!("request")
 
     const header = traceparent(span.spanData, { sampled: false })
     expect(header).toMatch(/-00$/)
@@ -208,7 +208,7 @@ describe("traceparent()", () => {
   test("emits 01 (sampled) when sampled=true explicitly", () => {
     setIdFormat("w3c")
     const log = createLogger("test")
-    const span = log.span("request")
+    const span = log.span!("request")
 
     const header = traceparent(span.spanData, { sampled: true })
     expect(header).toMatch(/-01$/)
@@ -219,7 +219,7 @@ describe("traceparent()", () => {
   test("traceparent can be used as HTTP header", () => {
     setIdFormat("w3c")
     const log = createLogger("test")
-    const span = log.span("request")
+    const span = log.span!("request")
 
     const header = traceparent(span.spanData)
 
@@ -263,7 +263,7 @@ describe("context propagation", () => {
     const log = createLogger("test")
 
     {
-      using span = log.span("request")
+      using span = log.span!("request")
       const current = getCurrentSpan()
 
       expect(current).not.toBeNull()
@@ -277,7 +277,7 @@ describe("context propagation", () => {
     const log = createLogger("test")
 
     {
-      using span = log.span("request")
+      using span = log.span!("request")
       expect(getCurrentSpan()).not.toBeNull()
     }
 
@@ -292,10 +292,10 @@ describe("context propagation", () => {
     const log2 = createLogger("other")
 
     {
-      using parentSpan = log.span("parent")
+      using parentSpan = log.span!("parent")
       // A span created by a DIFFERENT logger still gets parented
       // because of AsyncLocalStorage context
-      const childSpan = log2.span("child")
+      const childSpan = log2.span!("child")
 
       expect(childSpan.spanData.parentId).toBe(parentSpan.spanData.id)
       expect(childSpan.spanData.traceId).toBe(parentSpan.spanData.traceId)
@@ -308,7 +308,7 @@ describe("context propagation", () => {
     enableContextPropagation()
     const log = createLogger("test")
 
-    const span = log.span("async-parent")
+    const span = log.span!("async-parent")
 
     // Simulate async work
     await new Promise<void>((resolve) => {
@@ -344,7 +344,7 @@ describe("context propagation", () => {
     const log = createLogger("test")
 
     {
-      using span = log.span("request")
+      using span = log.span!("request")
       expect(getCurrentSpan()).toBeNull()
     }
   })
@@ -370,7 +370,7 @@ describe("sampling", () => {
     const log = createLogger("test")
 
     for (let i = 0; i < 10; i++) {
-      using span = log.span(`work-${i}`)
+      using span = log.span!(`work-${i}`)
     }
 
     expect(consoleMock.findSpans()).toHaveLength(0)
@@ -382,7 +382,7 @@ describe("sampling", () => {
     const log = createLogger("test")
 
     for (let i = 0; i < 5; i++) {
-      using span = log.span(`work-${i}`)
+      using span = log.span!(`work-${i}`)
     }
 
     expect(consoleMock.findSpans()).toHaveLength(5)
@@ -394,12 +394,12 @@ describe("sampling", () => {
     const log = createLogger("test")
 
     // Create a root span — should be unsampled (rate=0)
-    const root = log.span("root")
+    const root = log.span!("root")
     // Reset rate — but sampling decision was already made
     setSampleRate(1.0)
     // Child spans inherit parent's sampling decision
     {
-      using child = root.span("child")
+      using child = root.span!("child")
     }
     root.end()
 
@@ -412,11 +412,11 @@ describe("sampling", () => {
     setSampleRate(1.0)
     const log = createLogger("test")
 
-    const root = log.span("root")
+    const root = log.span!("root")
     // Lower rate after root creation — children should still be sampled
     setSampleRate(0.0)
     {
-      using child = root.span("child")
+      using child = root.span!("child")
     }
     root.end()
 
@@ -439,7 +439,7 @@ describe("sampling", () => {
     const log = createLogger("test")
 
     for (let i = 0; i < 4; i++) {
-      using span = log.span(`work-${i}`)
+      using span = log.span!(`work-${i}`)
     }
 
     // With alternating random values and 0.5 rate: 2 sampled, 2 not
@@ -449,7 +449,7 @@ describe("sampling", () => {
   test("span data is still available even when not sampled", () => {
     setSampleRate(0.0)
     const log = createLogger("test")
-    const span = log.span("work")
+    const span = log.span!("work")
 
     // spanData should still work — sampling only affects output
     span.spanData.count = 42
@@ -473,7 +473,7 @@ describe("auto-tagging with context", () => {
     const log = createLogger("test")
 
     {
-      using span = log.span("request")
+      using span = log.span!("request")
       log.info?.("inside span")
 
       const output = consoleMock.output.find((o) => {
@@ -498,7 +498,7 @@ describe("auto-tagging with context", () => {
     const log = createLogger("test")
 
     {
-      using span = log.span("request")
+      using span = log.span!("request")
       log.info?.("no context")
 
       const output = consoleMock.output.find((o) => {
@@ -534,7 +534,7 @@ describe("auto-tagging with context", () => {
     const log = createLogger("test")
 
     {
-      using span = log.span("request")
+      using span = log.span!("request")
       log.info?.("tagged message")
 
       const output = consoleMock.output.find((o) => o.message.includes("tagged message"))
@@ -550,7 +550,7 @@ describe("auto-tagging with context", () => {
     const log = createLogger("test")
 
     {
-      using span = log.span("request")
+      using span = log.span!("request")
       log.info?.("override test", { trace_id: "custom-trace" })
 
       const output = consoleMock.output.find((o) => {
@@ -580,7 +580,7 @@ describe("integration", () => {
     const log = createLogger("test")
 
     {
-      using span = log.span("request")
+      using span = log.span!("request")
       const header = traceparent(span.spanData)
 
       // Valid W3C traceparent
@@ -601,7 +601,7 @@ describe("integration", () => {
     const log = createLogger("test")
 
     {
-      using span = log.span("sampled")
+      using span = log.span!("sampled")
       log.info?.("in sampled span")
     }
 
