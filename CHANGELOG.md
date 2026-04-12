@@ -5,6 +5,34 @@ All notable changes to Loggily will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-04-12
+
+### Added
+
+- **v2 Pipeline API** — `createLogger(name, config?)` with a polymorphic config array. Objects configure, arrays branch, values write.
+- **New types**: `LogEvent`, `SpanEvent`, `Event`, `Stage`, `Pipeline`, `LoggerFactory`, `LoggerPlugin`
+- **`buildPipeline()` / `defaultPipeline()`** exported for power users
+- **`compose()`** for building custom `createLogger` with plugins
+- **Config array discrimination**: object = config (`level`, `ns`, `format`, `file`), array = branch, function = stage, `console`/writable = output
+- **Error method overloads**: `log.error(err, "msg", data?)` for Pino-style migration
+- **Custom stages**: `(event: Event) => Event | null | void` for transform/filter pipelines
+
+### Changed
+
+- **`createLogger` signature**: second arg is now a config array, not a props object. Use `.child({ props })` instead of `createLogger(name, props)`.
+- **Namespace filter**: use `ns` key (not `name`) in config objects
+- **Default pipeline**: re-reads env vars dynamically on each dispatch so legacy setters (`setLogLevel`, `enableSpans`, etc.) still work
+
+### Deprecated
+
+- All v1 global setters (`setLogLevel`, `enableSpans`, `setDebugFilter`, `setTraceFilter`, `setLogFormat`, `setOutputMode`, `setSuppressConsole`, `addWriter`, `writeSpan`). They still work — level/format/ns/trace map to env vars, writers/suppress to runtime state — but will be removed in a future major version. Migrate to config arrays.
+
+### Documentation
+
+- Comprehensive v2 API update across 17 doc files (guide, API reference, migration guides)
+- Comparison page rewritten — factual compatibility statements, no negative comparisons
+- Added `LogEvent`/`SpanEvent`/`Stage`/`Pipeline` type docs
+
 ## [0.5.0] - 2026-04-09
 
 ### Added
