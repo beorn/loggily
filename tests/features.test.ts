@@ -658,25 +658,39 @@ describe("baseCreateLogger", () => {
 
 describe("full composition chain", () => {
   test("pipe(base, withSpans, withEnvDefaults) creates working logger", () => {
-    const myCreateLogger = pipe(baseCreateLogger, withSpans(), withEnvDefaults())
-    const log = myCreateLogger("test")
+    const prev = process.env.LOG_LEVEL
+    process.env.LOG_LEVEL = "info"
+    try {
+      const myCreateLogger = pipe(baseCreateLogger, withSpans(), withEnvDefaults())
+      const log = myCreateLogger("test")
 
-    expect(log.info).toBeDefined()
-    log.info?.("works")
+      expect(log.info).toBeDefined()
+      log.info?.("works")
+    } finally {
+      if (prev !== undefined) process.env.LOG_LEVEL = prev
+      else delete process.env.LOG_LEVEL
+    }
   })
 
   test("pipe with custom plugin", () => {
-    const calls: string[] = []
-    const trackPlugin: LoggerPlugin = (factory) => (name, config?) => {
-      calls.push(`creating: ${name}`)
-      return factory(name, config)
+    const prev = process.env.LOG_LEVEL
+    process.env.LOG_LEVEL = "info"
+    try {
+      const calls: string[] = []
+      const trackPlugin: LoggerPlugin = (factory, _ctx) => (name, config?) => {
+        calls.push(`creating: ${name}`)
+        return factory(name, config)
+      }
+
+      const myCreateLogger = pipe(baseCreateLogger, trackPlugin, withSpans(), withEnvDefaults())
+      const log = myCreateLogger("test")
+
+      expect(calls).toEqual(["creating: test"])
+      expect(log.info).toBeDefined()
+    } finally {
+      if (prev !== undefined) process.env.LOG_LEVEL = prev
+      else delete process.env.LOG_LEVEL
     }
-
-    const myCreateLogger = pipe(baseCreateLogger, trackPlugin, withSpans(), withEnvDefaults())
-    const log = myCreateLogger("test")
-
-    expect(calls).toEqual(["creating: test"])
-    expect(log.info).toBeDefined()
   })
 
   test("custom plugin can wrap factory and intercept logger creation", () => {
@@ -691,6 +705,77 @@ describe("full composition chain", () => {
     myCreateLogger("b")
 
     expect(factoryCallCount).toBe(2)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. Namespace-Aware Conditional Gating
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("namespace-aware conditional gating", () => {
+  let prevLogLevel: string | undefined
+  let prevDebug: string | undefined
+
+  beforeEach(() => {
+    prevLogLevel = process.env.LOG_LEVEL
+    prevDebug = process.env.DEBUG
+  })
+
+  afterEach(() => {
+    if (prevLogLevel !== undefined) process.env.LOG_LEVEL = prevLogLevel
+    else delete process.env.LOG_LEVEL
+    if (prevDebug !== undefined) process.env.DEBUG = prevDebug
+    else delete process.env.DEBUG
+  })
+
+  test("DEBUG=myapp:db enables debug only for matching namespace", () => {
+    delete process.env.LOG_LEVEL
+    process.env.DEBUG = "myapp:db"
+
+    const dbLog = createLogger("myapp:db")
+    const authLog = createLogger("myapp:auth")
+
+    // myapp:db should have debug enabled (matches DEBUG filter)
+    expect(dbLog.debug).toBeDefined()
+
+    // myapp:auth should NOT have debug enabled (doesn't match)
+    expect(authLog.debug).toBeUndefined()
+
+    // Both should have info enabled (default level)
+    expect(dbLog.info).toBeDefined()
+    expect(authLog.info).toBeDefined()
+  })
+
+  test("DEBUG=myapp:* enables debug for all children", () => {
+    delete process.env.LOG_LEVEL
+    process.env.DEBUG = "myapp:*"
+
+    const dbLog = createLogger("myapp:db")
+    const authLog = createLogger("myapp:auth")
+    const otherLog = createLogger("other")
+
+    expect(dbLog.debug).toBeDefined()
+    expect(authLog.debug).toBeDefined()
+    expect(otherLog.debug).toBeUndefined()
+  })
+
+  test("without DEBUG, level is determined by LOG_LEVEL only", () => {
+    process.env.LOG_LEVEL = "info"
+    delete process.env.DEBUG
+
+    const log = createLogger("myapp")
+
+    expect(log.info).toBeDefined()
+    expect(log.debug).toBeUndefined()
+  })
+
+  test("DEBUG does not enable debug when LOG_LEVEL is already debug", () => {
+    process.env.LOG_LEVEL = "debug"
+    process.env.DEBUG = "myapp:db"
+
+    // LOG_LEVEL=debug means debug is already enabled for all — DEBUG filter doesn't matter
+    const authLog = createLogger("myapp:auth")
+    expect(authLog.debug).toBeDefined() // debug enabled by LOG_LEVEL, not DEBUG
   })
 })
 

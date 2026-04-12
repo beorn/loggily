@@ -32,6 +32,7 @@ import {
   safeStringify,
   serializeCause,
   readEnvLevel,
+  readEnvLevelForNamespace,
   readEnvNs,
   readEnvFormat,
   readEnvTrace,
@@ -680,11 +681,30 @@ export function withEnvDefaults(): LoggerPlugin {
       // We need to pass props AND a config array. But factory only accepts one or the other.
       // Solution: create via factory with config array, then the child() with props.
       const logger = factory(name, [{ level: "trace" as LogLevel }, envStage])
-      return logger.child(configOrProps as Record<string, unknown>)
+      return applyNamespaceGating(logger.child(configOrProps as Record<string, unknown>))
     }
 
-    return factory(name, [{ level: "trace" as LogLevel }, envStage])
+    return applyNamespaceGating(factory(name, [{ level: "trace" as LogLevel }, envStage]))
   }
+}
+
+/**
+ * Wrap a logger so that conditional method gating is namespace-aware.
+ * When DEBUG=myapp:db, only loggers whose namespace matches get debug enabled.
+ * Without this, all loggers get debug because readEnvLevel() bumps globally.
+ */
+function applyNamespaceGating(logger: ConditionalLogger): ConditionalLogger {
+  return new Proxy(logger, {
+    get(target, prop: string | symbol) {
+      if (typeof prop === "string" && prop in LOG_LEVEL_PRIORITY && prop !== "silent") {
+        const nsLevel = readEnvLevelForNamespace(target.name)
+        if (LOG_LEVEL_PRIORITY[prop as keyof typeof LOG_LEVEL_PRIORITY] < LOG_LEVEL_PRIORITY[nsLevel]) {
+          return undefined
+        }
+      }
+      return (target as unknown as Record<string | symbol, unknown>)[prop]
+    },
+  })
 }
 
 function createEnvPipeline(): Pipeline {

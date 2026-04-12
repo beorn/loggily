@@ -492,6 +492,32 @@ export function readEnvLevel(): LogLevel {
   return level
 }
 
+/**
+ * Namespace-aware level: only bumps to debug if the namespace matches the DEBUG filter.
+ * This enables zero-overhead conditional gating — `log.debug?.()` returns undefined
+ * for namespaces outside the DEBUG filter, skipping argument evaluation entirely.
+ */
+export function readEnvLevelForNamespace(namespace: string): LogLevel {
+  const env = getEnv("LOG_LEVEL")?.toLowerCase()
+  const baseLevel: LogLevel =
+    env === "trace" || env === "debug" || env === "info" || env === "warn" || env === "error" || env === "silent"
+      ? env
+      : "info"
+
+  const debugEnv = getEnv("DEBUG")
+  if (debugEnv && LOG_LEVEL_PRIORITY[baseLevel] > LOG_LEVEL_PRIORITY.debug) {
+    // DEBUG is set and would bump level — check if this namespace matches
+    const nsFilter = readEnvNs()
+    if (nsFilter && nsFilter(namespace)) {
+      return "debug" // namespace matches DEBUG filter — bump to debug
+    }
+    // Namespace doesn't match — keep the configured level
+    return baseLevel
+  }
+
+  return baseLevel
+}
+
 export function readEnvNs(): NsFilter | null {
   const debugEnv = getEnv("DEBUG")
   if (!debugEnv) return null
