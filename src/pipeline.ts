@@ -74,7 +74,7 @@ export function safeStringify(value: unknown): string {
   })
 }
 
-function formatConsoleEvent(event: Event): string {
+export function formatConsoleEvent(event: Event): string {
   const time = pc.dim(new Date(event.time).toISOString().split("T")[1]?.split(".")[0] || "")
   const ns = pc.cyan(event.namespace)
 
@@ -113,7 +113,7 @@ function formatConsoleEvent(event: Event): string {
   return output
 }
 
-function formatJSONEvent(event: Event): string {
+export function formatJSONEvent(event: Event): string {
   if (event.kind === "span") {
     return safeStringify({
       time: new Date(event.time).toISOString(),
@@ -175,7 +175,7 @@ export function parseNsFilter(ns: string | string[]): NsFilter {
 
 // ============ Console Output ============
 
-function writeToConsole(text: string, event: Event): void {
+export function writeToConsole(text: string, event: Event): void {
   if (event.kind === "span") {
     writeStderr(text)
     return
@@ -401,71 +401,9 @@ export function buildPipeline(elements: unknown[], parentConfig?: Partial<ScopeC
   }
 }
 
-// ============ Shared Runtime State ============
+// ============ Env Var Readers (exported for withEnvDefaults plugin) ============
 
-export interface RuntimeState {
-  suppressConsole: boolean
-  writers: Array<(formatted: string, level: string) => void>
-}
-
-export const runtimeState: RuntimeState = {
-  suppressConsole: false,
-  writers: [],
-}
-
-export function defaultPipeline(): Pipeline {
-  const rt = runtimeState
-  const disposables: (() => void)[] = []
-
-  let fileSink: ((event: Event) => void) | null = null
-  const logFile = getEnv("LOG_FILE")
-  if (logFile) {
-    const sink = createFileSink(logFile, "json")
-    fileSink = sink.write
-    disposables.push(sink.dispose)
-  }
-
-  // Dynamic dispatch — re-reads env vars each time for legacy setter compat
-  const dispatch = (event: Event): void => {
-    // Gate: level
-    const currentLevel = readEnvLevel()
-    if (event.kind === "log" && LOG_LEVEL_PRIORITY[event.level] < LOG_LEVEL_PRIORITY[currentLevel]) return
-
-    // Gate: spans
-    if (event.kind === "span") {
-      const trace = readEnvTrace()
-      if (!trace.enabled) return
-      if (trace.filter && !trace.filter(event.namespace)) return
-    }
-
-    // Gate: namespace
-    const currentNs = readEnvNs()
-    if (currentNs && !currentNs(event.namespace)) return
-
-    // Format once, route to all outputs
-    const formatter = readEnvFormat() === "json" ? formatJSONEvent : formatConsoleEvent
-    const text = formatter(event)
-    const lvl = event.kind === "log" ? event.level : "span"
-
-    for (const w of rt.writers) w(text, lvl)
-    if (!rt.suppressConsole) writeToConsole(text, event)
-    fileSink?.(event)
-  }
-
-  return {
-    dispatch,
-    get level() {
-      return readEnvLevel()
-    },
-    dispose: () => {
-      for (const d of disposables) d()
-    },
-  }
-}
-
-// ============ Env Var Readers ============
-
-function readEnvLevel(): LogLevel {
+export function readEnvLevel(): LogLevel {
   const env = getEnv("LOG_LEVEL")?.toLowerCase()
   let level: LogLevel =
     env === "trace" || env === "debug" || env === "info" || env === "warn" || env === "error" || env === "silent"
@@ -480,7 +418,7 @@ function readEnvLevel(): LogLevel {
   return level
 }
 
-function readEnvNs(): NsFilter | null {
+export function readEnvNs(): NsFilter | null {
   const debugEnv = getEnv("DEBUG")
   if (!debugEnv) return null
 
@@ -488,7 +426,7 @@ function readEnvNs(): NsFilter | null {
   return parseNsFilter(parts)
 }
 
-function readEnvFormat(): LogFormat {
+export function readEnvFormat(): LogFormat {
   const envFormat = getEnv("LOG_FORMAT")?.toLowerCase()
   if (envFormat === "json") return "json"
   if (envFormat === "console") return "console"
@@ -497,7 +435,7 @@ function readEnvFormat(): LogFormat {
   return "console"
 }
 
-function readEnvTrace(): { enabled: boolean; filter: NsFilter | null } {
+export function readEnvTrace(): { enabled: boolean; filter: NsFilter | null } {
   const traceEnv = getEnv("TRACE")
   if (!traceEnv) return { enabled: false, filter: null }
   if (traceEnv === "1" || traceEnv === "true") return { enabled: true, filter: null }

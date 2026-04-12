@@ -8,6 +8,11 @@
 export {
   // Core API
   createLogger,
+  createTestLogger,
+  compose,
+  withEnvDefaults,
+  type LoggerFactory,
+  type LoggerPlugin,
 
   // Types
   type ConditionalLogger,
@@ -73,7 +78,7 @@ export {
 } from "./tracing.js"
 
 // Pipeline builder for power users
-export { buildPipeline, defaultPipeline, type Pipeline } from "./pipeline.js"
+export { buildPipeline, type Pipeline } from "./pipeline.js"
 
 // File writer types (exported for type compatibility, but the function throws)
 export type { FileWriterOptions, FileWriter } from "./file-writer.js"

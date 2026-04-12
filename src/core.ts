@@ -25,11 +25,17 @@ import {
   type LogLevel,
   type OutputLogLevel,
   type LogFormat,
+  type NsFilter,
   LOG_LEVEL_PRIORITY,
   buildPipeline,
-  defaultPipeline,
-  runtimeState,
   safeStringify,
+  readEnvLevel,
+  readEnvNs,
+  readEnvFormat,
+  readEnvTrace,
+  writeToConsole,
+  formatConsoleEvent,
+  formatJSONEvent,
 } from "./pipeline.js"
 
 export type { Event, LogEvent, SpanEvent, Stage, LogLevel, OutputLogLevel, LogFormat }
@@ -448,171 +454,199 @@ function wrapConditional(logger: Logger, getLevel: () => LogLevel): ConditionalL
 
 // ============ Public API ============
 
+// ============ Base createLogger ============
+
 /**
- * Create a logger.
- *
- * @param name - Logger namespace (e.g., 'myapp', 'myapp:db')
- * @param configOrProps - Config array, or props object for backwards compat
- *
- * @example
- * // Zero config (reads LOG_LEVEL, DEBUG, LOG_FORMAT from env)
- * const log = createLogger('myapp')
- *
- * @example
- * // With props (backwards compat)
- * const log = createLogger('myapp', { version: '1.0' })
- *
- * @example
- * // Configured pipeline
- * const log = createLogger('myapp', [
- *   { level: 'debug', ns: '-sql' },
- *   console,
- *   { file: '/tmp/app.log', level: 'info', format: 'json' },
- * ])
+ * Base createLogger — requires a config array.
+ * Use the default `createLogger` export (with `withEnvDefaults`) for zero-config.
  */
-export function createLogger(name: string, configOrProps?: unknown[] | Record<string, unknown>): ConditionalLogger {
+function baseCreateLogger(name: string, configOrProps?: unknown[] | Record<string, unknown>): ConditionalLogger {
   let pipeline: Pipeline
   let props: Record<string, unknown> = {}
 
   if (Array.isArray(configOrProps)) {
     pipeline = buildPipeline(configOrProps)
-  } else if (configOrProps && typeof configOrProps === "object" && !Array.isArray(configOrProps)) {
-    // Non-array object = props (backwards compat with v1 createLogger(name, props))
+  } else if (configOrProps && typeof configOrProps === "object") {
     props = configOrProps as Record<string, unknown>
-    pipeline = defaultPipeline()
+    pipeline = buildPipeline(["console"])
   } else {
-    pipeline = defaultPipeline()
+    pipeline = buildPipeline(["console"])
   }
 
   const logger = createLoggerImpl(name, props, pipeline, null, null, null)
   return wrapConditional(logger, () => pipeline.level)
 }
 
-/**
- * Create a logger for tests — all levels enabled, outputs to console.
- * Equivalent to createLogger(name, [{ level: "trace" }, console]).
- */
-export function createTestLogger(name: string): ConditionalLogger {
-  return createLogger(name, [{ level: "trace" }, console])
-}
-
-// ============ Compose (Logger Plugin Composition) ============
+// ============ Compose ============
 
 export type LoggerFactory = (name: string, configOrProps?: unknown[] | Record<string, unknown>) => ConditionalLogger
 export type LoggerPlugin = (factory: LoggerFactory) => LoggerFactory
 
-/**
- * Compose a custom createLogger with plugins.
- *
- * @example
- * import { createLogger as base, compose } from "loggily"
- * import withSentry from "@sentry/loggily"
- *
- * const createLogger = compose(base, withSentry({ dsn: "..." }))
- * const log = createLogger("myapp")
- */
 export function compose(base: LoggerFactory, ...plugins: LoggerPlugin[]): LoggerFactory {
   return plugins.reduce((factory, plugin) => plugin(factory), base)
 }
 
-// ============ Legacy API ============
-// Level/format/ns/trace map to env vars (read fresh by defaultPipeline).
-// Writers/suppress are runtime state (can't be env vars).
+// ============ withEnvDefaults Plugin ============
 
-// _process cached for browser safety (same pattern as pipeline.ts)
 const _process = typeof process !== "undefined" ? process : undefined
 const _env = _process?.env ?? ({} as Record<string, string | undefined>)
 
-/** @deprecated Use createLogger config array: createLogger("x", [{ level }, console]) */
+// Env config — read fresh each dispatch (process.env access is ~ns, parsing is trivial)
+function currentLevel(): LogLevel {
+  return readEnvLevel()
+}
+function currentNs(): NsFilter | null {
+  return readEnvNs()
+}
+function currentFormat(): LogFormat {
+  return readEnvFormat()
+}
+function currentTrace(): { enabled: boolean; filter: NsFilter | null } {
+  return readEnvTrace()
+}
+
+// Runtime state for legacy addWriter/setSuppressConsole
+const _writers: Array<(formatted: string, level: string) => void> = []
+let _suppressConsole = false
+
+// File writer factory — set by index.ts (avoids node:fs in core.ts for browser compat)
+let _logFileWriterFactory: ((path: string) => { write: (s: string) => void; close: () => void }) | null = null
+/** @internal */
+export function _setLogFileWriterFactory(factory: typeof _logFileWriterFactory): void {
+  _logFileWriterFactory = factory
+}
+
+/**
+ * Plugin: read defaults from environment variables (LOG_LEVEL, DEBUG, LOG_FORMAT, TRACE, LOG_FILE).
+ * Included by default. Omit to disable env-var behavior entirely.
+ *
+ * When no config array is given, provides console output + env-var-based config.
+ * When a config array IS given, env vars are already used as defaults by buildPipeline.
+ * Legacy setters (setLogLevel, addWriter, etc.) affect loggers created without explicit config.
+ */
+export function withEnvDefaults(): LoggerPlugin {
+  return (factory) => (name, configOrProps?) => {
+    // Explicit config array — pass through, buildPipeline reads env defaults
+    if (Array.isArray(configOrProps)) return factory(name, configOrProps)
+
+    // No config array — dynamic pipeline from env vars + runtime state
+    const props =
+      configOrProps && typeof configOrProps === "object" ? (configOrProps as Record<string, unknown>) : undefined
+
+    const pipeline = createEnvPipeline()
+    const logger = createLoggerImpl(name, props ?? {}, pipeline, null, null, null)
+    return wrapConditional(logger, () => {
+      return currentLevel()
+    })
+  }
+}
+
+function createEnvPipeline(): Pipeline {
+  const disposables: (() => void)[] = []
+  const logFile = _env.LOG_FILE
+  let fileSink: ((event: Event) => void) | null = null
+  if (logFile && _logFileWriterFactory) {
+    const writer = _logFileWriterFactory(logFile)
+    fileSink = (event: Event) => {
+      const fmt = currentFormat() === "json" ? formatJSONEvent : formatConsoleEvent
+      writer.write(fmt(event))
+    }
+    disposables.push(() => writer.close())
+  }
+
+  const dispatch = (event: Event): void => {
+    if (event.kind === "log" && LOG_LEVEL_PRIORITY[event.level] < LOG_LEVEL_PRIORITY[currentLevel()]) return
+    if (event.kind === "span") {
+      const trace = currentTrace()
+      if (!trace.enabled) return
+      if (trace.filter && !trace.filter(event.namespace)) return
+    }
+    const ns = currentNs()
+    if (ns && !ns(event.namespace)) return
+
+    const formatter = currentFormat() === "json" ? formatJSONEvent : formatConsoleEvent
+    const text = formatter(event)
+    const lvl = event.kind === "log" ? event.level : "span"
+
+    for (const w of _writers) w(text, lvl)
+    if (!_suppressConsole) writeToConsole(text, event)
+    fileSink?.(event)
+  }
+
+  return {
+    dispatch,
+    get level() {
+      return currentLevel()
+    },
+    dispose: () => {
+      for (const d of disposables) d()
+    },
+  }
+}
+
+/** Default createLogger — includes withEnvDefaults. */
+export const createLogger: LoggerFactory = compose(baseCreateLogger, withEnvDefaults())
+
+/** Test helper — all levels, console output. */
+export function createTestLogger(name: string): ConditionalLogger {
+  return baseCreateLogger(name, [{ level: "trace" }, "console"])
+}
+
+// ============ Legacy Setters ============
+
+/** @deprecated Use config array */
 export function setLogLevel(level: LogLevel): void {
   _env.LOG_LEVEL = level
 }
-
-/** @deprecated Level is per-logger in v2 */
 export function getLogLevel(): LogLevel {
-  return (_env.LOG_LEVEL as LogLevel) ?? "info"
+  return currentLevel()
 }
-
-/** @deprecated Use TRACE=1 env var */
 export function enableSpans(): void {
   _env.TRACE = "1"
 }
-
-/** @deprecated */
 export function disableSpans(): void {
   delete _env.TRACE
 }
-
-/** @deprecated */
 export function spansAreEnabled(): boolean {
   return !!_env.TRACE
 }
-
-/** @deprecated Use TRACE=namespace env var */
 export function setTraceFilter(namespaces: string[] | null): void {
-  if (!namespaces || namespaces.length === 0) {
-    delete _env.TRACE
-  } else {
-    _env.TRACE = namespaces.join(",")
-  }
+  if (!namespaces || namespaces.length === 0) delete _env.TRACE
+  else _env.TRACE = namespaces.join(",")
 }
-
-/** @deprecated */
 export function getTraceFilter(): string[] | null {
   return _env.TRACE ? _env.TRACE.split(",") : null
 }
-
-/** @deprecated Use DEBUG=namespace env var or { ns } in config array */
 export function setDebugFilter(namespaces: string[] | null): void {
-  if (!namespaces || namespaces.length === 0) {
-    delete _env.DEBUG
-  } else {
-    _env.DEBUG = namespaces.join(",")
-  }
+  if (!namespaces || namespaces.length === 0) delete _env.DEBUG
+  else _env.DEBUG = namespaces.join(",")
 }
-
-/** @deprecated */
 export function getDebugFilter(): string[] | null {
   return _env.DEBUG ? _env.DEBUG.split(",") : null
 }
-
-/** @deprecated Use { format } in config array */
 export function setLogFormat(format: LogFormat): void {
   _env.LOG_FORMAT = format
 }
-
-/** @deprecated */
 export function getLogFormat(): LogFormat {
-  return (_env.LOG_FORMAT as LogFormat) ?? "console"
+  return currentFormat()
 }
-
-/** @deprecated Omit console from config array instead */
 export function setSuppressConsole(value: boolean): void {
-  runtimeState.suppressConsole = value
+  _suppressConsole = value
 }
-
 export type OutputMode = "console" | "stderr" | "writers-only"
-
-/** @deprecated Use config array */
 export function setOutputMode(_mode: OutputMode): void {}
-
-/** @deprecated */
 export function getOutputMode(): OutputMode {
   return "console"
 }
-
-/** @deprecated Pass writers in config array instead */
 export function addWriter(writer: (formatted: string, level: string) => void): () => void {
-  runtimeState.writers.push(writer)
+  _writers.push(writer)
   return () => {
-    const idx = runtimeState.writers.indexOf(writer)
-    if (idx !== -1) runtimeState.writers.splice(idx, 1)
+    const i = _writers.indexOf(writer)
+    if (i !== -1) _writers.splice(i, 1)
   }
 }
-
-/** @deprecated Spans dispatch through the pipeline automatically */
 export function writeSpan(namespace: string, duration: number, attrs: Record<string, unknown>): void {
-  const event: SpanEvent = {
+  createEnvPipeline().dispatch({
     kind: "span",
     time: Date.now(),
     namespace,
@@ -622,6 +656,5 @@ export function writeSpan(namespace: string, duration: number, attrs: Record<str
     spanId: (attrs.span_id as string) ?? "",
     traceId: (attrs.trace_id as string) ?? "",
     parentId: (attrs.parent_id as string | null) ?? null,
-  }
-  defaultPipeline().dispatch(event)
+  })
 }

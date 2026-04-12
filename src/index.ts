@@ -45,7 +45,9 @@ export {
   _setContextHooks,
   _clearContextHooks,
   createSpanDataProxy,
-  // Deprecated v1 API (throws with migration instructions)
+  // Plugin
+  withEnvDefaults,
+  // Deprecated v1 API (maps to env vars for backwards compat)
   setLogLevel,
   getLogLevel,
   enableSpans,
@@ -66,6 +68,11 @@ export {
 
 export { createFileWriter, type FileWriter, type FileWriterOptions } from "./file-writer.js"
 
+// Wire file writer into core for LOG_FILE env var support
+import { createFileWriter as _cfw } from "./file-writer.js"
+import { _setLogFileWriterFactory } from "./core.js"
+_setLogFileWriterFactory(_cfw)
+
 export {
   setIdFormat,
   getIdFormat,
@@ -77,4 +84,4 @@ export {
 } from "./tracing.js"
 
 // Re-export pipeline builder for power users
-export { buildPipeline, defaultPipeline, type Pipeline } from "./pipeline.js"
+export { buildPipeline, type Pipeline } from "./pipeline.js"
