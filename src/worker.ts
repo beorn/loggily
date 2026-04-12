@@ -92,101 +92,39 @@ type PostMessageFn = (message: WorkerConsoleMessage) => void
 let originalConsole: typeof console | null = null
 
 /**
- * Serialize a value for transmission via postMessage.
- * Handles non-serializable values like functions and circular references.
- */
-function serializeArg(arg: unknown, depth = 0): unknown {
-  // Prevent infinite recursion
-  if (depth > 5) return "[max depth]"
-
-  if (arg === null || arg === undefined) return arg
-  if (typeof arg === "function") return `[Function: ${arg.name || "anonymous"}]`
-  if (typeof arg === "symbol") return arg.toString()
-  if (typeof arg === "bigint") return arg.toString() + "n"
-
-  if (arg instanceof Error) {
-    const result: Record<string, unknown> = {
-      name: arg.name,
-      message: arg.message,
-      stack: arg.stack,
-    }
-    if ((arg as { code?: string }).code) result.code = (arg as { code?: string }).code
-    if (arg.cause !== undefined) result.cause = serializeArg(arg.cause, depth + 1)
-    return result
-  }
-
-  if (Array.isArray(arg)) {
-    return arg.map((v) => serializeArg(v, depth + 1))
-  }
-
-  if (typeof arg === "object") {
-    try {
-      // Try structured clone first (handles most cases)
-      structuredClone(arg)
-      return arg
-    } catch {
-      // Fall back to manual serialization
-      const result: Record<string, unknown> = {}
-      const seen = new Set<object>()
-      seen.add(arg)
-
-      for (const [key, value] of Object.entries(arg)) {
-        if (typeof value === "object" && value !== null && seen.has(value)) {
-          result[key] = "[Circular]"
-        } else {
-          result[key] = serializeArg(value, depth + 1)
-        }
-      }
-      return result
-    }
-  }
-
-  return arg
-}
-
-/**
- * Forward console.* calls from worker to main thread.
+ * Forward console.* calls from worker to main thread via postMessage.
  *
- * Monkey-patches console methods to send messages via postMessage.
- * Call this at the start of your worker script.
- *
- * @param postMessage - The worker's postMessage function
- * @param namespace - Optional namespace for log messages (e.g., "km:worker:parse")
+ * Monkey-patches console methods. postMessage uses structuredClone,
+ * which handles most values natively. If cloning fails (functions,
+ * symbols), falls back to original console.
  *
  * @example
  * ```typescript
- * // At top of worker file:
  * import { forwardConsole } from "loggily/worker"
  * forwardConsole(postMessage, "km:worker:parse")
- *
- * // Now all console.* calls are forwarded:
  * console.log("processing", { file: "test.md" })
- * console.error(new Error("failed"))
  * ```
  */
 export function forwardConsole(postMessage: PostMessageFn, namespace?: string): void {
-  // Store original console for restoration
   if (!originalConsole) {
     originalConsole = { ...console }
   }
 
-  const levels = ["log", "debug", "info", "warn", "error", "trace"] as const
-
-  for (const level of levels) {
+  for (const level of ["log", "debug", "info", "warn", "error", "trace"] as const) {
     console[level] = (...args: unknown[]) => {
-      const serializedArgs = args.map((arg) => serializeArg(arg))
-
       try {
-        postMessage({
-          type: "console",
-          level,
-          namespace,
-          args: serializedArgs,
-          timestamp: Date.now(),
-        })
+        // Sanitize non-cloneable values before postMessage (structuredClone rejects them)
+        const safe = args.map((a) =>
+          typeof a === "function"
+            ? `[Function: ${a.name || "anonymous"}]`
+            : typeof a === "symbol"
+              ? a.toString()
+              : a instanceof Error
+                ? { name: a.name, message: a.message, stack: a.stack }
+                : a,
+        )
+        postMessage({ type: "console", level, namespace, args: safe, timestamp: Date.now() })
       } catch {
-        // postMessage might fail if worker is shutting down
-        // Fall back to original console
         originalConsole?.[level](...args)
       }
     }
