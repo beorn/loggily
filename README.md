@@ -25,6 +25,14 @@ log.error?.(new Error("connection lost"))
 npm install loggily
 ```
 
+```bash
+DEBUG='*' node app                        # show all debug output
+DEBUG='myapp:db' node app                 # only database logs
+LOG_FILE=/tmp/app.log node app            # write to file
+NODE_ENV=production node app              # structured JSON output
+TRACE=1 node app                          # enable span timing
+```
+
 ```typescript
 import { createLogger } from "loggily"
 import { toOtel } from "loggily/otel"
@@ -61,12 +69,6 @@ log.metrics.summary() // myapp:db:query: 42 spans, mean=3.2ms, p95=8.4ms
 
 // Composable — build custom factories
 const myCreateLogger = pipe(baseCreateLogger, withSpans(), myPlugin())
-```
-
-```bash
-DEBUG=myapp:db bun app    # namespace hierarchy — same patterns as debug package
-NODE_ENV=production       # same code, structured JSON output
-TRACE=1                   # enable span output
 ```
 
 Also supports [async context propagation](https://loggily.dev/guide/context), [worker threads](https://loggily.dev/guide/workers), and [browser](https://loggily.dev/guide/browser).
