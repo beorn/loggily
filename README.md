@@ -64,12 +64,12 @@ The second argument is an array where each element type has a distinct role:
 
 ```typescript
 const log = createLogger("myapp", [
-  { level: "debug", metrics: true },           // config object — sets scope
-  toOtel({ api: otelApi }),                     // stage function — transforms/forwards events
-  pinoTransport,                                // writable — { write } receives raw events
-  { file: "/tmp/app.log", format: "json" },     // file sink — writes formatted strings
-  [{ level: "error" }, { file: "/tmp/err.log" }], // branch — sub-pipeline with own scope
-  console,                                      // console — colorized, human-readable
+  { level: "debug", metrics: true },    // config object — sets scope
+  toOtel({ api: otelApi }),              // stage — transforms/forwards
+  pinoTransport,                         // writable — { write } receives events
+  { file: "...", format: "json" },       // file sink — formatted strings
+  [{ level: "error" }, { file: "..." }], // branch — sub-pipeline with own scope
+  console,                               // console — colorized, human-readable
 ])
 ```
 
