@@ -1,6 +1,6 @@
 # Tracing
 
-Import from `loggily` (main entry) or `loggily/tracing`.
+Import from `loggily` (main entry).
 
 ## ID Format
 

@@ -119,6 +119,7 @@ export default defineConfig({
             { text: "Tracing", link: "/api/tracing" },
             { text: "Async Context", link: "/api/context" },
             { text: "Metrics", link: "/api/metrics" },
+            { text: "OpenTelemetry", link: "/api/otel" },
             { text: "Writers", link: "/api/writers" },
             { text: "Worker Thread", link: "/api/worker" },
           ],

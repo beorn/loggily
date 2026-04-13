@@ -99,7 +99,6 @@ import {
 - Symbols become their `toString()` representation
 - Errors become `{ name, message, stack }`
 - Circular references become `"[Circular]"`
-- Errors become `{ name, message, stack }` objects
 - Depth is capped at 5 levels
 
 ## Restoring Console
