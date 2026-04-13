@@ -19,7 +19,7 @@ log.debug?.("cache hit", { key: "user:42" })
 log.error?.(new Error("connection lost"))
 ```
 
-**Why the `?.`?** An [ergonomic and efficient](https://loggily.dev/guide/benchmarks) way to handle disabled logs — `?.` short-circuits the entire call, so nothing evaluates when the level is off. [~22x faster](https://loggily.dev/guide/benchmarks) than conventional noop loggers. [See how Loggily compares →](https://loggily.dev/guide/comparison)
+**On the `?.` optional chaining trick:** an [ergonomic and efficient](https://loggily.dev/guide/benchmarks) way to handle disabled logs — `?.` short-circuits the entire call, so nothing evaluates when the level is off. [~22x faster](https://loggily.dev/guide/benchmarks) than conventional noop loggers. [See how Loggily compares →](https://loggily.dev/guide/comparison)
 
 ## Getting Started
 
