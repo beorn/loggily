@@ -104,7 +104,7 @@ log.debug?.("cache hit", { key: "user:42" })
 log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 
 // Child loggers
-const db = log.child("db", { pool: "main" })       // namespace: "myapp:db"
+const db = log.child("db", { pool: "main" }) // namespace: "myapp:db"
 
 // Spans -- time any operation
 {
@@ -124,13 +124,14 @@ import { createLogger } from "loggily"
 import { toOtel } from "loggily/otel"
 import * as otelApi from "@opentelemetry/api"
 
-const log = createLogger("myapp", [                    // "myapp" -- namespace, filter with DEBUG=myapp
-  { level: "debug", metrics: true },                   // config object -- sets scope
-  toOtel({ api: otelApi }),                            // stage -- transforms/forwards events
-  pinoTransport,                                       // writable -- { write } receives raw Events
-  { file: "/tmp/app.log", format: "json" },            // file sink -- writes formatted strings
-  [{ level: "error" }, { file: "/tmp/err.log" }],      // branch -- sub-pipeline with own scope
-  console,                                             // console -- colorized, human-readable
+const log = createLogger("myapp", [
+  // "myapp" -- namespace, filter with DEBUG=myapp
+  { level: "debug", metrics: true }, // config object -- sets scope
+  toOtel({ api: otelApi }), // stage -- transforms/forwards events
+  pinoTransport, // writable -- { write } receives raw Events
+  { file: "/tmp/app.log", format: "json" }, // file sink -- writes formatted strings
+  [{ level: "error" }, { file: "/tmp/err.log" }], // branch -- sub-pipeline with own scope
+  console, // console -- colorized, human-readable
 ])
 
 // Custom writable -- any { write } receives raw Event objects
@@ -141,7 +142,7 @@ const log2 = createLogger("ingest", [
 
 // Custom stage -- functions transform, filter, or enrich events
 const log3 = createLogger("filtered", [
-  (event) => event.kind === "log" && event.message.includes("secret") ? null : event,
+  (event) => (event.kind === "log" && event.message.includes("secret") ? null : event),
   (event) => ({ ...event, props: { ...event.props, host: os.hostname() } }),
   console,
 ])
@@ -226,14 +227,20 @@ Key types exported for power users:
 | `loggily/otel`    | OpenTelemetry bridge (`toOtel` stage)                                |
 | `loggily/metrics` | Span metrics collection (`{ metrics: true }` or explicit collectors) |
 
-## Compatibility
+## Compatibility & Destinations
 
+- **OpenTelemetry** -- `toOtel({ api })` forwards to Jaeger, Grafana, Datadog, or any OTLP backend
+- **Sentry** -- capture errors via a 3-line stage function
+- **Pino transports** -- any `{ write }` object receives raw Events by default
+- **Elasticsearch / OpenSearch** -- post JSON events directly
+- **AWS CloudWatch** -- writable calling `putLogEvents`
+- **Prometheus** -- expose `log.metrics` as a `/metrics` endpoint
 - **`DEBUG=` patterns** -- same namespace filter syntax as the `debug` package
-- **Pino transports** -- `objectMode: true /* default, shown for clarity */` writables receive raw Event objects
-- **W3C Trace Context** -- `traceparent()` generates standard headers, `setIdFormat("w3c")` for W3C-format IDs
-- **OpenTelemetry** -- `toOtel({ api })` forwards to any OTLP backend (logs + spans)
-- **Browser** -- bundlers auto-select the browser entry point (no Node.js APIs)
-- **Worker threads** -- pipeline-based forwarding via `postMessage` + `structuredClone`
+- **W3C Trace Context** -- `traceparent()` generates standard headers
+- **Browser** -- bundlers auto-select the browser entry point
+- **Worker threads** -- pipeline-based forwarding via `postMessage`
+
+See the [Destinations guide](https://loggily.dev/guide/destinations) for copy-paste recipes.
 
 ## Why this exists
 

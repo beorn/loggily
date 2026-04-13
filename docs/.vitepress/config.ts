@@ -99,6 +99,7 @@ export default defineConfig({
             { text: "Near-Zero Cost Logging", link: "/guide/zero-overhead" },
             { text: "Spans", link: "/guide/spans" },
             { text: "Worker Threads", link: "/guide/workers" },
+            { text: "Destinations", link: "/guide/destinations" },
           ],
         },
         {
