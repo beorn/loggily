@@ -23,9 +23,7 @@ log.error?.(new Error("connection lost"))
 
 ```bash
 npm install loggily
-```
 
-```bash
 DEBUG='*' node app                        # show all debug output
 DEBUG='myapp:db' node app                 # only database logs
 LOG_FILE=/tmp/app.log node app            # write to file
