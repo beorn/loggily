@@ -48,8 +48,6 @@ log.debug?.(`state: ${JSON.stringify(computeExpensiveState())}`)
 npm install loggily
 ```
 
-Requires Node.js ≥ 23.6 or Bun ≥ 1.0. ESM-only. TypeScript 5.2+ for `using` (`.end()` works on any version). [Browser supported](https://loggily.dev/guide/browser) via conditional export.
-
 ## Config Pipeline
 
 The second argument is an array where each element type has a distinct role:
@@ -92,11 +90,14 @@ Loggily was built while developing a terminal UI where disabled debug logs insid
 
 > **Status:** Early release (0.x). The core API is stable, but details may evolve before 1.0.
 
+## Requirements
+
+Node.js ≥ 23.6 or Bun ≥ 1.0. ESM-only. TypeScript 5.2+ for `using` (`.end()` works on any version). [Browser supported](https://loggily.dev/guide/browser) via conditional export.
+
 ## When not to use Loggily
 
 - **You need auto-instrumentation** (HTTP, database, gRPC). Use OpenTelemetry's SDK directly — Loggily's bridge forwards events but doesn't instrument frameworks.
 - **You need log rotation or dozens of transport plugins.** Pino's transport ecosystem is deeper.
-- **You're not on a modern runtime.** Node.js ≥ 23.6 or Bun ≥ 1.0.
 
 ## Documentation
 
