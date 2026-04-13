@@ -28,6 +28,8 @@ features:
     details: "OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus, W3C Trace Context. Same DEBUG= patterns as the debug package."
 ---
 
+## Quick Look
+
 ```typescript
 import { createLogger } from "loggily"
 
