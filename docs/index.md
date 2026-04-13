@@ -31,7 +31,7 @@ features:
     linkText: "See comparison"
   - icon: 🔌
     title: "Send Anywhere"
-    details: "One config array wires all your destinations: console, files, OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus — or write your own sink. Objects configure, arrays branch, values write."
+    details: "Wire console, files, OpenTelemetry, Pino transports, Sentry, Elasticsearch, CloudWatch, and Prometheus in one config array — or add your own sink in a line."
     link: /guide/destinations
     linkText: "See all destinations"
 ---
