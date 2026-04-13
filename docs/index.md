@@ -56,10 +56,32 @@ yarn add loggily
 
 ```typescript
 import { createLogger } from "loggily"
+
+const log = createLogger("myapp", [{ level: "debug" }, console])
+
+log.info?.("server started", { port: 3000 })
+log.debug?.("cache hit", { key: "user:42" })
+log.error?.(new Error("connection lost"))
+
+// Spans — time any operation
+{
+  using span = log.span("db:query", { table: "users" })
+  const users = await db.query("SELECT * FROM users")
+  span.spanData.count = users.length
+}
+// → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
+```
+
+### Full pipeline
+
+Every element type in one example:
+
+```typescript
+import { createLogger } from "loggily"
 import { toOtel } from "loggily/otel"
 import * as otelApi from "@opentelemetry/api"
 
-const log = createLogger("myapp", [                   // "myapp" — namespace, filter with DEBUG=myapp
+const log = createLogger("myapp", [                    // "myapp" — namespace, filter with DEBUG=myapp
   { level: "debug", metrics: true },                   // config object — sets scope
   toOtel({ api: otelApi }),                            // stage — transforms/forwards events
   pinoTransport,                                       // writable — { write } receives raw Events
@@ -68,39 +90,24 @@ const log = createLogger("myapp", [                   // "myapp" — namespace, 
   console,                                             // console — colorized, human-readable
 ])
 
-// Structured logging — ?. skips everything when the level is disabled
-log.info?.("server started", { port: 3000 })
-log.debug?.("cache hit", { key: "user:42" })
-log.error?.(new Error("connection lost"))
-
-// Spans — automatic timing, parent-child tracking, trace IDs
-{
-  using span = log.span("db:query", { table: "users" })
-  const users = await db.query("SELECT * FROM users")
-  span.spanData.count = users.length
-}
-// → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
-// → also forwarded to OTLP backend and Pino transport
-
 // Metrics — check p50/p95/p99 via log.metrics
 for (const [name, s] of log.metrics.all()) {
   if (s.p95 > 100) console.warn(`${name} is slow: p95=${s.p95}ms`)
 }
 ```
 
-### Custom Writable
+### Custom writable
 
-Any object with a `write` method receives raw Event objects:
+Any `{ write }` object receives raw Event objects:
 
 ```typescript
 const log = createLogger("myapp", [
-  // { write } receives raw Event objects — serialize however you want
   { write: (event) => fetch("/ingest", { method: "POST", body: JSON.stringify(event) }) },
-  console, // console is special-cased: colorized, human-readable output
+  console,
 ])
 ```
 
-### Custom Stage
+### Custom stage
 
 Functions transform, filter, or enrich events inline:
 
