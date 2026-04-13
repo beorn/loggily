@@ -18,10 +18,8 @@ features:
     details: "The optional chaining trick short-circuits disabled log calls entirely — not just the log call, but all argument evaluation too. ~22x faster than conventional noop loggers in benchmarks."
   - title: "All-in-One Observability"
     details: "Replace debug + your JSON logger + ad-hoc timers with one API. <b>Namespace filtering</b>, <b>structured logs</b>, <b>spans</b> with trace IDs, <b>metrics</b> (p50/p95/p99), <b>worker threads</b>, <b>AsyncLocalStorage</b> propagation. ~3 KB, zero dependencies."
-  - title: "Beautiful Dev, Structured Prod"
-    details: "Colorized, human-readable console output in development. Structured JSON in production. Same code, no compromise. Switch with NODE_ENV."
-  - title: "Browser and Terminal"
-    details: "One pipeline, both environments. Bundlers auto-select the browser entry point. Node.js, Bun, and browsers — same API, same config."
+  - title: "Works Everywhere"
+    details: "<b>Browser</b> and <b>server</b> (Node.js, Bun) — same API, same config. <b>Beautiful colorized dev logs</b> and <b>performant structured prod logs</b> — same code, no compromise. Switch with NODE_ENV."
   - title: "Send Anywhere"
     details: "OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus, W3C Trace Context. Same DEBUG= patterns as the debug package."
 ---
