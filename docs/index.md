@@ -59,12 +59,13 @@ import { createLogger } from "loggily"
 import { toOtel } from "loggily/otel"
 import * as otelApi from "@opentelemetry/api"
 
-// One pipeline: console + OTEL + a Pino transport + metrics
 const log = createLogger("myapp", [
-  { level: "debug", metrics: true },
-  toOtel({ api: otelApi }),
-  pinoTransport,                        // any { write } receives raw Events
-  console,
+  { level: "debug", metrics: true },          // config object — sets scope
+  toOtel({ api: otelApi }),                    // stage — transforms/forwards events
+  pinoTransport,                               // writable — { write } receives raw Events
+  { file: "/tmp/app.log", format: "json" },    // file sink — writes formatted strings
+  [{ level: "error" }, { file: "/tmp/err.log" }], // branch — sub-pipeline with own scope
+  console,                                     // console — colorized, human-readable
 ])
 
 // Structured logging — ?. skips everything when the level is disabled
