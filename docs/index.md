@@ -93,8 +93,9 @@ Any object with a `write` method receives raw Event objects:
 
 ```typescript
 const log = createLogger("myapp", [
+  // { write } receives raw Event objects — serialize however you want
   { write: (event) => fetch("/ingest", { method: "POST", body: JSON.stringify(event) }) },
-  console,
+  console, // console is special-cased: colorized, human-readable output
 ])
 ```
 
