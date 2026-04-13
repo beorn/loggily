@@ -15,13 +15,17 @@ hero:
 
 features:
   - title: "Free If Silenced"
-    details: "The optional chaining trick short-circuits disabled log calls entirely. Nothing evaluates — ~22x faster than conventional noop loggers."
-  - title: "One Pipeline, Every Destination"
-    details: "Console, files, OpenTelemetry, Pino transports, custom writables — wire them all in one config array. Objects configure, arrays branch, values write. Colorized dev output, structured JSON in production. Same code."
+    details: "The optional chaining trick short-circuits disabled log calls entirely — not just the log call, but all argument evaluation too. ~22x faster than conventional noop loggers in benchmarks."
+  - title: "Three Tools in One"
+    details: "Replace debug (namespace filtering), your JSON logger (structured production output), and ad-hoc timers (spans with trace IDs and metrics). One import, one config, one API."
+  - title: "One Config Array"
+    details: "Objects configure, arrays branch, values write. Wire console, files, OpenTelemetry, Pino transports, and custom writables in one declarative array. Colorized dev output, structured JSON in production — same code."
   - title: "Send Anywhere"
-    details: "OpenTelemetry, Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus, W3C Trace Context. Same DEBUG= patterns as the debug package."
+    details: "OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus, W3C Trace Context. Same DEBUG= patterns as the debug package. Drop-in compatible."
   - title: "Full Observability Stack"
-    details: "Spans with trace IDs. Metrics (p50/p95/p99). Worker threads. AsyncLocalStorage propagation. ~3 KB, zero dependencies."
+    details: "Spans with parent-child tracking and trace IDs. Span metrics (p50/p95/p99). Worker thread forwarding via postMessage. AsyncLocalStorage context propagation across async chains."
+  - title: "~3 KB, Zero Dependencies"
+    details: "Pure TypeScript, ESM-only. Runs on Node.js 23.6+, Bun 1.0+, and browsers. Composable plugin system — pipe(baseCreateLogger, withSpans(), myPlugin()) to build custom factories."
 ---
 
 ::: code-group
