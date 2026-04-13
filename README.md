@@ -71,9 +71,7 @@ const myCreateLogger = pipe(baseCreateLogger, withSpans(), myPlugin())
 
 Also supports [async context propagation](https://loggily.dev/guide/context), [worker threads](https://loggily.dev/guide/workers), and [browser](https://loggily.dev/guide/browser).
 
-Works with: [OpenTelemetry](https://loggily.dev/guide/otel) (Jaeger, Grafana, Datadog, any OTLP backend) · [Pino transports](https://loggily.dev/guide/destinations#pino) · Sentry · Elasticsearch · AWS CloudWatch · Prometheus · [W3C Trace Context](https://loggily.dev/guide/tracing) · [`DEBUG=` patterns](https://loggily.dev/guide/namespaces)
-
-See the [Destinations guide](https://loggily.dev/guide/destinations) for copy-paste recipes.
+**Works with:** [OpenTelemetry](https://loggily.dev/guide/otel) (Jaeger, Grafana, Datadog, any OTLP backend) · [Pino transports](https://loggily.dev/guide/destinations#pino) · Sentry · Elasticsearch · AWS CloudWatch · Prometheus · [W3C Trace Context](https://loggily.dev/guide/tracing) · [`DEBUG=` patterns](https://loggily.dev/guide/namespaces) · [See all destinations →](https://loggily.dev/guide/destinations)
 
 ## About
 
