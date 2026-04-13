@@ -1,8 +1,8 @@
 /**
- * Tests proving Pino transport compatibility.
+ * Tests for writable sink compatibility.
  *
- * Pino transports are objects with { write(msg: string) } method.
- * loggily accepts these as writable sinks in config arrays.
+ * Writables receive raw Event objects by default (objectMode).
+ * Set objectMode: false for formatted string output.
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest"
@@ -26,24 +26,23 @@ describe("Pino transport compatibility", () => {
     for (const spy of restoreConsole) spy.mockRestore()
   })
 
-  test("Pino-style { write(msg) } transport receives formatted strings", () => {
-    const messages: string[] = []
-    const transport = { write: (msg: string) => messages.push(msg) }
+  test("{ write } transport receives raw Event objects by default", () => {
+    const events: Event[] = []
+    const transport = { write: (obj: unknown) => events.push(obj as Event) }
 
     const log = createLogger("test", [{ level: "debug" }, transport])
     log.info?.("hello world")
     log.debug?.("verbose detail")
 
-    expect(messages).toHaveLength(2)
-    expect(messages[0]).toContain("INFO")
-    expect(messages[0]).toContain("hello world")
-    expect(messages[1]).toContain("DEBUG")
-    expect(messages[1]).toContain("verbose detail")
+    expect(events).toHaveLength(2)
+    expect(events[0]!.kind).toBe("log")
+    expect((events[0] as LogEvent).message).toBe("hello world")
+    expect((events[1] as LogEvent).message).toBe("verbose detail")
   })
 
-  test("Pino transport receives JSON when format is json", () => {
+  test("objectMode: false receives formatted strings", () => {
     const messages: string[] = []
-    const transport = { write: (msg: string) => messages.push(msg) }
+    const transport = { write: (msg: string) => messages.push(msg), objectMode: false as const }
 
     const log = createLogger("test", [{ level: "info", format: "json" }, transport])
     log.info?.("structured", { count: 42 })
@@ -55,9 +54,9 @@ describe("Pino transport compatibility", () => {
     expect(parsed.count).toBe(42)
   })
 
-  test("Pino transport with level filtering", () => {
-    const messages: string[] = []
-    const transport = { write: (msg: string) => messages.push(msg) }
+  test("transport with level filtering via branch", () => {
+    const events: Event[] = []
+    const transport = { write: (obj: unknown) => events.push(obj as Event) }
 
     const log = createLogger("test", [
       { level: "debug" },
@@ -69,125 +68,25 @@ describe("Pino transport compatibility", () => {
     log.info?.("info msg")
     log.error?.("error msg")
 
-    // Transport should only receive the error
-    expect(messages).toHaveLength(1)
-    expect(messages[0]).toContain("error msg")
+    expect(events).toHaveLength(1)
+    expect((events[0] as LogEvent).message).toBe("error msg")
   })
 
-  test("Pino transport works alongside console sink", () => {
-    const transportMessages: string[] = []
-    const transport = { write: (msg: string) => transportMessages.push(msg) }
+  test("transport works alongside console sink", () => {
+    const events: Event[] = []
+    const transport = { write: (obj: unknown) => events.push(obj as Event) }
     const mock = createConsoleMock()
 
     const log = createLogger("test", [{ level: "info" }, "console", transport])
     log.info?.("dual output")
 
-    // Both console and transport receive the message
     expect(mock.output.some((o) => o.message.includes("dual output"))).toBe(true)
-    expect(transportMessages.some((m) => m.includes("dual output"))).toBe(true)
+    expect(events.some((e) => (e as LogEvent).message === "dual output")).toBe(true)
   })
 
-  test("Pino transport receives span events", () => {
-    const messages: string[] = []
-    const transport = { write: (msg: string) => messages.push(msg) }
-
-    const log = createLogger("test", [{ level: "trace" }, transport])
-
-    {
-      using span = log.span!("operation")
-      span.info?.("working")
-    }
-
-    // Should have at least the info message and the span
-    const spanMsg = messages.find((m) => m.includes("SPAN"))
-    expect(spanMsg).toBeDefined()
-    expect(spanMsg).toContain("operation")
-  })
-
-  test("Multiple Pino transports in config array", () => {
-    const all: string[] = []
-    const errorsOnly: string[] = []
-    const allTransport = { write: (msg: string) => all.push(msg) }
-    const errorTransport = { write: (msg: string) => errorsOnly.push(msg) }
-
-    const log = createLogger("test", [{ level: "debug" }, allTransport, [{ level: "error" }, errorTransport]])
-
-    log.debug?.("debug")
-    log.info?.("info")
-    log.error?.("error")
-
-    expect(all).toHaveLength(3)
-    expect(errorsOnly).toHaveLength(1)
-    expect(errorsOnly[0]).toContain("error")
-  })
-
-  test("Pino transport with namespace filtering", () => {
-    const messages: string[] = []
-    const transport = { write: (msg: string) => messages.push(msg) }
-
-    const log = createLogger("app", [{ level: "debug", ns: "app:db" }, transport])
-
-    log.info?.("root msg") // namespace "app" — doesn't match "app:db"
-    const db = log.child("db")
-    db.info?.("query done") // namespace "app:db" — matches
-
-    // Only the db message should pass the namespace filter
-    expect(messages).toHaveLength(1)
-    expect(messages[0]).toContain("query done")
-  })
-
-  test("Stage function works with Pino transport", () => {
-    const messages: string[] = []
-    const transport = { write: (msg: string) => messages.push(msg) }
-
-    const log = createLogger("test", [
-      { level: "info" },
-      // Stage: enrich with hostname
-      (e: Event) => ({
-        ...e,
-        props: { ...(e as LogEvent).props, enriched: true },
-      }),
-      transport,
-    ])
-
-    log.info?.("enriched msg")
-    expect(messages).toHaveLength(1)
-    expect(messages[0]).toContain("enriched")
-  })
-
-  test("Writable with objectMode receives raw Event objects", () => {
+  test("transport receives span events", () => {
     const events: Event[] = []
-    const transport = {
-      write: (obj: unknown) => events.push(obj as Event),
-      objectMode: true,
-    }
-
-    const log = createLogger("test", [{ level: "info" }, transport])
-    log.info?.("hello", { count: 42 })
-
-    expect(events).toHaveLength(1)
-    expect(events[0]!.kind).toBe("log")
-    expect((events[0] as LogEvent).message).toBe("hello")
-    expect((events[0] as LogEvent).props?.count).toBe(42)
-  })
-
-  test("Writable without objectMode receives formatted strings", () => {
-    const messages: unknown[] = []
-    const transport = { write: (data: unknown) => messages.push(data) }
-
-    const log = createLogger("test", [{ level: "info" }, transport])
-    log.info?.("hello")
-
-    expect(messages).toHaveLength(1)
-    expect(typeof messages[0]).toBe("string")
-  })
-
-  test("objectMode writable receives span events as raw objects", () => {
-    const events: Event[] = []
-    const transport = {
-      write: (obj: unknown) => events.push(obj as Event),
-      objectMode: true,
-    }
+    const transport = { write: (obj: unknown) => events.push(obj as Event) }
 
     const log = createLogger("test", [{ level: "trace" }, transport])
 
@@ -200,5 +99,69 @@ describe("Pino transport compatibility", () => {
     expect(spanEvent).toBeDefined()
     expect(spanEvent!.name).toBe("test:operation")
     expect(typeof spanEvent!.duration).toBe("number")
+  })
+
+  test("multiple transports in config array", () => {
+    const all: Event[] = []
+    const errorsOnly: Event[] = []
+    const allTransport = { write: (obj: unknown) => all.push(obj as Event) }
+    const errorTransport = { write: (obj: unknown) => errorsOnly.push(obj as Event) }
+
+    const log = createLogger("test", [{ level: "debug" }, allTransport, [{ level: "error" }, errorTransport]])
+
+    log.debug?.("debug")
+    log.info?.("info")
+    log.error?.("error")
+
+    expect(all).toHaveLength(3)
+    expect(errorsOnly).toHaveLength(1)
+    expect((errorsOnly[0] as LogEvent).message).toBe("error")
+  })
+
+  test("transport with namespace filtering", () => {
+    const events: Event[] = []
+    const transport = { write: (obj: unknown) => events.push(obj as Event) }
+
+    const log = createLogger("app", [{ level: "debug", ns: "app:db" }, transport])
+
+    log.info?.("root msg")
+    const db = log.child("db")
+    db.info?.("query done")
+
+    expect(events).toHaveLength(1)
+    expect((events[0] as LogEvent).message).toBe("query done")
+  })
+
+  test("stage function works with transport", () => {
+    const events: Event[] = []
+    const transport = { write: (obj: unknown) => events.push(obj as Event) }
+
+    const log = createLogger("test", [
+      { level: "info" },
+      (e: Event) => ({
+        ...e,
+        props: { ...(e as LogEvent).props, enriched: true },
+      }),
+      transport,
+    ])
+
+    log.info?.("enriched msg")
+    expect(events).toHaveLength(1)
+    expect((events[0] as LogEvent).props?.enriched).toBe(true)
+  })
+
+  test("explicit objectMode: true still works (backwards compat)", () => {
+    const events: Event[] = []
+    const transport = {
+      write: (obj: unknown) => events.push(obj as Event),
+      objectMode: true,
+    }
+
+    const log = createLogger("test", [{ level: "info" }, transport])
+    log.info?.("hello", { count: 42 })
+
+    expect(events).toHaveLength(1)
+    expect(events[0]!.kind).toBe("log")
+    expect((events[0] as LogEvent).props?.count).toBe(42)
   })
 })

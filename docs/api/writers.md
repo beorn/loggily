@@ -13,8 +13,72 @@ const log = createLogger("myapp", [console, { file: "/tmp/app.log", format: "jso
 // Errors-only file + console for everything
 const log = createLogger("myapp", [console, { file: "/tmp/errors.log", level: "error", format: "json" }])
 
-// Custom writable stream
-const log = createLogger("myapp", [{ write: (s: string) => process.stderr.write(s + "\n") }])
+// Custom writable — receives raw Event objects
+const log = createLogger("myapp", [{ write: (event) => myService.ingest(event) }])
+
+// Pino transport — just pass it directly
+const log = createLogger("myapp", [pinoTransport, console])
+```
+
+### Writable Sinks
+
+Any object with a `write` method is a writable sink. By default, writables receive **raw `Event` objects** — structured data you can inspect, transform, or forward:
+
+```typescript
+const log = createLogger("myapp", [
+  {
+    write: (event) => {
+      // event.kind === "log" or "span"
+      // event.level, event.namespace, event.message, event.props
+      analytics.track(event)
+    },
+  },
+  console,
+])
+```
+
+**Node.js streams** (`process.stderr`, `fs.createWriteStream()`) are auto-detected and receive **formatted strings** instead — no `objectMode` flag needed.
+
+```typescript
+// process.stderr auto-detected as a Node stream → receives strings
+const log = createLogger("myapp", [process.stderr])
+```
+
+### objectMode (explicit override)
+
+You can override the default with `objectMode`:
+
+| objectMode  | Behavior                                                      | When to use                          |
+| ----------- | ------------------------------------------------------------- | ------------------------------------ |
+| _(omitted)_ | Auto: plain `{ write }` gets Events, Node streams get strings | Almost always                        |
+| `true`      | Force raw Event objects                                       | Node stream that you want Events     |
+| `false`     | Force formatted strings                                       | Plain `{ write }` that wants strings |
+
+```typescript
+// Force a plain writable to receive formatted strings
+const log = createLogger("myapp", [{ write: (s: string) => file.appendSync(s), objectMode: false }])
+```
+
+```typescript
+interface Writable {
+  write: (data: unknown) => unknown
+  /** Set to false for formatted strings. Default: true for plain objects, false for Node streams. */
+  objectMode?: boolean
+}
+```
+
+### Stage Functions
+
+Stage functions are **transforms**, not sinks. They always receive and return raw `Event` objects:
+
+```typescript
+const log = createLogger("myapp", [
+  // Filter: return null to drop
+  (event) => (event.kind === "log" && event.message.includes("secret") ? null : event),
+  // Enrich: add fields
+  (event) => ({ ...event, props: { ...event.props, host: hostname() } }),
+  console,
+])
 ```
 
 ### File Sink Options
@@ -27,27 +91,6 @@ When using `{ file: "/path" }` in the config array, you can override scope setti
 | `level`  | `LogLevel` (optional)  | Override level for this sink  |
 | `ns`     | `string` (optional)    | Override namespace filter     |
 | `format` | `LogFormat` (optional) | Override format for this sink |
-
-### Writable Object Mode
-
-Writables can receive raw `Event` objects instead of formatted strings by setting `objectMode: true`:
-
-```typescript
-const transport = {
-  write: (event) => sendToService(event),
-  objectMode: true,
-}
-const log = createLogger("myapp", [transport])
-```
-
-When `objectMode` is `false` (the default), the writable receives a formatted string (console or JSON, depending on the current scope's `format` setting) followed by a newline. When `objectMode` is `true`, the raw `Event` object is passed directly — useful for Pino transports, custom analytics pipelines, or any sink that needs structured data.
-
-```typescript
-interface Writable {
-  write: (data: unknown) => unknown
-  objectMode?: boolean
-}
-```
 
 ## createFileWriter (low-level)
 
@@ -76,14 +119,6 @@ Create a buffered file writer that flushes automatically.
 | `flush()`     | Write buffer to disk immediately      |
 | `close()`     | Flush remaining buffer and close file |
 
-### Safety
-
-- The flush interval timer is `unref()`'d so it won't keep the process alive
-- A `process.on("exit")` handler flushes remaining buffer on shutdown
-- `close()` removes the exit handler and clears the interval
-- Multiple `close()` calls are safe (idempotent)
-- `write()` after `close()` is silently ignored
-
 ## Deprecated Writer API
 
 ```typescript
@@ -95,5 +130,3 @@ const unsub = addWriter((formatted: string, level: string) => {
 })
 unsub() // unsubscribe
 ```
-
-The `addWriter` function still works but is deprecated. Use `{ file }` in the config array for file output, or custom stage functions for custom routing.

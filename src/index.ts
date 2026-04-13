@@ -16,6 +16,7 @@ export {
   // Plugins
   withSpans,
   withEnvDefaults,
+  withConfigMetrics,
   // Types
   type ConditionalLogger,
   type Logger,

@@ -13,6 +13,7 @@ export {
   pipe,
   withSpans,
   withEnvDefaults,
+  withConfigMetrics,
   type LoggerFactory,
   type LoggerPlugin,
   type PluginCtx,

@@ -134,6 +134,9 @@ export function withMetrics(collector: SpanRecorder): (logger: ConditionalLogger
     // Wrap the logger's span method to intercept disposal
     return new Proxy(logger, {
       get(target, prop: string | symbol) {
+        if (prop === "metrics") {
+          return collector
+        }
         if (prop === "span") {
           const originalSpan = target.span
           if (!originalSpan) return undefined // TRACE off — preserve ?.  behavior
@@ -149,6 +152,15 @@ export function withMetrics(collector: SpanRecorder): (logger: ConditionalLogger
               }
             }
             return span
+          }
+        }
+        if (prop === "child") {
+          return (
+            namespaceOrContext?: string | Record<string, unknown>,
+            childProps?: Record<string, unknown>,
+          ): ConditionalLogger => {
+            const child = target.child(namespaceOrContext as string, childProps)
+            return withMetrics(collector)(child)
           }
         }
         if (prop === "logger") {

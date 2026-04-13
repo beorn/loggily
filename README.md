@@ -85,8 +85,8 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 - **Error cause chains** -- `log.error?.(err)` serializes `Error.cause` recursively (up to 3 levels).
 - **Worker threads** -- pipeline-based: `createWorkerLogger(postMessage, "ns")` on worker, `createWorkerLogHandler()` on main. Same events, same pipeline.
 - **OpenTelemetry bridge** -- `toOtel({ api })` stage forwards events to any OTLP backend. Transparent: events pass through to subsequent pipeline elements.
-- **Pino transport compatible** -- writable sinks with `objectMode: true` receive raw Event objects. Use any Pino transport as a pipeline destination.
-- **Span metrics** -- `withMetrics(collector)` gives aggregated p50/p95/p99 per span name via explicit collectors.
+- **Pino transport compatible** -- any `{ write }` object receives raw Event objects by default. Plug in Pino transports directly.
+- **Span metrics** -- `{ metrics: true }` in config auto-creates a collector on `log.metrics` (p50/p95/p99). Or use `withMetrics(collector)` for shared/custom collectors.
 - **Head-based sampling** -- `setSampleRate(0.1)` to sample 10% of traces.
 - **Composable plugins** -- `pipe(baseCreateLogger, withSpans(), myPlugin())` to build custom factories.
 - **Browser support** -- bundlers auto-select the browser entry point via `browser` condition.
@@ -97,22 +97,18 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 ```typescript
 import { createLogger } from "loggily"
 import { toOtel } from "loggily/otel"
-import { withMetrics, createMetricsCollector } from "loggily/metrics"
 import * as otelApi from "@opentelemetry/api"
 
 // --- 1. Create a logger with a pipeline ---
 
-const collector = createMetricsCollector()
-const log = withMetrics(collector)(
-  createLogger("myapp", [
-    { level: "debug" },
-    toOtel({ api: otelApi }), // forward to OTLP
-    { write: (event) => pinoTransport.write(event), objectMode: true }, // Pino transport
-    { file: "/tmp/app.log", format: "json" }, // JSON file
-    [{ level: "error" }, { file: "/tmp/errors.log" }], // errors branch
-    console, // dev console
-  ]),
-)
+const log = createLogger("myapp", [
+  { level: "debug", metrics: true }, // metrics: true auto-creates a collector on log.metrics
+  toOtel({ api: otelApi }), // forward to OTLP
+  pinoTransport,                                                      // any { write } works
+  { file: "/tmp/app.log", format: "json" }, // JSON file
+  [{ level: "error" }, { file: "/tmp/errors.log" }], // errors branch
+  console, // dev console
+])
 
 // --- 2. Log ---
 
@@ -137,7 +133,7 @@ db.info?.("connected")
 
 // --- 5. Metrics ---
 
-for (const [name, s] of collector.all()) {
+for (const [name, s] of log.metrics.all()) {
   if (s.p95 > 100) console.warn(`${name} is slow: p95=${s.p95}ms`)
 }
 ```
@@ -215,18 +211,18 @@ Key types exported for power users:
 
 ### Subpath exports
 
-| Import path       | Contents                                        |
-| ----------------- | ----------------------------------------------- |
-| `loggily`         | Core API, types, pipeline builder               |
-| `loggily/context` | AsyncLocalStorage context propagation (Node.js) |
-| `loggily/worker`  | Worker thread logger + message handlers         |
-| `loggily/otel`    | OpenTelemetry bridge (`toOtel` stage)           |
-| `loggily/metrics` | Span metrics collection (explicit collectors)   |
+| Import path       | Contents                                                             |
+| ----------------- | -------------------------------------------------------------------- |
+| `loggily`         | Core API, types, pipeline builder                                    |
+| `loggily/context` | AsyncLocalStorage context propagation (Node.js)                      |
+| `loggily/worker`  | Worker thread logger + message handlers                              |
+| `loggily/otel`    | OpenTelemetry bridge (`toOtel` stage)                                |
+| `loggily/metrics` | Span metrics collection (`{ metrics: true }` or explicit collectors) |
 
 ## Compatibility
 
 - **`DEBUG=` patterns** -- same namespace filter syntax as the `debug` package
-- **Pino transports** -- `objectMode: true` writables receive raw Event objects
+- **Pino transports** -- `objectMode: true /* default, shown for clarity */` writables receive raw Event objects
 - **W3C Trace Context** -- `traceparent()` generates standard headers, `setIdFormat("w3c")` for W3C-format IDs
 - **OpenTelemetry** -- `toOtel({ api })` forwards to any OTLP backend (logs + spans)
 - **Browser** -- bundlers auto-select the browser entry point (no Node.js APIs)

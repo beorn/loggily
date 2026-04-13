@@ -55,7 +55,7 @@ const log = createLogger("myapp", [
     if (event.kind === "log" && event.message.includes("secret")) return null
     return event
   },
-  { write: (event) => sendToService(event), objectMode: true }, // Writable sink
+  { write: (event) => sendToService(event) }, // Writable sink (receives raw Events by default)
   [
     // Branch: sub-pipeline
     { ns: "myapp:metrics" },
@@ -77,14 +77,15 @@ const log = createLogger("myapp", [
 
 ### Config Object Keys
 
-| Key          | Type                  | Description                                     |
-| ------------ | --------------------- | ----------------------------------------------- |
-| `level`      | `LogLevel`            | Minimum log level                               |
-| `ns`         | `string \| string[]`  | Namespace filter pattern                        |
-| `format`     | `"console" \| "json"` | Output format                                   |
-| `spans`      | `boolean`             | Enable/disable span output (per-pipeline)       |
-| `idFormat`   | `"simple" \| "w3c"`   | Trace/span ID format (default: `"simple"`)      |
-| `sampleRate` | `number` (0.0 -- 1.0) | Head-based trace sampling rate (default: `1.0`) |
+| Key          | Type                  | Description                                                |
+| ------------ | --------------------- | ---------------------------------------------------------- |
+| `level`      | `LogLevel`            | Minimum log level                                          |
+| `ns`         | `string \| string[]`  | Namespace filter pattern                                   |
+| `format`     | `"console" \| "json"` | Output format                                              |
+| `spans`      | `boolean`             | Enable/disable span output (per-pipeline)                  |
+| `metrics`    | `boolean`             | Auto-create MetricsCollector, accessible via `log.metrics` |
+| `idFormat`   | `"simple" \| "w3c"`   | Trace/span ID format (default: `"simple"`)                 |
+| `sampleRate` | `number` (0.0 -- 1.0) | Head-based trace sampling rate (default: `1.0`)            |
 
 ### Sink Object Keys (file sinks)
 
@@ -97,7 +98,7 @@ const log = createLogger("myapp", [
 
 ### Writable Object Mode
 
-When `objectMode: true`, the writable receives raw `Event` objects instead of formatted strings. Useful for Pino transports, analytics pipelines, or custom sinks that need structured data.
+Writables receive raw `Event` objects by default. Node.js streams (`process.stderr`, fs streams) are auto-detected and receive formatted strings. Set `objectMode: false` to force string mode on a plain writable.
 
 ## Environment Variables
 
@@ -359,12 +360,23 @@ const log = createLogger("myapp", [toOtel({ api: otelApi }), console])
 
 ### `loggily/metrics`
 
-Span metrics collection via explicit collectors:
+Span metrics collection. Simple way via config:
+
+```typescript
+const log = createLogger("myapp", [{ level: "debug", metrics: true }, console])
+
+log.metrics.stats("myapp:db") // SpanStats | undefined
+log.metrics.summary() // formatted string
+log.metrics.all() // Map<string, SpanStats>
+```
+
+Advanced way with explicit collector (for shared/custom collectors):
 
 ```typescript
 import { withMetrics, createMetricsCollector } from "loggily/metrics"
 const collector = createMetricsCollector()
 const log = withMetrics(collector)(createLogger("myapp"))
+// log.metrics === collector
 ```
 
 ## Key Types
@@ -507,8 +519,7 @@ async function handleRequest(req: Request) {
 
 ```typescript
 const log = createLogger("myapp", [
-  // objectMode: true → receives raw Event objects, not formatted strings
-  { write: (event) => pinoTransport.write(event), objectMode: true },
+  pinoTransport, // any { write } receives raw Events by default
   console, // also print to console
 ])
 ```
@@ -516,14 +527,23 @@ const log = createLogger("myapp", [
 ### Metrics collection
 
 ```typescript
-import { withMetrics, createMetricsCollector } from "loggily/metrics"
+// Simple: { metrics: true } in config
+const log = createLogger("myapp", [{ level: "debug", metrics: true }, console])
 
-const collector = createMetricsCollector()
-const log = withMetrics(collector)(createLogger("myapp"))
+{
+  using span = log.span("db:query")
+  // ...
+}
 
 // After your app runs:
-console.log(collector.summary())
-// myapp:db: 42 spans, mean=3.2ms, p50=2.1ms, p95=8.4ms, p99=12.1ms
+console.log(log.metrics.summary())
+// myapp:db:query: 42 spans, mean=3.2ms, p50=2.1ms, p95=8.4ms, p99=12.1ms
+
+// Advanced: explicit collector (for sharing across loggers)
+import { withMetrics, createMetricsCollector } from "loggily/metrics"
+const collector = createMetricsCollector()
+const log2 = withMetrics(collector)(createLogger("myapp"))
+// log2.metrics === collector
 ```
 
 ### Worker thread logging

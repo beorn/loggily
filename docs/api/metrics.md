@@ -1,10 +1,40 @@
 # Metrics
 
-Import from `loggily/metrics`. Works everywhere (Node.js, Bun, browser).
+Collects span timing data (p50/p95/p99) for performance monitoring.
 
-Collects span timing data (p50/p95/p99) for performance monitoring via explicit collectors.
+## `{ metrics: true }` (simple)
 
-## Usage
+Add `metrics: true` to any config object. A per-logger `MetricsCollector` is created automatically and exposed as `log.metrics`.
+
+```typescript
+import { createLogger } from "loggily"
+
+const log = createLogger("myapp", [{ level: "debug", metrics: true }, console])
+
+{
+  using span = log.span("query")
+  // ...
+}
+
+log.metrics.stats("myapp:query") // SpanStats | undefined
+log.metrics.summary() // formatted string
+log.metrics.all() // Map<string, SpanStats>
+```
+
+Child loggers inherit the same collector:
+
+```typescript
+const db = log.child("db")
+{
+  using span = db.span("query")
+  // ...
+}
+log.metrics.stats("myapp:db:query") // same collector
+```
+
+## `withMetrics(collector)` (advanced)
+
+Import from `loggily/metrics`. Use when you need a shared collector across multiple loggers or custom configuration.
 
 ```typescript
 import { withMetrics, createMetricsCollector } from "loggily/metrics"
@@ -12,6 +42,8 @@ import { createLogger } from "loggily"
 
 const collector = createMetricsCollector()
 const log = withMetrics(collector)(createLogger("myapp"))
+
+// log.metrics === collector
 
 {
   using span = log.span("query")
@@ -27,6 +59,7 @@ collector.reset() // clear data
 
 | Export                                | Description                                                   |
 | ------------------------------------- | ------------------------------------------------------------- |
+| `{ metrics: true }`                   | Config key: auto-creates collector on `log.metrics`           |
 | `createMetricsCollector(maxEntries?)` | Create a standalone collector (default 1000 entries per span) |
 | `withMetrics(collector)`              | Wrap a logger to record spans to a collector                  |
 

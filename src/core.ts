@@ -41,6 +41,8 @@ import {
   formatJSONEvent,
 } from "./pipeline.js"
 
+import { createMetricsCollector as _createMetricsCollector, withMetrics as _withMetrics } from "./metrics.js"
+
 export type { Event, LogEvent, SpanEvent, Stage, LogLevel, OutputLogLevel, LogFormat, ConfigElement }
 export { LOG_LEVEL_PRIORITY, safeStringify }
 
@@ -103,6 +105,9 @@ export interface ConditionalLogger extends Disposable {
   readonly name: string
   readonly props: Readonly<Record<string, unknown>>
   readonly level: LogLevel
+
+  /** Metrics collector, present when `{ metrics: true }` is in config or `withMetrics()` was applied */
+  readonly metrics?: import("./metrics.js").MetricsCollector
 
   dispatch(event: Event): void
 
@@ -763,8 +768,41 @@ function createEnvPipeline(): Pipeline {
   }
 }
 
-/** Default createLogger — includes withEnvDefaults + withSpans. */
-export const createLogger: LoggerFactory = pipe(baseCreateLogger, withEnvDefaults(), withSpans())
+// ============ withConfigMetrics Plugin ============
+
+/**
+ * Plugin: when `{ metrics: true }` appears in the config array, automatically
+ * creates a MetricsCollector and applies withMetrics to the logger.
+ * The collector is accessible via `logger.metrics`.
+ */
+export function withConfigMetrics(): LoggerPlugin {
+  return (factory, _ctx) => {
+    return (name, configOrProps?) => {
+      const logger = factory(name, configOrProps)
+
+      // Only scan config arrays, not props objects
+      if (!Array.isArray(configOrProps)) return logger
+
+      // Check if any config object has metrics: true (flat scan, not into branches)
+      const hasMetrics = configOrProps.some(
+        (el) =>
+          typeof el === "object" &&
+          el !== null &&
+          !Array.isArray(el) &&
+          "metrics" in el &&
+          (el as Record<string, unknown>).metrics === true,
+      )
+
+      if (!hasMetrics) return logger
+
+      const collector = _createMetricsCollector()
+      return _withMetrics(collector)(logger)
+    }
+  }
+}
+
+/** Default createLogger — includes withEnvDefaults + withSpans + withConfigMetrics. */
+export const createLogger: LoggerFactory = pipe(baseCreateLogger, withEnvDefaults(), withSpans(), withConfigMetrics())
 
 /** Test helper — all levels, console output. */
 export function createTestLogger(name: string): ConditionalLogger {

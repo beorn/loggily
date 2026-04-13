@@ -148,6 +148,77 @@ describe("withMetrics (explicit collector)", () => {
   })
 })
 
+describe("{ metrics: true } config", () => {
+  test("creates a collector accessible via log.metrics", () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+
+    const log = createLogger("test:config-metrics", [{ level: "debug", metrics: true }, console])
+
+    expect(log.metrics).toBeDefined()
+    expect(typeof log.metrics!.stats).toBe("function")
+    expect(typeof log.metrics!.summary).toBe("function")
+    expect(typeof log.metrics!.all).toBe("function")
+  })
+
+  test("log.metrics.stats() returns data after spans run", () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+
+    const log = createLogger("test:config-stats", [{ level: "debug", metrics: true }, console])
+
+    {
+      using _span = log.span?.("db")
+    }
+
+    const stats = log.metrics!.stats("test:config-stats:db")
+    expect(stats).toBeDefined()
+    expect(stats!.count).toBe(1)
+  })
+
+  test("log.metrics is undefined when metrics not enabled", () => {
+    const log = createLogger("test:no-metrics", [{ level: "debug" }, console])
+
+    expect(log.metrics).toBeUndefined()
+  })
+
+  test("child loggers inherit the metrics collector", () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+
+    const log = createLogger("test:child-metrics", [{ level: "debug", metrics: true }, console])
+
+    const child = log.child("sub")
+    {
+      using _span = (child as unknown as { span?: Function }).span?.("op")
+    }
+
+    expect(child.metrics).toBeDefined()
+    expect(child.metrics).toBe(log.metrics) // same collector instance
+    const stats = log.metrics!.stats("test:child-metrics:sub:op")
+    expect(stats).toBeDefined()
+    expect(stats!.count).toBe(1)
+  })
+})
+
+describe("withMetrics sets .metrics", () => {
+  test("withMetrics(collector) exposes collector as .metrics", () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+
+    const collector = createMetricsCollector()
+    const log = withMetrics(collector)(createLogger("test:wm-metrics"))
+
+    expect(log.metrics).toBe(collector)
+  })
+
+  test("child via .child() inherits .metrics from withMetrics", () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+
+    const collector = createMetricsCollector()
+    const log = withMetrics(collector)(createLogger("test:wm-child"))
+    const child = log.child("sub")
+
+    expect(child.metrics).toBe(collector)
+  })
+})
+
 describe("LazyProps", () => {
   test("span accepts lazy props function", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true)

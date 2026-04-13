@@ -31,6 +31,7 @@ const parseJSON = (s: string): Record<string, any> => JSON.parse(s) as Record<st
  *  Uses a class so the pipeline recognizes it as a writable (not a config POJO). */
 class CaptureWriter {
   lines: string[] = []
+  objectMode = false as const
   write(s: string): void {
     this.lines.push(s)
   }

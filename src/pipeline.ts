@@ -243,13 +243,19 @@ function createFileSink(path: string, format: LogFormat): { write: (event: Event
   }
 }
 
+function isNodeStream(obj: unknown): boolean {
+  return typeof obj === "object" && obj !== null && ("_write" in obj || "writable" in obj || "fd" in obj)
+}
+
 function createWritableSink(writable: Writable, format: LogFormat): (event: Event) => void {
-  if (writable.objectMode) {
-    // Object mode: pass raw Event directly (for Pino transport compat)
-    return (event: Event) => writable.write(event)
+  // Node.js streams (process.stderr, fs streams) default to string mode
+  // Plain { write } objects default to object mode (raw Events)
+  const useObjectMode = writable.objectMode ?? !isNodeStream(writable)
+  if (!useObjectMode) {
+    const formatter = format === "json" ? formatJSONEvent : formatConsoleEvent
+    return (event: Event) => writable.write(formatter(event) + "\n")
   }
-  const formatter = format === "json" ? formatJSONEvent : formatConsoleEvent
-  return (event: Event) => writable.write(formatter(event) + "\n")
+  return (event: Event) => writable.write(event)
 }
 
 // ============ Pipeline ============
@@ -269,7 +275,7 @@ interface Output {
 
 // ============ Discrimination ============
 
-const VALID_CONFIG_KEYS = new Set(["level", "ns", "format", "spans", "idFormat", "sampleRate"])
+const VALID_CONFIG_KEYS = new Set(["level", "ns", "format", "spans", "metrics", "idFormat", "sampleRate"])
 const SINK_KEYS = new Set(["file", "otel"])
 
 function isPojo(obj: unknown): obj is Record<string, unknown> {
@@ -293,11 +299,11 @@ function isValidLogLevel(val: unknown): val is LogLevel {
 
 // ============ Config Types ============
 
-/** A writable sink — any object with a write method (Pino transports, streams, etc.) */
+/** A writable sink — any object with a write method. Receives raw Event objects by default. */
 export interface Writable {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   write: (data: any) => any
-  /** When true, raw Event objects are passed instead of formatted strings */
+  /** Set to false to receive formatted strings instead of raw Event objects (default: true) */
   objectMode?: boolean
 }
 
@@ -307,6 +313,8 @@ export interface ConfigObject {
   ns?: string | string[]
   format?: LogFormat
   spans?: boolean
+  /** Enable per-logger metrics collection. Creates a MetricsCollector accessible via `log.metrics`. */
+  metrics?: boolean
   /** ID format for trace/span IDs: "simple" (default) or "w3c" (W3C Trace Context) */
   idFormat?: "simple" | "w3c"
   /** Head-based sampling rate for new traces: 0.0 (none) to 1.0 (all, default) */
