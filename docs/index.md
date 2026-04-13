@@ -81,13 +81,14 @@ import { createLogger } from "loggily"
 import { toOtel } from "loggily/otel"
 import * as otelApi from "@opentelemetry/api"
 
-const log = createLogger("myapp", [                    // "myapp" — namespace, filter with DEBUG=myapp
-  { level: "debug", metrics: true },                   // config object — sets scope
-  toOtel({ api: otelApi }),                            // stage — transforms/forwards events
-  pinoTransport,                                       // writable — { write } receives raw Events
-  { file: "/tmp/app.log", format: "json" },            // file sink — writes formatted strings
-  [{ level: "error" }, { file: "/tmp/err.log" }],      // branch — sub-pipeline with own scope
-  console,                                             // console — colorized, human-readable
+const log = createLogger("myapp", [
+  // "myapp" — namespace, filter with DEBUG=myapp
+  { level: "debug", metrics: true }, // config object — sets scope
+  toOtel({ api: otelApi }), // stage — transforms/forwards events
+  pinoTransport, // writable — { write } receives raw Events
+  { file: "/tmp/app.log", format: "json" }, // file sink — writes formatted strings
+  [{ level: "error" }, { file: "/tmp/err.log" }], // branch — sub-pipeline with own scope
+  console, // console — colorized, human-readable
 ])
 
 // Metrics — check p50/p95/p99 via log.metrics
@@ -114,8 +115,9 @@ Functions transform, filter, or enrich events inline:
 ```typescript
 const log = createLogger("myapp", [
   // Drop sensitive messages
-  (event) => event.kind === "log" && event.message.includes("secret") ? null : event,
+  (event) => (event.kind === "log" && event.message.includes("secret") ? null : event),
   // Tag every event with the hostname
   (event) => ({ ...event, props: { ...event.props, host: os.hostname() } }),
   console,
 ])
+```

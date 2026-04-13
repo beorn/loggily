@@ -96,53 +96,54 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 
 ```typescript
 import { createLogger } from "loggily"
-import { toOtel } from "loggily/otel"
-import * as otelApi from "@opentelemetry/api"
 
-// --- 1. Create a logger with a pipeline ---
-
-const log = createLogger("myapp", [
-  { level: "debug", metrics: true }, // metrics: true auto-creates a collector on log.metrics
-  toOtel({ api: otelApi }), // forward to OTLP
-  pinoTransport,                                                      // any { write } works
-  { file: "/tmp/app.log", format: "json" }, // JSON file
-  [{ level: "error" }, { file: "/tmp/errors.log" }], // errors branch
-  console, // dev console
-])
-
-// --- 2. Log ---
+const log = createLogger("myapp", [{ level: "debug" }, console])
 
 log.info?.("server started", { port: 3000 })
 log.debug?.("cache hit", { key: "user:42" })
 log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 
-// --- 3. Child loggers ---
+// Child loggers
+const db = log.child("db", { pool: "main" })       // namespace: "myapp:db"
 
-const db = log.child("db", { pool: "main" }) // namespace: "myapp:db"
-db.info?.("connected")
-
-// --- 4. Spans ---
-
+// Spans — time any operation
 {
   using span = db.span("query", { table: "users" })
   const users = await db.query("SELECT * FROM users")
   span.spanData.count = users.length
 }
 // → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
-// → forwarded to OTLP, Pino transport, and JSON file
+```
 
-// --- 5. Metrics ---
+Or zero config — reads `LOG_LEVEL`, `DEBUG`, `TRACE` from env:
 
+```typescript
+const log = createLogger("myapp")
+log.info?.("started")
+```
+
+### Full pipeline
+
+Every config element type in one example:
+
+```typescript
+import { createLogger } from "loggily"
+import { toOtel } from "loggily/otel"
+import * as otelApi from "@opentelemetry/api"
+
+const log = createLogger("myapp", [                    // "myapp" — namespace, filter with DEBUG=myapp
+  { level: "debug", metrics: true },                   // config object — sets scope
+  toOtel({ api: otelApi }),                            // stage — transforms/forwards events
+  pinoTransport,                                       // writable — { write } receives raw Events
+  { file: "/tmp/app.log", format: "json" },            // file sink — writes formatted strings
+  [{ level: "error" }, { file: "/tmp/err.log" }],      // branch — sub-pipeline with own scope
+  console,                                             // console — colorized, human-readable
+])
+
+// Metrics — check p50/p95/p99 via log.metrics
 for (const [name, s] of log.metrics.all()) {
   if (s.p95 > 100) console.warn(`${name} is slow: p95=${s.p95}ms`)
 }
-```
-
-Or start with zero config and add features as you need them:
-
-```typescript
-const log = createLogger("myapp") // reads LOG_LEVEL, DEBUG, TRACE from env
-log.info?.("started")
 ```
 
 ### Composition with plugins
