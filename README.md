@@ -23,7 +23,7 @@ log.debug?.("cache hit", { key: "user:42" })
 log.error?.(new Error("connection lost"))
 ```
 
-Readable, colorized output in development:
+Readable, colorized output in development (colors don't render on GitHub -- run it in a terminal):
 
 ```
 14:32:15 INFO myapp server started {port: 3000}
