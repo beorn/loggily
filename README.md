@@ -77,7 +77,7 @@ See the [Destinations guide](https://loggily.dev/guide/destinations) for copy-pa
 
 ## About
 
-Tired of choosing between logging and production performance. Wanted structured JSON for production AND beautiful colorized output for development, in both browser and terminal, without the overhead when logs are off.
+Born from the frustration of choosing between logging and production performance. Loggily gives you structured JSON for production and beautiful colorized output for development — in both browser and terminal — without the overhead when logs are off.
 
 **Requirements:** Node.js ≥ 23.6 or Bun ≥ 1.0. ESM-only. TypeScript 5.2+ for `using` (`.end()` works on any version). [Browser supported](https://loggily.dev/guide/browser) via conditional export.
 
