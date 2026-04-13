@@ -71,10 +71,26 @@ npm install loggily
 
 Requires Node.js ≥ 23.6 or Bun ≥ 1.0. ESM-only. TypeScript 5.2+ for `using` (`.end()` works on any version). [Browser supported](https://loggily.dev/guide/browser) via conditional export.
 
+## Config Pipeline
+
+The second argument is an array where each element type has a distinct role:
+
+```typescript
+const log = createLogger("myapp", [
+  { level: "debug", metrics: true },           // config object — sets scope
+  toOtel({ api: otelApi }),                     // stage function — transforms/forwards events
+  pinoTransport,                                // writable — { write } receives raw events
+  { file: "/tmp/app.log", format: "json" },     // file sink — writes formatted strings
+  [{ level: "error" }, { file: "/tmp/err.log" }], // branch — sub-pipeline with own scope
+  console,                                      // console — colorized, human-readable
+])
+```
+
+Objects configure, arrays branch, values write. [Full guide →](https://loggily.dev/guide/config-array)
+
 ## Features
 
-- **Zero-cost disabled logs** — `?.` short-circuits the entire call: no string interpolation, no JSON.stringify, no function evaluation.
-- **Config pipeline** — `createLogger("app", [config, console, { file }, stage, [branch]])`. Objects configure, arrays branch, values write. [Six element types](https://loggily.dev/guide/config-array), one array.
+- **Zero-cost disabled logs** — `?.` short-circuits the entire call. [~22x faster](https://loggily.dev/guide/benchmarks) than noop loggers.
 - **Namespace hierarchy** — `DEBUG=myapp:db` shows only database output. Same filter patterns as the `debug` package.
 - **Spans** — `using span = log.span("name")`. Duration, parent-child tracking, trace IDs, custom data. Built-in [metrics collection](https://loggily.dev/guide/metrics) (p50/p95/p99).
 - **Dev & production** — colorized console in development, structured JSON in production. Same code.
