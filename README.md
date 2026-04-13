@@ -1,17 +1,11 @@
 # Loggily
 
-**Clarity without the clutter.**
-
-Debugs, logs, and spans — one API.
-
 [![Tests](https://github.com/beorn/loggily/actions/workflows/test.yml/badge.svg)](https://github.com/beorn/loggily/actions/workflows/test.yml)
 [![npm version](https://img.shields.io/npm/v/loggily.svg)](https://www.npmjs.com/package/loggily)
 [![size](https://img.shields.io/bundlephobia/minzip/loggily)](https://bundlephobia.com/package/loggily)
 [![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Most apps end up with three logging tools: `debug` for local troubleshooting, a JSON logger for production, and ad-hoc timers or a tracing SDK for performance. Three APIs, three configs, three output formats.
-
-Loggily replaces all three with one namespace tree and one output pipeline. Pure TypeScript, zero dependencies, ~3 KB.
+Debugs, logs, and spans — one API. Replace `debug` + your JSON logger + ad-hoc timers with one namespace tree and one output pipeline. Pure TypeScript, zero dependencies, ~3 KB.
 
 ```typescript
 import { createLogger } from "loggily"
