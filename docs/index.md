@@ -68,19 +68,39 @@ log.error?.(new Error("connection lost"))
 ### Spans
 
 ```typescript
-// With `using` (TS 5.2+, Bun 1.0+, Node 23.6+)
 {
   using span = log.span("db:query", { table: "users" })
   const users = await db.query("SELECT * FROM users")
   span.spanData.count = users.length
 }
 // SPAN myapp:db:query (45ms) {count: 100, table: "users"}
+```
 
-// Without `using` — call .end() manually
-const span = log.span("db:query", { table: "users" })
-try {
-  /* ... */
-} finally {
-  span.end()
-}
+### Metrics
+
+```typescript
+import { spanStats } from "loggily/metrics"
+
+// After spans run, get p50/p95/p99 aggregates
+const stats = spanStats()
+// Map { "myapp:db:query" => { count: 42, p50: 3.2, p95: 8.4, p99: 12.1, ... } }
+```
+
+### OpenTelemetry
+
+```typescript
+import * as otelApi from "@opentelemetry/api"
+import { toOtel } from "loggily/otel"
+
+// Forward to OTLP AND console — toOtel() is transparent
+const log = createLogger("myapp", [toOtel({ api: otelApi }), console])
+```
+
+### Pino Transports
+
+```typescript
+import { createLogger } from "loggily"
+
+// Any Pino transport works — objectMode receives raw Event objects
+const log = createLogger("myapp", [{ write: (event) => pinoTransport.write(event), objectMode: true }, console])
 ```

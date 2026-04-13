@@ -35,19 +35,19 @@ const log = withMetrics(collector)(createLogger("myapp"))
 }
 
 collector.stats("myapp:query") // { count, min, max, mean, p50, p95, p99, total }
-collector.summary()            // formatted string
-collector.reset()              // clear data
+collector.summary() // formatted string
+collector.reset() // clear data
 ```
 
 ## API
 
-| Export | Description |
-| --- | --- |
-| `spanStats()` | Ambient stats: `Map<name, SpanStats>` |
-| `spanSummary()` | Formatted summary string |
-| `resetSpanStats()` | Clear ambient data |
+| Export                                | Description                                                   |
+| ------------------------------------- | ------------------------------------------------------------- |
+| `spanStats()`                         | Ambient stats: `Map<name, SpanStats>`                         |
+| `spanSummary()`                       | Formatted summary string                                      |
+| `resetSpanStats()`                    | Clear ambient data                                            |
 | `createMetricsCollector(maxEntries?)` | Create a standalone collector (default 1000 entries per span) |
-| `withMetrics(collector?)` | Wrap a logger to record to a collector (default: ambient) |
+| `withMetrics(collector?)`             | Wrap a logger to record to a collector (default: ambient)     |
 
 ### SpanStats
 

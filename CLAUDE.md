@@ -451,6 +451,124 @@ Features available in browser: logging, spans, child loggers, custom stages, tra
 
 Features Node.js only: file sinks (`{ file: ... }`), context propagation (`loggily/context`), worker threads (`loggily/worker`).
 
+## Common Patterns
+
+### Production setup with file + JSON + OTEL
+
+```typescript
+import * as otelApi from "@opentelemetry/api"
+import { createLogger } from "loggily"
+import { toOtel } from "loggily/otel"
+
+const log = createLogger("myapp", [
+  { level: "info", format: "json" },
+  toOtel({ api: otelApi }),           // forward to OTLP backend
+  { file: "/var/log/app.log" },       // write JSON to file
+  [{ level: "error" }, { file: "/var/log/errors.log" }],  // errors to separate file
+])
+```
+
+### Request handler with async context
+
+```typescript
+import { enableContextPropagation } from "loggily/context"
+enableContextPropagation()
+
+const log = createLogger("api")
+
+async function handleRequest(req: Request) {
+  using span = log.span("request", { method: req.method, url: req.url })
+
+  // All logs in this async context auto-inherit trace_id/span_id
+  const result = await processRequest(req)  // child spans auto-parent
+  span.spanData.status = result.status
+  return result
+}
+```
+
+### Pino transport as pipeline destination
+
+```typescript
+const log = createLogger("myapp", [
+  // objectMode: true → receives raw Event objects, not formatted strings
+  { write: (event) => pinoTransport.write(event), objectMode: true },
+  console,  // also print to console
+])
+```
+
+### Metrics collection
+
+```typescript
+import { spanStats, spanSummary } from "loggily/metrics"
+
+// Ambient: just import loggily/metrics and spans are auto-recorded
+// After your app runs:
+console.log(spanSummary())
+// myapp:db: 42 spans, mean=3.2ms, p50=2.1ms, p95=8.4ms, p99=12.1ms
+
+// Explicit: custom collector per logger
+import { withMetrics, createMetricsCollector } from "loggily/metrics"
+const collector = createMetricsCollector()
+const log = withMetrics(collector)(createLogger("myapp"))
+```
+
+### Worker thread logging
+
+```typescript
+// worker.ts
+import { createWorkerLogger } from "loggily/worker"
+const log = createWorkerLogger(postMessage, "myapp:worker")
+log.info?.("processing", { file: "data.csv" })
+{
+  using span = log.span("parse")
+  span.spanData.lines = 100
+}
+
+// main.ts
+import { createWorkerLogHandler } from "loggily/worker"
+const handler = createWorkerLogHandler()
+worker.on("message", (msg) => handler(msg))
+```
+
+### Custom pipeline stage (filter/transform/enrich)
+
+```typescript
+const log = createLogger("myapp", [
+  // Filter: drop events matching a condition
+  (event) => {
+    if (event.kind === "log" && event.message.includes("secret")) return null
+    return event
+  },
+  // Enrich: add fields to every event
+  (event) => ({ ...event, props: { ...event.props, host: hostname() } }),
+  console,
+])
+```
+
+### Branching pipeline (different destinations per namespace/level)
+
+```typescript
+const log = createLogger("myapp", [
+  { level: "debug" },
+  console,                                           // everything to console
+  [{ ns: "myapp:metrics" }, { file: "/tmp/metrics.log", format: "json" }],  // metrics branch
+  [{ level: "error" }, { file: "/tmp/errors.log", format: "json" }],        // errors branch
+])
+```
+
+### W3C traceparent headers
+
+```typescript
+import { setIdFormat, traceparent } from "loggily"
+
+setIdFormat("w3c")  // use W3C-format IDs instead of simple sp_1/tr_1
+
+const span = log.span("outbound-request")
+fetch(url, {
+  headers: { traceparent: traceparent(span.spanData) }
+})
+```
+
 ## Best Practices
 
 1. **Config array for explicit setup**: Use `createLogger("name", [config])` when you want explicit control

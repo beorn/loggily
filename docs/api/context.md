@@ -27,10 +27,10 @@ Once enabled, spans automatically parent to the current context span (even acros
 
 ## API
 
-| Export | Description |
-| --- | --- |
-| `enableContextPropagation()` | Turn on AsyncLocalStorage tracking |
-| `disableContextPropagation()` | Turn it off |
-| `isContextPropagationEnabled()` | Check status |
-| `getCurrentSpan()` | Get active `{ spanId, traceId, parentId }` or `null` |
-| `runInSpanContext(ctx, fn)` | Run `fn` in a specific span context |
+| Export                          | Description                                          |
+| ------------------------------- | ---------------------------------------------------- |
+| `enableContextPropagation()`    | Turn on AsyncLocalStorage tracking                   |
+| `disableContextPropagation()`   | Turn it off                                          |
+| `isContextPropagationEnabled()` | Check status                                         |
+| `getCurrentSpan()`              | Get active `{ spanId, traceId, parentId }` or `null` |
+| `runInSpanContext(ctx, fn)`     | Run `fn` in a specific span context                  |

@@ -19,20 +19,20 @@ log.info?.("request handled", { status: 200 })
 
 ## API
 
-| Export | Description |
-| --- | --- |
-| `toOtel(options?)` | Pipeline stage that forwards events to OpenTelemetry |
-| `OtelBridgeOptions` | Options type |
+| Export              | Description                                          |
+| ------------------- | ---------------------------------------------------- |
+| `toOtel(options?)`  | Pipeline stage that forwards events to OpenTelemetry |
+| `OtelBridgeOptions` | Options type                                         |
 
 ### Options
 
 ```typescript
 interface OtelBridgeOptions {
-  api: typeof import("@opentelemetry/api")  // required
-  loggerName?: string   // OTLP logger name (default: "loggily")
-  tracerName?: string   // OTLP tracer name (default: "loggily")
-  logs?: boolean        // forward log events (default: true)
-  spans?: boolean       // forward span events (default: true)
+  api: typeof import("@opentelemetry/api") // required
+  loggerName?: string // OTLP logger name (default: "loggily")
+  tracerName?: string // OTLP tracer name (default: "loggily")
+  logs?: boolean // forward log events (default: true)
+  spans?: boolean // forward span events (default: true)
 }
 ```
 
@@ -43,9 +43,9 @@ interface OtelBridgeOptions {
 ```typescript
 const log = createLogger("myapp", [
   { level: "info" },
-  toOtel({ api: otelApi }),           // forward to OTLP
-  console,                            // also print to console
-  { file: "/tmp/app.log" },           // also write to file
+  toOtel({ api: otelApi }), // forward to OTLP
+  console, // also print to console
+  { file: "/tmp/app.log" }, // also write to file
 ])
 ```
 

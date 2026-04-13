@@ -161,6 +161,33 @@ log.error?.(new Error("timeout"), "request failed", { url: "/api" }) // Error + 
 log.error?.("manual error", { code: "ETIMEOUT" }) // String message + data
 ```
 
+### OpenTelemetry
+
+```typescript
+import * as otelApi from "@opentelemetry/api"
+import { toOtel } from "loggily/otel"
+
+// Forward to OTLP backend AND console — toOtel() is transparent
+const log = createLogger("myapp", [toOtel({ api: otelApi }), console])
+```
+
+### Metrics
+
+```typescript
+import { spanStats } from "loggily/metrics"
+
+// After spans run, get aggregated timing data
+const stats = spanStats()
+// Map { "myapp:db" => { count: 42, p50: 3.2, p95: 8.4, p99: 12.1, ... } }
+```
+
+### Pino transports
+
+```typescript
+// Any writable with objectMode receives raw Event objects
+const log = createLogger("myapp", [{ write: (event) => pinoTransport.write(event), objectMode: true }, console])
+```
+
 ### Composition with plugins
 
 `createLogger` is `pipe(baseCreateLogger, withEnvDefaults(), withSpans())`. For full manual control:
