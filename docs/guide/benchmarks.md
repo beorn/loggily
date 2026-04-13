@@ -36,7 +36,7 @@ When debug logging is disabled but arguments require evaluation (JSON.stringify)
 | debug           |       7M |   153.3 |      64x |
 | winston         |       1M |   774.6 |     323x |
 
-**Loggily is ~22x faster** than conventional noop loggers for disabled calls with expensive arguments. The `?.` pattern skips argument evaluation entirely -- `log.debug?.(\`state: ${expensiveArg()}\`)` never calls `expensiveArg()` when debug is disabled.
+**Loggily is ~22x faster** than conventional noop loggers for disabled calls with expensive arguments. The `?.` pattern skips argument evaluation entirely -- `log.debug?.(\`state: ${expensiveArg()}\`)`never calls`expensiveArg()` when debug is disabled.
 
 This is the key insight: real-world logging often involves string interpolation, `JSON.stringify`, or computed values. The `?.` pattern eliminates this cost entirely.
 
