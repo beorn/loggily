@@ -14,20 +14,20 @@ hero:
       link: https://github.com/beorn/loggily
 
 features:
-  - title: One Unified Pipeline
-    details: "Most projects juggle debug for dev output, a JSON logger for production, and a tracing SDK for timings — three configs, three formats, three APIs. Loggily integrates all three: one namespace tree, one output pipeline, one import."
   - title: "Near-Zero Cost via ?."
-    details: "Optional chaining skips the entire call — including argument evaluation — when a level is disabled. In benchmarks with expensive disabled log arguments, ~22x faster than a conventional noop logger."
-  - title: "Debug-Style Namespaces"
-    details: "Namespace filtering with DEBUG=myapp,-myapp:noisy. Uses native console methods so source lines stay clickable in DevTools. Compatible with the same patterns as the debug package."
-  - title: "Structured Logs"
-    details: "Colorized console with timestamps and clickable source lines in development. Structured JSON in production. Same code, same API — output format switches automatically."
-  - title: "Lightweight Spans"
-    details: "Built-in spans with automatic timing, parent-child tracking, and trace IDs. Uses TC39 Explicit Resource Management (using) for automatic cleanup."
-  - title: "Composable Config Pipeline"
-    details: "Configure with a single array: objects set options, arrays branch, values write. Pass console for terminal output, { file } for file output, or functions for custom stages."
+    details: "Optional chaining skips the entire call — including argument evaluation — when a level is disabled. ~22x faster than a conventional noop logger in benchmarks."
+  - title: "Debugs + Logs + Spans"
+    details: "One API instead of three. Namespace filtering (DEBUG=myapp:db), structured JSON in production, spans with parent-child tracking and trace IDs. One import, one config."
+  - title: "OpenTelemetry Bridge"
+    details: "toOtel() stage forwards events to any OTLP backend (Jaeger, Grafana, Datadog). Transparent — events pass through to your other pipeline destinations too."
+  - title: "Pino Transport Compatible"
+    details: "Writable sinks with objectMode receive raw Event objects. Use any Pino transport as a pipeline destination. DEBUG= patterns compatible with the debug package."
+  - title: "Worker Threads + Metrics"
+    details: "Pipeline-based worker logging via postMessage. Span metrics with p50/p95/p99 aggregation. Async context propagation via AsyncLocalStorage."
+  - title: "Composable Plugins"
+    details: "pipe(baseCreateLogger, withSpans(), myPlugin()) to build custom factories. Config arrays for branching pipelines: objects configure, arrays branch, values write."
   - title: "~3KB, Zero Dependencies"
-    details: "No external dependencies. Native TypeScript, ESM-only. Runs on Node.js 23.6+, Bun 1.0+, and browsers."
+    details: "Pure TypeScript, ESM-only. Runs on Node.js 23.6+, Bun 1.0+, and browsers. Dev console + production JSON from the same code."
 ---
 
 > Early release (0.x) — API may evolve before 1.0.
