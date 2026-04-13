@@ -64,7 +64,7 @@ The second argument is an array where each element type has a distinct role:
 
 ```typescript
 const log = createLogger("myapp", [
-  { level: "debug", metrics: true },      // config object — sets scope
+  { level: "debug", metrics: true },     // config object — sets scope
   toOtel({ api: otelApi }),              // stage — transforms/forwards
   pinoTransport,                         // writable — { write } receives events
   { file: "...", format: "json" },       // file sink — formatted strings
