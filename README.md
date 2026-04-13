@@ -1,9 +1,9 @@
-# Loggily — Clarity without the clutter
-
 [![Tests](https://github.com/beorn/loggily/actions/workflows/test.yml/badge.svg)](https://github.com/beorn/loggily/actions/workflows/test.yml)
 [![npm version](https://img.shields.io/npm/v/loggily.svg)](https://www.npmjs.com/package/loggily)
 [![size](https://img.shields.io/bundlephobia/minzip/loggily)](https://bundlephobia.com/package/loggily)
 [![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+# Loggily — Clarity without the clutter
 
 Debugs, logs, and spans — one API. Replace `debug` + your JSON logger + ad-hoc timers with one namespace tree and one output pipeline. Pure TypeScript, zero dependencies, ~3 KB.
 
