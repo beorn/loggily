@@ -92,7 +92,7 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 - **Browser support** -- bundlers auto-select the browser entry point via `browser` condition.
 - **~3 KB, zero dependencies.**
 
-## Usage
+## Quick Start
 
 ```typescript
 import { createLogger } from "loggily"
@@ -106,7 +106,7 @@ log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 // Child loggers
 const db = log.child("db", { pool: "main" })       // namespace: "myapp:db"
 
-// Spans — time any operation
+// Spans -- time any operation
 {
   using span = db.span("query", { table: "users" })
   const users = await db.query("SELECT * FROM users")
@@ -115,32 +115,38 @@ const db = log.child("db", { pool: "main" })       // namespace: "myapp:db"
 // → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
 ```
 
-Or zero config — reads `LOG_LEVEL`, `DEBUG`, `TRACE` from env:
+## Complete Example
 
-```typescript
-const log = createLogger("myapp")
-log.info?.("started")
-```
-
-### Full pipeline
-
-Every config element type in one example:
+The config array accepts six element types -- here they are in one pipeline:
 
 ```typescript
 import { createLogger } from "loggily"
 import { toOtel } from "loggily/otel"
 import * as otelApi from "@opentelemetry/api"
 
-const log = createLogger("myapp", [                    // "myapp" — namespace, filter with DEBUG=myapp
-  { level: "debug", metrics: true },                   // config object — sets scope
-  toOtel({ api: otelApi }),                            // stage — transforms/forwards events
-  pinoTransport,                                       // writable — { write } receives raw Events
-  { file: "/tmp/app.log", format: "json" },            // file sink — writes formatted strings
-  [{ level: "error" }, { file: "/tmp/err.log" }],      // branch — sub-pipeline with own scope
-  console,                                             // console — colorized, human-readable
+const log = createLogger("myapp", [                    // "myapp" -- namespace, filter with DEBUG=myapp
+  { level: "debug", metrics: true },                   // config object -- sets scope
+  toOtel({ api: otelApi }),                            // stage -- transforms/forwards events
+  pinoTransport,                                       // writable -- { write } receives raw Events
+  { file: "/tmp/app.log", format: "json" },            // file sink -- writes formatted strings
+  [{ level: "error" }, { file: "/tmp/err.log" }],      // branch -- sub-pipeline with own scope
+  console,                                             // console -- colorized, human-readable
 ])
 
-// Metrics — check p50/p95/p99 via log.metrics
+// Custom writable -- any { write } receives raw Event objects
+const log2 = createLogger("ingest", [
+  { write: (event) => fetch("/ingest", { method: "POST", body: JSON.stringify(event) }) },
+  console,
+])
+
+// Custom stage -- functions transform, filter, or enrich events
+const log3 = createLogger("filtered", [
+  (event) => event.kind === "log" && event.message.includes("secret") ? null : event,
+  (event) => ({ ...event, props: { ...event.props, host: os.hostname() } }),
+  console,
+])
+
+// Metrics -- { metrics: true } auto-creates a collector on log.metrics
 for (const [name, s] of log.metrics.all()) {
   if (s.p95 > 100) console.warn(`${name} is slow: p95=${s.p95}ms`)
 }

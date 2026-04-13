@@ -54,6 +54,8 @@ yarn add loggily
 
 :::
 
+## Quick Start
+
 ```typescript
 import { createLogger } from "loggily"
 
@@ -63,18 +65,21 @@ log.info?.("server started", { port: 3000 })
 log.debug?.("cache hit", { key: "user:42" })
 log.error?.(new Error("connection lost"))
 
+// Child loggers
+const db = log.child("db", { pool: "main" }) // namespace: "myapp:db"
+
 // Spans — time any operation
 {
-  using span = log.span("db:query", { table: "users" })
+  using span = db.span("query", { table: "users" })
   const users = await db.query("SELECT * FROM users")
   span.spanData.count = users.length
 }
 // → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
 ```
 
-### Full pipeline
+## Complete Example
 
-Every element type in one example:
+The config array accepts six element types — here they are in one pipeline:
 
 ```typescript
 import { createLogger } from "loggily"
@@ -90,11 +95,6 @@ const log = createLogger("myapp", [
   [{ level: "error" }, { file: "/tmp/err.log" }], // branch — sub-pipeline with own scope
   console, // console — colorized, human-readable
 ])
-
-// Metrics — check p50/p95/p99 via log.metrics
-for (const [name, s] of log.metrics.all()) {
-  if (s.p95 > 100) console.warn(`${name} is slow: p95=${s.p95}ms`)
-}
 ```
 
 ### Custom writable
@@ -114,10 +114,17 @@ Functions transform, filter, or enrich events inline:
 
 ```typescript
 const log = createLogger("myapp", [
-  // Drop sensitive messages
   (event) => (event.kind === "log" && event.message.includes("secret") ? null : event),
-  // Tag every event with the hostname
   (event) => ({ ...event, props: { ...event.props, host: os.hostname() } }),
   console,
 ])
+```
+
+### Metrics
+
+```typescript
+// { metrics: true } auto-creates a collector on log.metrics
+for (const [name, s] of log.metrics.all()) {
+  if (s.p95 > 100) console.warn(`${name} is slow: p95=${s.p95}ms`)
+}
 ```
