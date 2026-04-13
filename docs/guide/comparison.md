@@ -122,7 +122,10 @@ log.debug(`state: ${computeState()}`)
 
 ```typescript
 // Loggily -- config array
-const log = createLogger("myapp", [console, { file: "/tmp/app.log", format: "json" }])
+const log = createLogger("myapp", [
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
 ```
 
 ### Error logging
@@ -147,7 +150,8 @@ const log = createLogger("myapp", [
   // Enrich events
   (event) => ({ ...event, props: { ...event.props, host: hostname() } }),
   // Filter events
-  (event) => (event.kind === "log" && event.message.includes("secret") ? null : event),
+  (event) =>
+    event.kind === "log" && event.message.includes("secret") ? null : event,
   console,
 ])
 ```

@@ -88,12 +88,18 @@ import * as otelApi from "@opentelemetry/api"
 
 const log = createLogger("myapp", [
   // "myapp" — namespace, filter with DEBUG=myapp
-  { level: "debug", metrics: true }, // config object — sets scope
-  toOtel({ api: otelApi }), // stage — transforms/forwards events
-  pinoTransport, // writable — { write } receives raw Events
-  { file: "/tmp/app.log", format: "json" }, // file sink — writes formatted strings
-  [{ level: "error" }, { file: "/tmp/err.log" }], // branch — sub-pipeline with own scope
-  console, // console — colorized, human-readable
+  // config object — sets scope
+  { level: "debug", metrics: true },
+  // stage — transforms/forwards events
+  toOtel({ api: otelApi }),
+  // writable — { write } receives raw Events
+  pinoTransport,
+  // file sink — writes formatted strings
+  { file: "/tmp/app.log", format: "json" },
+  // branch — sub-pipeline with own scope
+  [{ level: "error" }, { file: "/tmp/err.log" }],
+  // console — colorized, human-readable
+  console,
 ])
 ```
 
@@ -103,7 +109,13 @@ Any `{ write }` object receives raw Event objects:
 
 ```typescript
 const log = createLogger("myapp", [
-  { write: (event) => fetch("/ingest", { method: "POST", body: JSON.stringify(event) }) },
+  {
+    write: (event) =>
+      fetch("/ingest", {
+        method: "POST",
+        body: JSON.stringify(event),
+      }),
+  },
   console,
 ])
 ```
@@ -114,8 +126,12 @@ Functions transform, filter, or enrich events inline:
 
 ```typescript
 const log = createLogger("myapp", [
-  (event) => (event.kind === "log" && event.message.includes("secret") ? null : event),
-  (event) => ({ ...event, props: { ...event.props, host: os.hostname() } }),
+  (event) =>
+    event.kind === "log" && event.message.includes("secret") ? null : event,
+  (event) => ({
+    ...event,
+    props: { ...event.props, host: os.hostname() },
+  }),
   console,
 ])
 ```

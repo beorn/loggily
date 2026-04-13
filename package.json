@@ -1,7 +1,7 @@
 {
   "name": "loggily",
   "version": "0.8.0",
-  "description": "Debugs, logs, and spans \u2014 one API. Disabled logs skip argument evaluation entirely via optional chaining. ~3KB, zero dependencies.",
+  "description": "Debugs, logs, and spans — one API. Disabled logs skip argument evaluation entirely via optional chaining. ~3KB, zero dependencies.",
   "keywords": [
     "browser",
     "bun",
@@ -24,7 +24,7 @@
     "url": "https://github.com/beorn/loggily/issues"
   },
   "license": "MIT",
-  "author": "Bj\u00f8rn Stabell <bjorn@stabell.org>",
+  "author": "Bjørn Stabell <bjorn@stabell.org>",
   "repository": {
     "type": "git",
     "url": "https://github.com/beorn/loggily.git"
@@ -78,11 +78,14 @@
     "test": "bunx --bun vitest run",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "docs:fmt": "oxfmt docs/",
+    "docs:lint": "oxfmt --check docs/"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "mitata": "^1.0.34",
+    "oxfmt": "0.38.0",
     "tsdown": "^0.21.7",
     "vitepress": "^1.6.4",
     "vitepress-enrich": "^0.4.0",

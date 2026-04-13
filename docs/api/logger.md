@@ -48,7 +48,9 @@ const err = new Error("timeout")
 err.cause = inner
 
 log.error?.(err)
-// props includes: error_cause: { name: "Error", message: "DNS failed", stack: "..." }
+// props includes:
+//   error_cause: { name: "Error", message: "DNS failed",
+//     stack: "..." }
 ```
 
 Nested cause chains are followed recursively. If a cause itself has a `.cause`, it is serialized as a nested `cause` property:
@@ -61,7 +63,11 @@ const outer = new Error("request timeout")
 outer.cause = mid
 
 log.error?.(outer)
-// error_cause: { name: "Error", message: "DNS failed", cause: { name: "Error", message: "ECONNREFUSED", ... } }
+// error_cause: {
+//   name: "Error", message: "DNS failed",
+//   cause: { name: "Error",
+//     message: "ECONNREFUSED", ... }
+// }
 ```
 
 Non-Error cause values (the spec allows any value) are included as-is.

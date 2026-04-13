@@ -52,7 +52,10 @@ type Stage = (event: Event) => Event | null | void
 Arrays in the config array create sub-pipelines with their own scope:
 
 ```typescript
-const log = createLogger("myapp", [console, [{ ns: "myapp:metrics", format: "json" }, { file: "/tmp/metrics.log" }]])
+const log = createLogger("myapp", [
+  console,
+  [{ ns: "myapp:metrics", format: "json" }, { file: "/tmp/metrics.log" }],
+])
 ```
 
 ## Namespace Filter Patterns
@@ -105,7 +108,11 @@ DEBUG='myapp:db,myapp:cache' bun run app  # Only db and cache subtrees
 import { buildPipeline } from "loggily"
 
 // Build a custom pipeline
-const pipeline = buildPipeline([{ level: "debug" }, console, { file: "/tmp/app.log", format: "json" }])
+const pipeline = buildPipeline([
+  { level: "debug" },
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
 ```
 
 ## Deprecated API

@@ -59,7 +59,10 @@ const log = createLogger("myapp", [
       fetch("http://localhost:9200/logs/_doc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...event, "@timestamp": new Date(event.time).toISOString() }),
+        body: JSON.stringify({
+          ...event,
+          "@timestamp": new Date(event.time).toISOString(),
+        }),
       })
     },
   },
@@ -70,7 +73,10 @@ const log = createLogger("myapp", [
 ## AWS CloudWatch
 
 ```typescript
-import { CloudWatchLogsClient, PutLogEventsCommand } from "@aws-sdk/client-cloudwatch-logs"
+import {
+  CloudWatchLogsClient,
+  PutLogEventsCommand,
+} from "@aws-sdk/client-cloudwatch-logs"
 
 const cw = new CloudWatchLogsClient({})
 
@@ -81,7 +87,12 @@ const log = createLogger("myapp", [
         new PutLogEventsCommand({
           logGroupName: "/app/myapp",
           logStreamName: "main",
-          logEvents: [{ timestamp: event.time, message: JSON.stringify(event) }],
+          logEvents: [
+            {
+              timestamp: event.time,
+              message: JSON.stringify(event),
+            },
+          ],
         }),
       )
     },
@@ -136,7 +147,9 @@ const log = createLogger("myapp", [
       if (event.kind === "log" && event.level === "error") {
         fetch("https://hooks.slack.com/services/...", {
           method: "POST",
-          body: JSON.stringify({ text: `🚨 ${event.namespace}: ${event.message}` }),
+          body: JSON.stringify({
+            text: `🚨 ${event.namespace}: ${event.message}`,
+          }),
         })
       }
     },
@@ -151,10 +164,14 @@ Combine any of the above — they're just array elements:
 
 ```typescript
 const log = createLogger("myapp", [
-  toOtel({ api: otelApi }),                                    // OTLP backend
-  pinoTransport,                                               // Pino transport
-  { file: "/var/log/app.log", format: "json" },                // file
-  (event) => { if (event.level === "error") Sentry.captureException(...); return event },
+  toOtel({ api: otelApi }),                  // OTLP backend
+  pinoTransport,                             // Pino transport
+  { file: "/var/log/app.log", format: "json" }, // file
+  (event) => {                               // Sentry
+    if (event.level === "error")
+      Sentry.captureException(...)
+    return event
+  },
   console,
 ])
 ```

@@ -35,7 +35,13 @@ Colorized in your terminal:
 Set `LOG_FORMAT=json` or `NODE_ENV=production` and the same calls produce structured JSON -- same data, machine-parseable, ready for Datadog or Elastic or whatever your ops team uses:
 
 ```json
-{ "time": "2024-01-15T14:32:15.123Z", "level": "info", "name": "myapp", "msg": "server started", "port": 3000 }
+{
+  "time": "2024-01-15T14:32:15.123Z",
+  "level": "info",
+  "name": "myapp",
+  "msg": "server started",
+  "port": 3000
+}
 ```
 
 You never choose between human-readable and machine-parseable. You get both from the same call.
@@ -69,7 +75,10 @@ LOG_LEVEL=debug bun run app               # Debug level globally, all namespaces
 You can also set namespace filters in the config array:
 
 ```typescript
-const log = createLogger("myapp", [{ ns: "myapp:db,-myapp:db:verbose" }, console])
+const log = createLogger("myapp", [
+  { ns: "myapp:db,-myapp:db:verbose" },
+  console,
+])
 ```
 
 **The wall**: A request takes 3 seconds. You know it's slow, but you don't know which part.
@@ -219,7 +228,8 @@ enableContextPropagation()
 {
   using span = log.span("request", { path: "/api/users" })
 
-  // ANY logger, ANYWHERE in this async context, auto-inherits trace_id and span_id
+  // ANY logger, ANYWHERE in this async context,
+  // auto-inherits trace_id and span_id
   log.info?.("handling request")
   // -> includes trace_id and span_id in JSON output
 

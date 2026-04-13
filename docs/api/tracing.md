@@ -18,7 +18,10 @@ TRACE_ID_FORMAT=w3c bun run app
 ### Via config object
 
 ```typescript
-const log = createLogger("myapp", [{ level: "debug", idFormat: "w3c" }, console])
+const log = createLogger("myapp", [
+  { level: "debug", idFormat: "w3c" },
+  console,
+])
 const span = log.span("request")
 // span.spanData.id    → "a1b2c3d4e5f6a7b8"
 // span.spanData.traceId → "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
@@ -78,7 +81,10 @@ TRACE_SAMPLE_RATE=0.1 bun run app   # Sample 10% of traces
 ### Via config object
 
 ```typescript
-const log = createLogger("myapp", [{ level: "debug", sampleRate: 0.1 }, console])
+const log = createLogger("myapp", [
+  { level: "debug", sampleRate: 0.1 },
+  console,
+])
 ```
 
 ### Via setters (deprecated)

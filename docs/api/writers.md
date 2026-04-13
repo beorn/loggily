@@ -8,13 +8,21 @@ Output destinations are configured in the config array passed to `createLogger`:
 import { createLogger } from "loggily"
 
 // Console + file output
-const log = createLogger("myapp", [console, { file: "/tmp/app.log", format: "json" }])
+const log = createLogger("myapp", [
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
 
 // Errors-only file + console for everything
-const log = createLogger("myapp", [console, { file: "/tmp/errors.log", level: "error", format: "json" }])
+const log = createLogger("myapp", [
+  console,
+  { file: "/tmp/errors.log", level: "error", format: "json" },
+])
 
 // Custom writable — receives raw Event objects
-const log = createLogger("myapp", [{ write: (event) => myService.ingest(event) }])
+const log = createLogger("myapp", [
+  { write: (event) => myService.ingest(event) },
+])
 
 // Pino transport — just pass it directly
 const log = createLogger("myapp", [pinoTransport, console])
@@ -56,13 +64,17 @@ You can override the default with `objectMode`:
 
 ```typescript
 // Force a plain writable to receive formatted strings
-const log = createLogger("myapp", [{ write: (s: string) => file.appendSync(s), objectMode: false }])
+const log = createLogger("myapp", [
+  { write: (s: string) => file.appendSync(s), objectMode: false },
+])
 ```
 
 ```typescript
 interface Writable {
   write: (data: unknown) => unknown
-  /** Set to false for formatted strings. Default: true for plain objects, false for Node streams. */
+  // Set to false for formatted strings.
+  // Default: true for plain objects,
+  // false for Node streams.
   objectMode?: boolean
 }
 ```
@@ -74,7 +86,8 @@ Stage functions are **transforms**, not sinks. They always receive and return ra
 ```typescript
 const log = createLogger("myapp", [
   // Filter: return null to drop
-  (event) => (event.kind === "log" && event.message.includes("secret") ? null : event),
+  (event) =>
+    event.kind === "log" && event.message.includes("secret") ? null : event,
   // Enrich: add fields
   (event) => ({ ...event, props: { ...event.props, host: hostname() } }),
   console,

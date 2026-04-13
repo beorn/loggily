@@ -50,7 +50,8 @@ const log = withMetrics(collector)(createLogger("myapp"))
   // ...
 }
 
-collector.stats("myapp:query") // { count, min, max, mean, p50, p95, p99, total }
+// { count, min, max, mean, p50, p95, p99, total }
+collector.stats("myapp:query")
 collector.summary() // formatted string
 collector.reset() // clear data
 ```

@@ -50,7 +50,10 @@ const log = createLogger("worker", [workerTransportStage(postMessage)])
 ### forwardConsole
 
 ```typescript
-function forwardConsole(postMessage: (msg: unknown) => void, namespace?: string): void
+function forwardConsole(
+  postMessage: (msg: unknown) => void,
+  namespace?: string,
+): void
 ```
 
 Monkey-patch `console.*` to forward output via `postMessage`. Functions and Symbols are stringified before posting; Errors are serialized to `{ name, message, stack }`. Other values are passed directly — `postMessage` uses `structuredClone`, so most types work natively.
@@ -86,7 +89,9 @@ worker.on("message", (msg) => handle(msg))
 ### handleWorkerEvents
 
 ```typescript
-function handleWorkerEvents(target: ConditionalLogger | { dispatch(event: Event): void }): (msg: unknown) => void
+function handleWorkerEvents(
+  target: ConditionalLogger | { dispatch(event: Event): void },
+): (msg: unknown) => void
 ```
 
 Route worker events to a specific logger. More control than `createWorkerLogHandler`:
@@ -113,11 +118,16 @@ Handle only console forwarding messages (from `forwardConsole`).
 ## Type Guards
 
 ```typescript
-isWorkerEvent(msg: unknown): msg is Event           // LogEvent | SpanEvent
-isWorkerLogEvent(msg: unknown): msg is LogEvent      // kind === "log"
-isWorkerSpanEvent(msg: unknown): msg is SpanEvent    // kind === "span"
-isWorkerConsoleMessage(msg: unknown): msg is WorkerConsoleMessage  // type === "console"
-isWorkerMessage(msg: unknown): msg is WorkerConsoleMessage | Event // any worker message
+isWorkerEvent(msg: unknown):
+  msg is Event              // LogEvent | SpanEvent
+isWorkerLogEvent(msg: unknown):
+  msg is LogEvent           // kind === "log"
+isWorkerSpanEvent(msg: unknown):
+  msg is SpanEvent          // kind === "span"
+isWorkerConsoleMessage(msg: unknown):
+  msg is WorkerConsoleMessage // type === "console"
+isWorkerMessage(msg: unknown):
+  msg is WorkerConsoleMessage | Event // any worker msg
 ```
 
 ## Message Format
@@ -126,10 +136,19 @@ Worker log/span messages are standard `Event` objects (same as main-thread event
 
 ```typescript
 // LogEvent (kind: "log")
-{ kind: "log", time: 1234567890, namespace: "worker", level: "info", message: "hello", props: { file: "x" } }
+{
+  kind: "log", time: 1234567890,
+  namespace: "worker", level: "info",
+  message: "hello", props: { file: "x" }
+}
 
 // SpanEvent (kind: "span")
-{ kind: "span", time: 1234567890, namespace: "worker:parse", name: "parse", duration: 42, spanId: "sp_1", traceId: "tr_1", parentId: null }
+{
+  kind: "span", time: 1234567890,
+  namespace: "worker:parse", name: "parse",
+  duration: 42, spanId: "sp_1",
+  traceId: "tr_1", parentId: null
+}
 ```
 
 Console messages use a separate format:

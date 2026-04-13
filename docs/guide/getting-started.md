@@ -35,7 +35,11 @@ The string argument is the **namespace** -- it appears in every log message and 
 The optional second argument is a **config array** that controls output and behavior:
 
 ```typescript
-const log = createLogger("myapp", [{ level: "debug" }, console, { file: "/tmp/app.log", format: "json" }])
+const log = createLogger("myapp", [
+  { level: "debug" },
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
 ```
 
 In the config array: objects configure (`{ level, ns, format }`), arrays branch into sub-pipelines, and values write output. Pass `console` for terminal output, or `{ file: "/path" }` for file output.
@@ -169,7 +173,10 @@ DEBUG='*' bun run app                    # Everything
 You can also use the `ns` key in the config array:
 
 ```typescript
-const log = createLogger("myapp", [{ ns: "myapp:db,-myapp:db:verbose" }, console])
+const log = createLogger("myapp", [
+  { ns: "myapp:db,-myapp:db:verbose" },
+  console,
+])
 ```
 
 ## Output Format
@@ -183,7 +190,8 @@ bun run app
 
 # Production (automatic)
 NODE_ENV=production bun run app
-# {"time":"2026-01-15T14:32:15.123Z","level":"info","name":"myapp","msg":"server started","port":3000}
+# {"time":"2026-01-15T14:32:15.123Z","level":"info",
+#  "name":"myapp","msg":"server started","port":3000}
 
 # Explicit
 LOG_FORMAT=json bun run app
