@@ -1,6 +1,6 @@
 # Near-Zero Cost Logging
 
-Optional chaining skips argument evaluation when a level is disabled. For trivial arguments, the difference is negligible (~0.2ns). For expensive arguments (string interpolation, JSON serialization, computed values), the win is typically **10x+** because the work is never done.
+Optional chaining skips argument evaluation when a level is disabled. For trivial arguments, the difference is negligible (~0.2ns). For expensive arguments (string interpolation, JSON serialization, computed values), the win is [**~22x**](/guide/benchmarks) because the work is never done.
 
 ## How It Works
 
@@ -79,7 +79,7 @@ log.debug?.("msg") // Correct
 
 ## Performance Numbers
 
-10M iterations, Bun 1.1.x, M1 Mac:
+See [Benchmarks](/guide/benchmarks) for detailed methodology and full results.
 
 | Pattern           | Cheap args | Expensive args |
 | ----------------- | ---------- | -------------- |

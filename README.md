@@ -85,7 +85,7 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 - **Error cause chains** -- `log.error?.(err)` serializes `Error.cause` recursively (up to 3 levels).
 - **Worker threads** -- pipeline-based: `createWorkerLogger(postMessage, "ns")` on worker, `createWorkerLogHandler()` on main. Same events, same pipeline.
 - **OpenTelemetry bridge** -- `toOtel({ api })` stage forwards events to any OTLP backend. Transparent: events pass through to subsequent pipeline elements.
-- **Pino transport compatible** -- any `{ write }` object receives raw Event objects by default. Plug in Pino transports directly.
+- **Pino transport compatible** -- works with object-mode writable sinks (compatible with Pino transport interface). Events use Loggily's record shape.
 - **Span metrics** -- `{ metrics: true }` in config auto-creates a collector on `log.metrics` (p50/p95/p99). Or use `withMetrics(collector)` for shared/custom collectors.
 - **Head-based sampling** -- `setSampleRate(0.1)` to sample 10% of traces.
 - **Composable plugins** -- `pipe(baseCreateLogger, withSpans(), myPlugin())` to build custom factories.
@@ -104,12 +104,12 @@ log.debug?.("cache hit", { key: "user:42" })
 log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 
 // Child loggers
-const db = log.child("db", { pool: "main" }) // namespace: "myapp:db"
+const dbLog = log.child("db", { pool: "main" }) // namespace: "myapp:db"
 
 // Spans -- time any operation
 {
-  using span = db.span("query", { table: "users" })
-  const users = await db.query("SELECT * FROM users")
+  using span = dbLog.span("query", { table: "users" })
+  const users = await queryUsers() // your DB call
   span.spanData.count = users.length
 }
 // → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
@@ -155,7 +155,7 @@ for (const [name, s] of log.metrics.all()) {
 
 ### Composition with plugins
 
-`createLogger` is `pipe(baseCreateLogger, withEnvDefaults(), withSpans())`. For full manual control:
+`createLogger` is `pipe(baseCreateLogger, withEnvDefaults(), withSpans(), withConfigMetrics())`. For full manual control:
 
 ```typescript
 import { baseCreateLogger, pipe, withSpans, withEnvDefaults } from "loggily"
@@ -231,7 +231,7 @@ Key types exported for power users:
 
 - **OpenTelemetry** -- `toOtel({ api })` forwards to Jaeger, Grafana, Datadog, or any OTLP backend
 - **Sentry** -- capture errors via a 3-line stage function
-- **Pino transports** -- any `{ write }` object receives raw Events by default
+- **Pino transports** -- works with object-mode writable sinks (compatible with Pino transport interface)
 - **Elasticsearch / OpenSearch** -- post JSON events directly
 - **AWS CloudWatch** -- writable calling `putLogEvents`
 - **Prometheus** -- expose `log.metrics` as a `/metrics` endpoint

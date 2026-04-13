@@ -25,7 +25,7 @@ When `debug` is disabled, `log.debug` is `undefined`. JavaScript's `?.` operator
 
 ## Benchmarks
 
-10M iterations, Bun 1.1.x, M1 Mac:
+See [Benchmarks](/guide/benchmarks) for detailed methodology. Summary:
 
 | Scenario                               | ops/s    | ns/op   |
 | -------------------------------------- | -------- | ------- |
@@ -34,13 +34,13 @@ When `debug` is disabled, `log.debug` is `undefined`. JavaScript's `?.` operator
 | Traditional noop (expensive args)      | 17M      | 57.6    |
 | **Optional chaining (expensive args)** | **408M** | **2.5** |
 
-For cheap arguments the overhead is ~0.2ns -- negligible. For expensive arguments, **22x faster**.
+For cheap arguments the overhead is ~0.2ns -- negligible. For expensive arguments, **~22x faster**.
 
 ## What Loggily Does
 
 | Feature            | Loggily     |
 | ------------------ | ----------- |
-| Near-zero disabled | `?.` (22x)  |
+| Near-zero disabled | `?.` (~22x) |
 | Built-in spans     | Yes         |
 | Debug namespaces   | Yes         |
 | Structured JSON    | Yes         |
@@ -49,7 +49,7 @@ For cheap arguments the overhead is ~0.2ns -- negligible. For expensive argument
 | Worker threads     | Yes         |
 | Config pipeline    | Array-based |
 
-Loggily is a superset of `debug` -- compatible with the same `DEBUG=` env var and namespace patterns -- plus levels, structured data, spans, and JSON output. It works with Pino transports via custom stages, and is `DEBUG=` compatible with the debug package. See [Comparison](/guide/comparison) for details.
+Loggily is compatible with the `debug` package's `DEBUG=` namespace syntax -- same env var, same patterns -- plus levels, structured data, spans, and JSON output. It works with object-mode writable sinks (compatible with the Pino transport interface). See [Comparison](/guide/comparison) for details.
 
 ## Design Principles
 

@@ -4,13 +4,15 @@
 
 ### Core
 
-| Export                            | Description                                                            |
-| --------------------------------- | ---------------------------------------------------------------------- |
-| `createLogger(name, config?)`     | Create a conditional logger (includes `withEnvDefaults`)               |
-| `baseCreateLogger(name, config?)` | Base logger factory without `withEnvDefaults` — for manual composition |
-| `createTestLogger(name)`          | Test helper — all levels enabled, console output                       |
-| `pipe(base, ...plugins)`          | Pipe a logger factory through plugins (left-to-right)                  |
-| `withEnvDefaults()`               | Plugin: read defaults from env vars (included by default)              |
+| Export                            | Description                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| `createLogger(name, config?)`     | Create a conditional logger (includes `withEnvDefaults`, `withSpans`, `withConfigMetrics`) |
+| `baseCreateLogger(name, config?)` | Base logger factory without `withEnvDefaults()` or `withSpans()` — for manual composition  |
+| `createTestLogger(name)`          | Test helper — all levels enabled, console output                                           |
+| `pipe(base, ...plugins)`          | Pipe a logger factory through plugins (left-to-right)                                      |
+| `withEnvDefaults()`               | Plugin: read defaults from env vars (included by default)                                  |
+| `withSpans()`                     | Plugin: enable `.span()` capability (included by default)                                  |
+| `withConfigMetrics()`             | Plugin: enable `{ metrics: true }` in config (included by default)                         |
 
 `baseCreateLogger` does NOT include `withSpans()` or `withEnvDefaults()`. Use it when you want full manual control over plugin composition:
 
@@ -18,21 +20,21 @@
 import { baseCreateLogger, pipe, withSpans, withEnvDefaults } from "loggily"
 
 // Manual composition — choose exactly which plugins to include
-const myCreateLogger = pipe(baseCreateLogger, withSpans(), withEnvDefaults())
+const myCreateLogger = pipe(baseCreateLogger, withEnvDefaults(), withSpans())
 ```
 
 ### Config Array Elements
 
 The second argument to `createLogger` is an optional config array:
 
-| Element Type   | Example                                                        | Description                         |
-| -------------- | -------------------------------------------------------------- | ----------------------------------- |
-| Config object  | `{ level: "debug", ns: "-sql", format: "json", spans: false }` | Set scope for subsequent elements   |
-| `console`      | `console` or `"console"`                                       | Console output at current scope     |
-| File sink      | `{ file: "/path", level?, ns?, format? }`                      | File output with optional overrides |
-| Stage function | `(event) => event \| null \| void`                             | Transform, filter, or enrich events |
-| Branch array   | `[{ ns: "metrics" }, { file: "/tmp/m.log" }]`                  | Sub-pipeline with own scope         |
-| Writable       | `{ write: (s: string) => void }`                               | Any writable stream                 |
+| Element Type   | Example                                                        | Description                                                               |
+| -------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Config object  | `{ level: "debug", ns: "-sql", format: "json", spans: false }` | Set scope for subsequent elements                                         |
+| `console`      | `console` or `"console"`                                       | Console output at current scope                                           |
+| File sink      | `{ file: "/path", level?, ns?, format? }`                      | File output with optional overrides                                       |
+| Stage function | `(event) => event \| null \| void`                             | Transform, filter, or enrich events                                       |
+| Branch array   | `[{ ns: "metrics" }, { file: "/tmp/m.log" }]`                  | Sub-pipeline with own scope                                               |
+| Writable       | `{ write: (data) => void, objectMode?: boolean }`              | Receives raw Event objects by default; Node streams get formatted strings |
 
 ### Pipeline (power users)
 

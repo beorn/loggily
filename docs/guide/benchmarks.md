@@ -36,7 +36,7 @@ When debug logging is disabled but arguments require evaluation (JSON.stringify)
 | debug           |       7M |   153.3 |      64x |
 | winston         |       1M |   774.6 |     323x |
 
-**Loggily is 31x faster than pino** for disabled calls with expensive arguments. The `?.` pattern skips argument evaluation entirely -- `log.debug?.(\`state: ${expensiveArg()}\`)`never calls`expensiveArg()` when debug is disabled.
+**Loggily is ~22x faster** than conventional noop loggers for disabled calls with expensive arguments. The `?.` pattern skips argument evaluation entirely -- `log.debug?.(\`state: ${expensiveArg()}\`)` never calls `expensiveArg()` when debug is disabled.
 
 This is the key insight: real-world logging often involves string interpolation, `JSON.stringify`, or computed values. The `?.` pattern eliminates this cost entirely.
 
@@ -88,7 +88,7 @@ Span create + dispose (no output):
 
 ## Key Takeaways
 
-1. **Disabled + expensive args**: Loggily's `?.` pattern is 31x faster than pino. The big win is specifically for disabled logging with expensive argument construction (string interpolation, JSON serialization, computed values).
+1. **Disabled + expensive args**: Loggily's `?.` pattern is ~22x faster than conventional noop loggers. The big win is specifically for disabled logging with expensive argument construction (string interpolation, JSON serialization, computed values). See [Benchmarks](/guide/benchmarks) for details.
 2. **Disabled + cheap args**: Pino is faster due to no Proxy overhead. Both are sub-microsecond -- the difference is negligible in practice.
 3. **Enabled + cheap args**: Loggily is ~1.3x faster than pino when both write to the same kind of noop sink.
 4. **Enabled + structured data**: Loggily and pino are comparable.

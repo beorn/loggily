@@ -16,12 +16,15 @@ const log = createLogger("myapp", [
 
 ### Config Object Keys
 
-| Key      | Type                  | Description                               |
-| -------- | --------------------- | ----------------------------------------- |
-| `level`  | `LogLevel`            | Minimum log level                         |
-| `ns`     | `string \| string[]`  | Namespace filter pattern                  |
-| `format` | `"console" \| "json"` | Output format                             |
-| `spans`  | `boolean`             | Enable/disable span output (per-pipeline) |
+| Key          | Type                  | Description                                                |
+| ------------ | --------------------- | ---------------------------------------------------------- |
+| `level`      | `LogLevel`            | Minimum log level                                          |
+| `ns`         | `string \| string[]`  | Namespace filter pattern                                   |
+| `format`     | `"console" \| "json"` | Output format                                              |
+| `spans`      | `boolean`             | Enable/disable span output (per-pipeline)                  |
+| `metrics`    | `boolean`             | Auto-create MetricsCollector, accessible via `log.metrics` |
+| `idFormat`   | `"simple" \| "w3c"`   | Trace/span ID format (default: `"simple"`)                 |
+| `sampleRate` | `number` (0.0 -- 1.0) | Head-based trace sampling rate (default: `1.0`)            |
 
 ### Sink Object Keys
 
@@ -84,15 +87,17 @@ DEBUG='myapp:db,myapp:cache' bun run app  # Only db and cache subtrees
 
 `createLogger` includes the `withEnvDefaults()` plugin by default. When no config array is provided, it reads from environment variables:
 
-| Variable       | Values                                  | Default   |
-| -------------- | --------------------------------------- | --------- |
-| `LOG_LEVEL`    | trace, debug, info, warn, error, silent | `info`    |
-| `LOG_FORMAT`   | console, json                           | `console` |
-| `LOG_FILE`     | file path                               | (none)    |
-| `DEBUG`        | `*`, namespace prefixes, `-prefix`      | (none)    |
-| `TRACE`        | `1`, `true`, namespace prefixes         | (none)    |
-| `TRACE_FORMAT` | json                                    | (none)    |
-| `NODE_ENV`     | production                              | (none)    |
+| Variable            | Values                                  | Default   |
+| ------------------- | --------------------------------------- | --------- |
+| `LOG_LEVEL`         | trace, debug, info, warn, error, silent | `info`    |
+| `LOG_FORMAT`        | console, json                           | `console` |
+| `LOG_FILE`          | file path                               | (none)    |
+| `DEBUG`             | `*`, namespace prefixes, `-prefix`      | (none)    |
+| `TRACE`             | `1`, `true`, namespace prefixes         | (none)    |
+| `TRACE_FORMAT`      | json                                    | (none)    |
+| `TRACE_ID_FORMAT`   | simple, w3c                             | `simple`  |
+| `TRACE_SAMPLE_RATE` | 0.0 -- 1.0                              | `1.0`     |
+| `NODE_ENV`          | production                              | (none)    |
 
 ## Pipeline Builder (power users)
 

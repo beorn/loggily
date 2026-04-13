@@ -150,7 +150,7 @@ const log = createLogger("myapp")
 const log = createLogger("myapp", [{ level: "debug" }, console])
 ```
 
-`createLogger` = `pipe(baseCreateLogger, withEnvDefaults(), withSpans())`.
+`createLogger` = `pipe(baseCreateLogger, withEnvDefaults(), withSpans(), withConfigMetrics())`.
 
 ### baseCreateLogger(name, config?)
 
@@ -159,7 +159,7 @@ Base logger factory without `withEnvDefaults()` or `withSpans()`. Use for full m
 ```typescript
 import { baseCreateLogger, pipe, withSpans, withEnvDefaults } from "loggily"
 
-const myCreateLogger = pipe(baseCreateLogger, withSpans(), withEnvDefaults())
+const myCreateLogger = pipe(baseCreateLogger, withEnvDefaults(), withSpans())
 ```
 
 Loggers from `baseCreateLogger` do NOT have `.span()` capability -- calling `.span()` throws.
@@ -261,12 +261,12 @@ TRACE=myapp:db bun run app           # Only database spans
 ```typescript
 import { baseCreateLogger, pipe, withSpans, withEnvDefaults } from "loggily"
 
-// createLogger already includes withEnvDefaults() + withSpans()
+// createLogger already includes withEnvDefaults() + withSpans() + withConfigMetrics()
 // Pipe with custom plugins:
 const myCreateLogger = pipe(createLogger, withSentry({ dsn: "..." }))
 
 // Or build from scratch:
-const customFactory = pipe(baseCreateLogger, withSpans(), myPlugin())
+const customFactory = pipe(baseCreateLogger, withEnvDefaults(), withSpans(), myPlugin())
 ```
 
 `withEnvDefaults()` reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, `TRACE`, etc. from env vars.

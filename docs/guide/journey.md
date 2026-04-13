@@ -20,9 +20,9 @@ log.warn?.("disk space low", { free: "2GB" })
 log.error?.(new Error("connection failed"))
 ```
 
-Notice the `?.` -- if a log level is disabled, the entire call is skipped, including argument evaluation. For trivial arguments the overhead difference is negligible, but for real-world logging with string interpolation and serialization, this is typically **10x+ faster** because it skips the work entirely.
+Notice the `?.` -- if a log level is disabled, the entire call is skipped, including argument evaluation. For trivial arguments the overhead difference is negligible, but for real-world logging with string interpolation and serialization, this is [**~22x faster**](/guide/benchmarks) because it skips the work entirely.
 
-Colorized in your terminal, with source locations:
+Colorized in your terminal:
 
 ```
 14:32:15 INFO myapp server started {port: 3000}
@@ -240,7 +240,7 @@ Normally, you'd pull in one library for logs, another for debug prints, a tracin
 
 At this point you've replaced that patchwork with a single library:
 
-- **Structured logging** with levels, namespaces, colorized dev output, JSON production output, and source locations
+- **Structured logging** with levels, namespaces, colorized dev output, JSON production output
 - **Debug output** with `DEBUG=namespace:*` filtering -- compatible with the debug package's patterns, integrated
 - **Span timing** with `using` keyword, nested traces, and independent `TRACE=` control
 - **Composable output** via the config array -- console, file, custom stages, branches

@@ -112,7 +112,7 @@ log.debug(`state: ${computeState()}`)
 // Loggily -- built-in
 {
   using span = log.span("db:query", { table: "users" })
-  const users = await db.query("SELECT * FROM users")
+  const users = await queryUsers() // your DB call
   span.spanData.count = users.length
 }
 // SPAN myapp:db:query (45ms) {count: 100, table: "users"}

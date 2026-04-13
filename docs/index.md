@@ -21,11 +21,11 @@ features:
   - title: "Send Anywhere"
     details: "OpenTelemetry, Datadog, Grafana, Jaeger, Sentry, Elasticsearch, CloudWatch, Prometheus — via OTEL bridge, writable sinks, or stage functions. See Destinations."
   - title: "Pino + debug Compatible"
-    details: "Any Pino transport works as a writable sink. DEBUG= namespace patterns work the same as the debug package. Drop-in for existing setups."
+    details: "Works with object-mode writable sinks (compatible with Pino transport interface). DEBUG= namespace patterns work the same as the debug package. Drop-in for existing setups."
   - title: "Worker Threads + Metrics"
     details: "Pipeline-based worker logging via postMessage. Span metrics with p50/p95/p99 aggregation. Async context propagation via AsyncLocalStorage."
   - title: "Composable, Unified"
-    details: "One pipeline replaces debug + JSON logger + tracing SDK. Extend with pipe(baseCreateLogger, withSpans(), myPlugin()). Config arrays for branching: objects configure, arrays branch, values write."
+    details: "One pipeline replaces debug + JSON logger + tracing SDK. Extend with pipe(baseCreateLogger, withEnvDefaults(), withSpans(), myPlugin()). Config arrays for branching: objects configure, arrays branch, values write."
   - title: "~3KB, Zero Dependencies"
     details: "Pure TypeScript, ESM-only. Runs on Node.js 23.6+, Bun 1.0+, and browsers. Dev console + production JSON from the same code."
 ---
@@ -66,12 +66,12 @@ log.debug?.("cache hit", { key: "user:42" })
 log.error?.(new Error("connection lost"))
 
 // Child loggers
-const db = log.child("db", { pool: "main" }) // namespace: "myapp:db"
+const dbLog = log.child("db", { pool: "main" }) // namespace: "myapp:db"
 
 // Spans — time any operation
 {
-  using span = db.span("query", { table: "users" })
-  const users = await db.query("SELECT * FROM users")
+  using span = dbLog.span("query", { table: "users" })
+  const users = await queryUsers() // your DB call
   span.spanData.count = users.length
 }
 // → SPAN myapp:db:query (45ms) {count: 100, table: "users"}

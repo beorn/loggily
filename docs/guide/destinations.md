@@ -11,8 +11,8 @@ import * as otelApi from "@opentelemetry/api"
 import { toOtel } from "loggily/otel"
 
 const log = createLogger("myapp", [
-  toOtel({ api: otelApi }),   // forwards logs + spans to OTLP
-  console,                    // also prints to console
+  toOtel({ api: otelApi }), // forwards logs + spans to OTLP
+  console, // also prints to console
 ])
 ```
 
@@ -38,7 +38,7 @@ const log = createLogger("myapp", [
 
 ## Pino Transports
 
-Any Pino transport works as a writable — Events are raw objects by default:
+Object-mode writable sinks are compatible with the Pino transport interface — Events are raw objects by default:
 
 ```typescript
 import { pino } from "pino"
@@ -54,13 +54,15 @@ Post JSON events directly:
 
 ```typescript
 const log = createLogger("myapp", [
-  { write: (event) => {
-    fetch("http://localhost:9200/logs/_doc", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...event, "@timestamp": new Date(event.time).toISOString() }),
-    })
-  }},
+  {
+    write: (event) => {
+      fetch("http://localhost:9200/logs/_doc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...event, "@timestamp": new Date(event.time).toISOString() }),
+      })
+    },
+  },
   console,
 ])
 ```
@@ -73,13 +75,17 @@ import { CloudWatchLogsClient, PutLogEventsCommand } from "@aws-sdk/client-cloud
 const cw = new CloudWatchLogsClient({})
 
 const log = createLogger("myapp", [
-  { write: (event) => {
-    cw.send(new PutLogEventsCommand({
-      logGroupName: "/app/myapp",
-      logStreamName: "main",
-      logEvents: [{ timestamp: event.time, message: JSON.stringify(event) }],
-    }))
-  }},
+  {
+    write: (event) => {
+      cw.send(
+        new PutLogEventsCommand({
+          logGroupName: "/app/myapp",
+          logStreamName: "main",
+          logEvents: [{ timestamp: event.time, message: JSON.stringify(event) }],
+        }),
+      )
+    },
+  },
   console,
 ])
 ```
@@ -125,14 +131,16 @@ const log = createLogger("myapp", [
 
 ```typescript
 const log = createLogger("myapp", [
-  { write: (event) => {
-    if (event.kind === "log" && event.level === "error") {
-      fetch("https://hooks.slack.com/services/...", {
-        method: "POST",
-        body: JSON.stringify({ text: `🚨 ${event.namespace}: ${event.message}` }),
-      })
-    }
-  }},
+  {
+    write: (event) => {
+      if (event.kind === "log" && event.level === "error") {
+        fetch("https://hooks.slack.com/services/...", {
+          method: "POST",
+          body: JSON.stringify({ text: `🚨 ${event.namespace}: ${event.message}` }),
+        })
+      }
+    },
+  },
   console,
 ])
 ```
