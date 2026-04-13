@@ -21,7 +21,7 @@ features:
     linkText: "See benchmarks"
   - icon: 🔭
     title: "All-in-One Observability"
-    details: "One API replaces debug, your JSON logger, and metrics and traces. Namespace filtering, structured logs, spans, metrics, worker threads, and async context — ~3 KB, zero dependencies."
+    details: "One API replaces debug, your JSON logger, and your tracing SDK. Structured logs, namespace filtering, spans with trace IDs, metrics, worker threads, and async context propagation — ~3 KB, zero dependencies."
     link: /guide/journey
     linkText: "Get started"
   - icon: 🌐
