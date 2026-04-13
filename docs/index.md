@@ -2,9 +2,9 @@
 layout: home
 
 hero:
-  name: "Loggily"
-  text: "Clarity without the clutter"
-  tagline: "Debugs, logs, and spans — structured and dev, server and browser — one TypeScript API. No output, no overhead."
+  name:"Loggily"
+  text:"Clarity without the clutter"
+  tagline:"Debugs, logs, and spans — structured and dev, server and browser — one TypeScript API. No output, no overhead."
   actions:
     - theme: brand
       text: Get Started
@@ -15,36 +15,36 @@ hero:
 
 features:
   - icon: ⚡
-    title: "Free If Silenced"
-    details: "The optional chaining trick makes disabled log calls truly free — the entire call short-circuits, so not even the arguments evaluate. ~22x faster than noop loggers."
+    title:"Free If Silenced"
+    details:"The optional chaining trick makes disabled log calls truly free — the entire call short-circuits, so not even the arguments evaluate. ~22x faster than noop loggers."
     link: /guide/benchmarks
-    linkText: "See benchmarks "
+    linkText: "See benchmarks"
   - icon: 🔭
-    title: "All-in-One Observability"
-    details: "One API replaces debug, your JSON logger, and ad-hoc timers. Namespace filtering, structured logs, spans, metrics, worker threads, and async context — ~3 KB, zero dependencies."
+    title:"All-in-One Observability"
+    details:"One API replaces debug, your JSON logger, and ad-hoc timers. Namespace filtering, structured logs, spans, metrics, worker threads, and async context — ~3 KB, zero dependencies."
     link: /guide/journey
-    linkText: "Get started "
+    linkText: "Get started"
   - icon: 🌐
-    title: "Works Everywhere"
-    details: "Same API in browser and server (Node.js, Bun). Beautiful colorized logs in development, performant structured JSON in production — no compromise."
+    title:"Works Everywhere"
+    details:"Same API in browser and server (Node.js, Bun). Beautiful colorized logs in development, performant structured JSON in production — no compromise."
     link: /guide/comparison
-    linkText: "See comparison "
+    linkText: "See comparison"
   - icon: 🔌
-    title: "Send Anywhere"
-    details: "Console, files, OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus — or write your own sink."
+    title:"Send Anywhere"
+    details:"Console, files, OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus — or write your own sink."
     link: /guide/destinations
-    linkText: "See all destinations "
+    linkText: "See all destinations"
 ---
 
 ## Quick Look
 
 ```typescript
-import { createLogger } from "loggily"
+import { createLogger } from"loggily"
 
 const log = createLogger("myapp") // zero config — reads LOG_LEVEL, DEBUG from env
 
 log.info?.("server started", { port: 3000 })
-log.debug?.("cache hit", { key: "user:42" })
+log.debug?.("cache hit", { key:"user:42" })
 log.error?.(new Error("connection lost"))
 ```
 
@@ -81,16 +81,16 @@ $ TRACE=1 node app                          # enable span timing
 ```
 
 ```typescript
-import { createLogger } from "loggily"
-import { toOtel } from "loggily/otel"
+import { createLogger } from"loggily"
+import { toOtel } from"loggily/otel"
 
 // Config pipeline — objects configure, arrays branch, values write
 const log = createLogger("myapp", [
-  { level: "debug", metrics: true },     // config object — sets scope
+  { level:"debug", metrics: true },     // config object — sets scope
   toOtel({ api: otelApi }),              // stage — forwards to Jaeger/Grafana/Datadog
   pinoTransport,                         // writable — { write } receives events
-  { file: "...", format: "json" },       // file sink — formatted strings
-  [{ level: "warn" }, { file: "..." }],  // branch — sub-pipeline with own scope
+  { file:"...", format:"json" },       // file sink — formatted strings
+  [{ level:"warn" }, { file:"..." }],  // branch — sub-pipeline with own scope
   console,                               // colorized dev output, JSON in production
 ])
 
@@ -100,16 +100,16 @@ log.debug?.(`state: ${expensiveFunc()}`) // skipped if debug off
 log.error?.(new Error("connection lost"))
 
 // Child loggers — extend namespace, add context
-const dbLog = log.child("db", { pool: "main" }) // namespace: "myapp:db"
+const dbLog = log.child("db", { pool:"main" }) // namespace:"myapp:db"
 
 // Spans — time any operation, auto-track parent/child + trace IDs
 // AsyncLocalStorage propagation: logs in async chains inherit span context
 {
-  using span = dbLog.span("query", { table: "users" })
+  using span = dbLog.span("query", { table:"users" })
   const users = await queryUsers() // logs inside queryUsers() get trace IDs
   span.spanData.count = users.length
 }
-// → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
+// → SPAN myapp:db:query (45ms) {count: 100, table:"users"}
 
 // Metrics — p50/p95/p99 from spans
 log.metrics.summary() // myapp:db:query: 42 spans, mean=3.2ms, p95=8.4ms
