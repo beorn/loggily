@@ -39,12 +39,12 @@ features:
 ## Quick Look
 
 ```typescript
-import { createLogger } from"loggily"
+import { createLogger } from "loggily"
 
 const log = createLogger("myapp") // zero config — reads LOG_LEVEL, DEBUG from env
 
 log.info?.("server started", { port: 3000 })
-log.debug?.("cache hit", { key:"user:42" })
+log.debug?.("cache hit", { key: "user:42" })
 log.error?.(new Error("connection lost"))
 ```
 
@@ -81,16 +81,16 @@ $ TRACE=1 node app                          # enable span timing
 ```
 
 ```typescript
-import { createLogger } from"loggily"
-import { toOtel } from"loggily/otel"
+import { createLogger } from "loggily"
+import { toOtel } from "loggily/otel"
 
 // Config pipeline — objects configure, arrays branch, values write
 const log = createLogger("myapp", [
-  { level:"debug", metrics: true },     // config object — sets scope
+  { level: "debug", metrics: true },     // config object — sets scope
   toOtel({ api: otelApi }),              // stage — forwards to Jaeger/Grafana/Datadog
   pinoTransport,                         // writable — { write } receives events
-  { file:"...", format:"json" },       // file sink — formatted strings
-  [{ level:"warn" }, { file:"..." }],  // branch — sub-pipeline with own scope
+  { file: "...", format: "json" },       // file sink — formatted strings
+  [{ level: "warn" }, { file: "..." }],  // branch — sub-pipeline with own scope
   console,                               // colorized dev output, JSON in production
 ])
 
@@ -100,16 +100,16 @@ log.debug?.(`state: ${expensiveFunc()}`) // skipped if debug off
 log.error?.(new Error("connection lost"))
 
 // Child loggers — extend namespace, add context
-const dbLog = log.child("db", { pool:"main" }) // namespace:"myapp:db"
+const dbLog = log.child("db", { pool: "main" }) // namespace: "myapp:db"
 
 // Spans — time any operation, auto-track parent/child + trace IDs
 // AsyncLocalStorage propagation: logs in async chains inherit span context
 {
-  using span = dbLog.span("query", { table:"users" })
+  using span = dbLog.span("query", { table: "users" })
   const users = await queryUsers() // logs inside queryUsers() get trace IDs
   span.spanData.count = users.length
 }
-// → SPAN myapp:db:query (45ms) {count: 100, table:"users"}
+// → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
 
 // Metrics — p50/p95/p99 from spans
 log.metrics.summary() // myapp:db:query: 42 spans, mean=3.2ms, p95=8.4ms
