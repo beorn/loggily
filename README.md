@@ -85,6 +85,4 @@ Born from the frustration of choosing between logging and production performance
 
 **Docs:** [Get Started](https://loggily.dev/guide/journey) · [Full docs](https://loggily.dev/) · [Comparison](https://loggily.dev/guide/comparison) · [Migration from debug](https://loggily.dev/guide/migration-from-debug)
 
-> **Status:** Early release (0.x). The core API is stable, but details may evolve before 1.0.
-
 [MIT](LICENSE)
