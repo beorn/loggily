@@ -31,7 +31,7 @@ features:
     linkText: "See comparison"
   - icon: 🔌
     title: "Send Anywhere"
-    details: "Wire console, files, OpenTelemetry, Pino transports, Sentry, Elasticsearch, CloudWatch, and Prometheus in one config array — or add your own sink in a line."
+    details: "Flexible, ergonomic transport config: console, files, OpenTelemetry, Pino transports, Sentry, Elasticsearch, and more — all in one array. Add your own sink in a line."
     link: /guide/destinations
     linkText: "See all destinations"
 ---
