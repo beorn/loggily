@@ -86,3 +86,27 @@ for (const [name, s] of log.metrics.all()) {
   if (s.p95 > 100) console.warn(`${name} is slow: p95=${s.p95}ms`)
 }
 ```
+
+### Custom Writable
+
+Any object with a `write` method receives raw Event objects:
+
+```typescript
+const log = createLogger("myapp", [
+  { write: (event) => fetch("/ingest", { method: "POST", body: JSON.stringify(event) }) },
+  console,
+])
+```
+
+### Custom Stage
+
+Functions transform, filter, or enrich events inline:
+
+```typescript
+const log = createLogger("myapp", [
+  // Drop sensitive messages
+  (event) => event.kind === "log" && event.message.includes("secret") ? null : event,
+  // Tag every event with the hostname
+  (event) => ({ ...event, props: { ...event.props, host: os.hostname() } }),
+  console,
+])
