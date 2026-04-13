@@ -34,20 +34,7 @@ const dbLog = log.child("db", { pool: "main" }) // namespace: "myapp:db"
 // → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
 ```
 
-Colorized output in development (run in a terminal to see colors):
-
-```
-14:32:15 INFO  myapp server started {port: 3000}
-14:32:15 DEBUG myapp cache hit {key: "user:42"}
-14:32:15 ERROR myapp connection lost
-14:32:15 SPAN  myapp:db:query (45ms) {count: 100, table: "users"}
-```
-
-Set `NODE_ENV=production` and the same calls emit structured JSON:
-
-```json
-{"time":"2024-01-15T14:32:15.123Z","level":"info","name":"myapp","msg":"server started","port":3000}
-```
+Colorized, human-readable output in development; structured JSON in production (`NODE_ENV=production`). Same code, same calls.
 
 ## Why the `?.`
 
@@ -93,7 +80,6 @@ Objects configure, arrays branch, values write. [Full guide →](https://loggily
 - **Zero-cost disabled logs** — `?.` short-circuits the entire call. [~22x faster](https://loggily.dev/guide/benchmarks) than noop loggers.
 - **Namespace hierarchy** — `DEBUG=myapp:db` shows only database output. Same filter patterns as the `debug` package.
 - **Spans** — `using span = log.span("name")`. Duration, parent-child tracking, trace IDs, custom data. Built-in [metrics collection](https://loggily.dev/guide/metrics) (p50/p95/p99).
-- **Dev & production** — colorized console in development, structured JSON in production. Same code.
 - **Child loggers** — `log.child("auth")` extends namespace, `log.child({ requestId })` adds context.
 - **Async context** — [AsyncLocalStorage propagation](https://loggily.dev/guide/context): every log in a request's async chain inherits trace/span IDs automatically.
 - **OpenTelemetry bridge** — [`toOtel({ api })`](https://loggily.dev/guide/otel) forwards events to any OTLP backend (Jaeger, Grafana, Datadog). Transparent pass-through.
