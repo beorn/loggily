@@ -7,6 +7,18 @@
 
 Debugs, logs, and spans — one API. Replace `debug` + your JSON logger + ad-hoc timers with one namespace tree and one output pipeline. Pure TypeScript, zero dependencies, ~3 KB.
 
+```typescript
+import { createLogger } from "loggily"
+
+const log = createLogger("myapp", [{ level: "debug" }, console])
+
+log.info?.("server started", { port: 3000 })
+log.debug?.("cache hit", { key: "user:42" })
+log.error?.(new Error("connection lost"))
+```
+
+**Why the `?.`?** An [ergonomic and efficient](https://loggily.dev/guide/benchmarks) way to handle disabled logs — `?.` short-circuits the entire call, so nothing evaluates when the level is off. [~22x faster](https://loggily.dev/guide/benchmarks) than conventional noop loggers.
+
 ## Getting Started
 
 ```bash
@@ -27,7 +39,7 @@ const log = createLogger("myapp", [
   console,                               // colorized dev output, JSON in production
 ])
 
-// Structured logging — ?.  means disabled logs are free (nothing evaluates)
+// Structured logging
 log.info?.("server started", { port: 3000 })
 log.debug?.(`state: ${JSON.stringify(computeExpensiveState())}`) // skipped if debug off
 log.error?.(new Error("connection lost"))
@@ -56,7 +68,7 @@ NODE_ENV=production       # same code, structured JSON output
 TRACE=1                   # enable span output
 ```
 
-**Why the `?.`?** An [ergonomic and efficient](https://loggily.dev/guide/benchmarks) way to handle disabled logs — [~22x faster](https://loggily.dev/guide/benchmarks) than conventional noop loggers. Also supports [async context propagation](https://loggily.dev/guide/context), [worker threads](https://loggily.dev/guide/workers), and [browser](https://loggily.dev/guide/browser). ~3 KB, zero dependencies.
+Also supports [async context propagation](https://loggily.dev/guide/context), [worker threads](https://loggily.dev/guide/workers), and [browser](https://loggily.dev/guide/browser).
 
 Works with: [OpenTelemetry](https://loggily.dev/guide/otel) (Jaeger, Grafana, Datadog, any OTLP backend) · [Pino transports](https://loggily.dev/guide/destinations#pino) · Sentry · Elasticsearch · AWS CloudWatch · Prometheus · [W3C Trace Context](https://loggily.dev/guide/tracing) · [`DEBUG=` patterns](https://loggily.dev/guide/namespaces)
 
