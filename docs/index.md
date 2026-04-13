@@ -104,14 +104,14 @@ log.metrics.summary() // myapp:db:query: 42 spans, mean=3.2ms, p95=8.4ms
 const myCreateLogger = pipe(baseCreateLogger, withSpans(), myPlugin())
 ```
 
-Also supports [async context propagation](/guide/context), [worker threads](/guide/workers), and [browser](/guide/browser).
+Also supports async context propagation, [worker threads](/guide/workers), and browsers.
 
-**Works with:** [OpenTelemetry](/guide/otel) (Jaeger, Grafana, Datadog, any OTLP backend) · [Pino transports](/guide/destinations#pino) · Sentry · Elasticsearch · AWS CloudWatch · Prometheus · [W3C Trace Context](/guide/tracing) · [`DEBUG=` patterns](/guide/namespaces) · [See all destinations →](/guide/destinations)
+**Works with:** OpenTelemetry (Jaeger, Grafana, Datadog, any OTLP backend) · [Pino transports](/guide/destinations#pino) · Sentry · Elasticsearch · AWS CloudWatch · Prometheus · W3C Trace Context · `DEBUG=` patterns · [See all destinations →](/guide/destinations)
 
 ## About
 
 Born from the frustration of juggling separate systems for debug logging, structured production logs, metrics, and spans — each with its own API, config, and propagation — and then duplicating the whole setup again because browser and terminal needed completely different pipelines and destinations. Loggily unifies it all: one API, one config, one pipeline that works everywhere, without the overhead when logs are off.
 
-**Requirements:** Node.js ≥ 23.6 or Bun ≥ 1.0. ESM-only. TypeScript 5.2+ for `using` (`.end()` works on any version). [Browser supported](/guide/browser) via conditional export.
+**Requirements:** Node.js ≥ 23.6 or Bun ≥ 1.0. ESM-only. TypeScript 5.2+ for `using` (`.end()` works on any version). Browser supported via conditional export.
 
 **When not to use Loggily:** if you need auto-instrumentation (HTTP, database, gRPC) use OpenTelemetry's SDK directly; if you need log rotation or dozens of transport plugins, Pino's ecosystem is deeper.
