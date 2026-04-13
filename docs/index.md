@@ -45,19 +45,19 @@ log.error?.(new Error("connection lost"))
 ::: code-group
 
 ```console [npm]
-npm install loggily
+$ npm install loggily
 ```
 
 ```console [bun]
-bun add loggily
+$ bun add loggily
 ```
 
 ```console [pnpm]
-pnpm add loggily
+$ pnpm add loggily
 ```
 
 ```console [yarn]
-yarn add loggily
+$ yarn add loggily
 ```
 
 :::
