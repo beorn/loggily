@@ -16,7 +16,7 @@ hero:
 features:
   - icon: ⚡
     title: "Free If Silenced"
-    details: "The optional chaining trick makes disabled log calls virtually free — the entire call short-circuits, so not even the arguments evaluate. ~22x faster than noop loggers."
+    details: "The optional chaining trick makes disabled log calls practically free — the entire call short-circuits, so not even the arguments evaluate. ~22x faster than noop loggers."
     link: /guide/benchmarks
     linkText: "See benchmarks"
   - icon: 🔭
