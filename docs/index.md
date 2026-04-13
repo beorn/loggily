@@ -16,16 +16,16 @@ hero:
 features:
   - icon: ⚡
     title: "Free If Silenced"
-    details: "The optional chaining trick short-circuits disabled log calls entirely — not just the log call, but all argument evaluation too. ~22x faster than conventional noop loggers in benchmarks."
+    details: "The optional chaining trick makes disabled log calls truly free — the entire call short-circuits, so not even the arguments evaluate. That's ~22x faster than conventional noop loggers."
   - icon: 🔭
     title: "All-in-One Observability"
-    details: "Replace debug + your JSON logger + ad-hoc timers with one API. <b>Namespace filtering</b>, <b>structured logs</b>, <b>spans</b> with trace IDs, <b>metrics</b> (p50/p95/p99), <b>worker threads</b>, <b>AsyncLocalStorage</b> propagation. ~3 KB, zero dependencies."
+    details: "One API replaces debug, your JSON logger, and ad-hoc timers. You get namespace filtering, structured logs, spans with trace IDs, metrics (p50/p95/p99), worker threads, and AsyncLocalStorage propagation — all in ~3 KB with zero dependencies."
   - icon: 🌐
     title: "Works Everywhere"
-    details: "<b>Browser</b> and <b>server</b> (Node.js, Bun) — same API, same config. <b>Beautiful colorized dev logs</b> and <b>performant structured prod logs</b> — same code, no compromise. Switch with NODE_ENV."
+    details: "Same API in browser and server (Node.js, Bun). Beautiful colorized logs in development, performant structured JSON in production — same code, no compromise. Just set NODE_ENV."
   - icon: 🔌
     title: "Send Anywhere"
-    details: "OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus, W3C Trace Context. Same DEBUG= patterns as the debug package."
+    details: "Console, files, OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus, W3C Trace Context — or write your own sink. Same DEBUG= patterns as the debug package."
 ---
 
 ## Quick Look
