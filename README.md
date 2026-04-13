@@ -75,7 +75,7 @@ Also supports [async context propagation](https://loggily.dev/guide/context), [w
 
 ## About
 
-Born from the frustration of juggling separate systems for debug logging, structured production logs, metrics, and spans — each with its own API, config, and propagation. Loggily unifies them into one namespace tree and one output pipeline, with structured JSON for production and beautiful colorized output for development — in both browser and terminal — without the overhead when logs are off.
+Born from the frustration of juggling separate systems for debug logging, structured production logs, metrics, and spans — each with its own API, config, and propagation — and then duplicating the whole setup again because browser and terminal needed completely different pipelines and destinations. Loggily unifies it all: one API, one config, one pipeline that works everywhere, without the overhead when logs are off.
 
 **Requirements:** Node.js ≥ 23.6 or Bun ≥ 1.0. ESM-only. TypeScript 5.2+ for `using` (`.end()` works on any version). [Browser supported](https://loggily.dev/guide/browser) via conditional export.
 
