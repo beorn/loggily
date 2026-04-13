@@ -7,7 +7,7 @@
 
 **Debugs, logs, and spans — structured and dev, server and browser — one API.**
 
-Replace `debug` + your JSON logger + ad-hoc timers with one namespace tree and one output pipeline. Pure TypeScript, zero dependencies, ~3 KB.
+Replace `debug` + `pino`/`winston` + ad-hoc timers with one namespace tree and one output pipeline. Pure TypeScript, zero dependencies, ~3 KB.
 
 ```typescript
 import { createLogger } from "loggily"
