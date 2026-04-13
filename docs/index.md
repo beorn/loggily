@@ -57,16 +57,19 @@ yarn add loggily
 ```typescript
 import { createLogger } from "loggily"
 import { toOtel } from "loggily/otel"
-import { spanStats } from "loggily/metrics"
+import { withMetrics, createMetricsCollector } from "loggily/metrics"
 import * as otelApi from "@opentelemetry/api"
 
 // One pipeline: console + OTEL + a Pino transport
-const log = createLogger("myapp", [
-  { level: "debug" },
-  toOtel({ api: otelApi }),
-  { write: (event) => pinoTransport.write(event), objectMode: true },
-  console,
-])
+const collector = createMetricsCollector()
+const log = withMetrics(collector)(
+  createLogger("myapp", [
+    { level: "debug" },
+    toOtel({ api: otelApi }),
+    { write: (event) => pinoTransport.write(event), objectMode: true },
+    console,
+  ]),
+)
 
 // Structured logging — ?. skips everything when the level is disabled
 log.info?.("server started", { port: 3000 })
@@ -82,8 +85,8 @@ log.error?.(new Error("connection lost"))
 // → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
 // → also forwarded to OTLP backend and Pino transport
 
-// Metrics — spans are auto-recorded, check p50/p95/p99 any time
-for (const [name, s] of spanStats()) {
+// Metrics — check p50/p95/p99 from explicit collector
+for (const [name, s] of collector.all()) {
   if (s.p95 > 100) console.warn(`${name} is slow: p95=${s.p95}ms`)
 }
 ```

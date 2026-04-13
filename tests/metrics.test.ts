@@ -1,16 +1,8 @@
 import { describe, test, expect, beforeEach, vi, afterEach } from "vitest"
 import { createLogger, enableSpans, disableSpans, setLogLevel, setTraceFilter } from "../src/index.ts"
-import {
-  createMetricsCollector,
-  withMetrics,
-  spanStats,
-  spanSummary,
-  resetSpanStats,
-  type MetricsCollector,
-} from "../src/metrics.ts"
+import { createMetricsCollector, withMetrics, type MetricsCollector } from "../src/metrics.ts"
 
 beforeEach(() => {
-  resetSpanStats()
   enableSpans()
   setLogLevel("trace")
   setTraceFilter(null)
@@ -75,36 +67,35 @@ describe("createMetricsCollector", () => {
   })
 })
 
-describe("ambient collector", () => {
-  test("auto-records spans when TRACE is on", () => {
-    // Suppress console output
+describe("withMetrics (explicit collector)", () => {
+  test("records spans to the provided collector", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
-    const log = createLogger("test:ambient")
+    const collector = createMetricsCollector()
+    const log = withMetrics(collector)(createLogger("test:explicit"))
     {
       using span = log.span?.("op")
       span!.spanData.x = 1
     }
 
-    const stats = spanStats()
-    expect(stats.has("test:ambient:op")).toBe(true)
-    expect(stats.get("test:ambient:op")!.count).toBe(1)
+    const stats = collector.all()
+    expect(stats.has("test:explicit:op")).toBe(true)
+    expect(stats.get("test:explicit:op")!.count).toBe(1)
   })
 
-  test("spanSummary returns formatted text", () => {
+  test("collector summary returns formatted text", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
-    const log = createLogger("test:summary")
+    const collector = createMetricsCollector()
+    const log = withMetrics(collector)(createLogger("test:summary"))
     {
       using _span = log.span?.("work")
     }
 
-    const text = spanSummary()
+    const text = collector.summary()
     expect(text).toContain("test:summary:work")
   })
-})
 
-describe("withMetrics", () => {
   test("records to custom collector", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
@@ -116,19 +107,6 @@ describe("withMetrics", () => {
 
     expect(collector.stats("test:custom:op")).toBeDefined()
     expect(collector.stats("test:custom:op")!.count).toBe(1)
-  })
-
-  test("default (no arg) uses ambient collector", () => {
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
-
-    const log = withMetrics()(createLogger("test:default"))
-    {
-      using _span = log.span?.("op")
-    }
-
-    // Should appear in ambient stats
-    const stats = spanStats()
-    expect(stats.has("test:default:op")).toBe(true)
   })
 
   test("stacks — fan-out to multiple collectors", () => {
@@ -166,7 +144,6 @@ describe("withMetrics", () => {
     {
       using _span = log.span?.("op")
     }
-    // The ambient recorder still fires, but that's fine — it's just data collection
     // The key property: no span OUTPUT is produced
   })
 })

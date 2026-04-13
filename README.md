@@ -86,7 +86,7 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 - **Worker threads** -- pipeline-based: `createWorkerLogger(postMessage, "ns")` on worker, `createWorkerLogHandler()` on main. Same events, same pipeline.
 - **OpenTelemetry bridge** -- `toOtel({ api })` stage forwards events to any OTLP backend. Transparent: events pass through to subsequent pipeline elements.
 - **Pino transport compatible** -- writable sinks with `objectMode: true` receive raw Event objects. Use any Pino transport as a pipeline destination.
-- **Span metrics** -- `spanStats()` gives aggregated p50/p95/p99 per span name. Ambient or explicit via `withMetrics()`.
+- **Span metrics** -- `withMetrics(collector)` gives aggregated p50/p95/p99 per span name via explicit collectors.
 - **Head-based sampling** -- `setSampleRate(0.1)` to sample 10% of traces.
 - **Composable plugins** -- `pipe(baseCreateLogger, withSpans(), myPlugin())` to build custom factories.
 - **Browser support** -- bundlers auto-select the browser entry point via `browser` condition.
@@ -97,19 +97,22 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 ```typescript
 import { createLogger } from "loggily"
 import { toOtel } from "loggily/otel"
-import { spanStats } from "loggily/metrics"
+import { withMetrics, createMetricsCollector } from "loggily/metrics"
 import * as otelApi from "@opentelemetry/api"
 
 // --- 1. Create a logger with a pipeline ---
 
-const log = createLogger("myapp", [
-  { level: "debug" },
-  toOtel({ api: otelApi }),                                    // forward to OTLP
-  { write: (event) => pinoTransport.write(event), objectMode: true },  // Pino transport
-  { file: "/tmp/app.log", format: "json" },                   // JSON file
-  [{ level: "error" }, { file: "/tmp/errors.log" }],           // errors branch
-  console,                                                     // dev console
-])
+const collector = createMetricsCollector()
+const log = withMetrics(collector)(
+  createLogger("myapp", [
+    { level: "debug" },
+    toOtel({ api: otelApi }), // forward to OTLP
+    { write: (event) => pinoTransport.write(event), objectMode: true }, // Pino transport
+    { file: "/tmp/app.log", format: "json" }, // JSON file
+    [{ level: "error" }, { file: "/tmp/errors.log" }], // errors branch
+    console, // dev console
+  ]),
+)
 
 // --- 2. Log ---
 
@@ -119,7 +122,7 @@ log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 
 // --- 3. Child loggers ---
 
-const db = log.child("db", { pool: "main" })   // namespace: "myapp:db"
+const db = log.child("db", { pool: "main" }) // namespace: "myapp:db"
 db.info?.("connected")
 
 // --- 4. Spans ---
@@ -134,7 +137,7 @@ db.info?.("connected")
 
 // --- 5. Metrics ---
 
-for (const [name, s] of spanStats()) {
+for (const [name, s] of collector.all()) {
   if (s.p95 > 100) console.warn(`${name} is slow: p95=${s.p95}ms`)
 }
 ```
@@ -142,7 +145,7 @@ for (const [name, s] of spanStats()) {
 Or start with zero config and add features as you need them:
 
 ```typescript
-const log = createLogger("myapp")  // reads LOG_LEVEL, DEBUG, TRACE from env
+const log = createLogger("myapp") // reads LOG_LEVEL, DEBUG, TRACE from env
 log.info?.("started")
 ```
 
@@ -169,15 +172,17 @@ const log = createTestLogger("test") // all levels enabled, console output
 
 ### Environment variables
 
-| Variable       | Values                                  | Default   |
-| -------------- | --------------------------------------- | --------- |
-| `LOG_LEVEL`    | trace, debug, info, warn, error, silent | `info`    |
-| `LOG_FORMAT`   | console, json                           | `console` |
-| `LOG_FILE`     | file path                               | (none)    |
-| `DEBUG`        | `*`, namespace prefixes, `-prefix`      | (none)    |
-| `TRACE`        | `1`, `true`, namespace prefixes         | (none)    |
-| `TRACE_FORMAT` | json                                    | (none)    |
-| `NODE_ENV`     | production                              | (none)    |
+| Variable            | Values                                  | Default   |
+| ------------------- | --------------------------------------- | --------- |
+| `LOG_LEVEL`         | trace, debug, info, warn, error, silent | `info`    |
+| `LOG_FORMAT`        | console, json                           | `console` |
+| `LOG_FILE`          | file path                               | (none)    |
+| `DEBUG`             | `*`, namespace prefixes, `-prefix`      | (none)    |
+| `TRACE`             | `1`, `true`, namespace prefixes         | (none)    |
+| `TRACE_FORMAT`      | json                                    | (none)    |
+| `TRACE_ID_FORMAT`   | simple, w3c                             | `simple`  |
+| `TRACE_SAMPLE_RATE` | 0.0 -- 1.0                              | `1.0`     |
+| `NODE_ENV`          | production                              | (none)    |
 
 ### Namespace filter patterns
 
@@ -216,7 +221,7 @@ Key types exported for power users:
 | `loggily/context` | AsyncLocalStorage context propagation (Node.js) |
 | `loggily/worker`  | Worker thread logger + message handlers         |
 | `loggily/otel`    | OpenTelemetry bridge (`toOtel` stage)           |
-| `loggily/metrics` | Span metrics collection (ambient + explicit)    |
+| `loggily/metrics` | Span metrics collection (explicit collectors)   |
 
 ## Compatibility
 

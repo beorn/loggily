@@ -55,12 +55,6 @@ export interface SpanRecorder {
   recordSpan(data: SpanRecord): void
 }
 
-/** @internal */
-export let _ambientRecorder: SpanRecorder | null = null
-export function _setAmbientRecorder(recorder: SpanRecorder | null): void {
-  _ambientRecorder = recorder
-}
-
 // ============ Types ============
 
 export type LazyMessage = string | (() => string)
@@ -132,7 +126,15 @@ export interface ConditionalLogger extends Disposable {
 
 // ============ ID Generation ============
 
-import { generateSpanId, generateTraceId, resetIdCounters, shouldSample } from "./tracing.js"
+import {
+  generateSpanId,
+  generateTraceId,
+  resetIdCounters,
+  shouldSample,
+  setIdFormat,
+  setSampleRate,
+} from "./tracing.js"
+import type { IdFormat } from "./tracing.js"
 
 export function resetIds(): void {
   resetIdCounters()
@@ -505,8 +507,6 @@ function createSpanMethod(
       }
 
       _exitContext?.(newSpanId)
-      _ambientRecorder?.recordSpan({ name: childName, durationMs: newSpanData.duration })
-
       if (sampled) {
         const spanEvent: SpanEvent = {
           kind: "span",
@@ -663,6 +663,19 @@ export function _setLogFileWriterFactory(factory: typeof _logFileWriterFactory):
  */
 export function withEnvDefaults(): LoggerPlugin {
   return (factory, _ctx) => (name, configOrProps?) => {
+    // Apply tracing env vars (once per logger creation, idempotent)
+    const envIdFormat = _env.TRACE_ID_FORMAT?.toLowerCase()
+    if (envIdFormat === "simple" || envIdFormat === "w3c") {
+      setIdFormat(envIdFormat as IdFormat)
+    }
+    const envSampleRate = _env.TRACE_SAMPLE_RATE
+    if (envSampleRate !== undefined) {
+      const rate = Number.parseFloat(envSampleRate)
+      if (!Number.isNaN(rate) && rate >= 0 && rate <= 1) {
+        setSampleRate(rate)
+      }
+    }
+
     // Explicit config array — pass through, buildPipeline reads env defaults
     if (Array.isArray(configOrProps)) return factory(name, configOrProps)
 

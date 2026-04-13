@@ -130,12 +130,11 @@ The stage is transparent — events pass through unchanged to subsequent pipelin
 
 ## Exports from `loggily/metrics`
 
-Span metrics collection — ambient or explicit.
+Span metrics collection via explicit collectors.
 
 | Export                     | Description                                      |
 | -------------------------- | ------------------------------------------------ |
-| `spanStats()`              | Get aggregated span stats (p50/p95/p99)          |
-| `withMetrics(collector?)`  | Plugin: attach metrics collection to a logger    |
+| `withMetrics(collector)`   | Wrap a logger to record spans to a collector     |
 | `createMetricsCollector()` | Create a standalone metrics collector            |
 | `SpanStats`                | Stats type: count, min, max, mean, p50, p95, p99 |
 

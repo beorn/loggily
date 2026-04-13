@@ -18,12 +18,18 @@ let currentIdFormat: IdFormat = "simple"
  * Set the ID format for new spans and traces.
  * - "simple": sp_1, sp_2, tr_1, tr_2 (default, lightweight)
  * - "w3c": 32-char hex trace ID, 16-char hex span ID (W3C Trace Context compatible)
+ *
+ * @deprecated Use the `TRACE_ID_FORMAT` env var or `{ idFormat: "w3c" }` in the config array instead.
  */
 export function setIdFormat(format: IdFormat): void {
   currentIdFormat = format
 }
 
-/** Get the current ID format */
+/**
+ * Get the current ID format.
+ *
+ * @deprecated Use the `TRACE_ID_FORMAT` env var or `{ idFormat: "w3c" }` in the config array instead.
+ */
 export function getIdFormat(): IdFormat {
   return currentIdFormat
 }
@@ -125,6 +131,7 @@ let sampleRate = 1.0
  * Set the head-based sampling rate for new traces.
  * Applied at trace creation — all spans within a sampled trace are kept.
  *
+ * @deprecated Use the `TRACE_SAMPLE_RATE` env var or `{ sampleRate: 0.1 }` in the config array instead.
  * @param rate - Sampling rate from 0.0 (sample nothing) to 1.0 (sample everything, default)
  */
 export function setSampleRate(rate: number): void {
@@ -134,7 +141,11 @@ export function setSampleRate(rate: number): void {
   sampleRate = rate
 }
 
-/** Get the current sampling rate */
+/**
+ * Get the current sampling rate.
+ *
+ * @deprecated Use the `TRACE_SAMPLE_RATE` env var or `{ sampleRate: 0.1 }` in the config array instead.
+ */
 export function getSampleRate(): number {
   return sampleRate
 }

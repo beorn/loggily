@@ -77,12 +77,14 @@ const log = createLogger("myapp", [
 
 ### Config Object Keys
 
-| Key      | Type                  | Description                               |
-| -------- | --------------------- | ----------------------------------------- |
-| `level`  | `LogLevel`            | Minimum log level                         |
-| `ns`     | `string \| string[]`  | Namespace filter pattern                  |
-| `format` | `"console" \| "json"` | Output format                             |
-| `spans`  | `boolean`             | Enable/disable span output (per-pipeline) |
+| Key          | Type                  | Description                                     |
+| ------------ | --------------------- | ----------------------------------------------- |
+| `level`      | `LogLevel`            | Minimum log level                               |
+| `ns`         | `string \| string[]`  | Namespace filter pattern                        |
+| `format`     | `"console" \| "json"` | Output format                                   |
+| `spans`      | `boolean`             | Enable/disable span output (per-pipeline)       |
+| `idFormat`   | `"simple" \| "w3c"`   | Trace/span ID format (default: `"simple"`)      |
+| `sampleRate` | `number` (0.0 -- 1.0) | Head-based trace sampling rate (default: `1.0`) |
 
 ### Sink Object Keys (file sinks)
 
@@ -99,15 +101,17 @@ When `objectMode: true`, the writable receives raw `Event` objects instead of fo
 
 ## Environment Variables
 
-| Variable       | Values                                  | Default   | Effect                              |
-| -------------- | --------------------------------------- | --------- | ----------------------------------- |
-| `LOG_LEVEL`    | trace, debug, info, warn, error, silent | `info`    | Filter output by level              |
-| `DEBUG`        | \*, namespace prefixes, -prefix         | (none)    | Filter output by namespace          |
-| `TRACE`        | 1, true, or namespace prefixes          | (none)    | Enable span output                  |
-| `TRACE_FORMAT` | json                                    | (none)    | Force JSON output                   |
-| `LOG_FORMAT`   | console, json                           | `console` | Override output format              |
-| `LOG_FILE`     | /path/to/file                           | (none)    | File output (default pipeline only) |
-| `NODE_ENV`     | production                              | (none)    | Auto-enable JSON format             |
+| Variable            | Values                                  | Default   | Effect                              |
+| ------------------- | --------------------------------------- | --------- | ----------------------------------- |
+| `LOG_LEVEL`         | trace, debug, info, warn, error, silent | `info`    | Filter output by level              |
+| `DEBUG`             | \*, namespace prefixes, -prefix         | (none)    | Filter output by namespace          |
+| `TRACE`             | 1, true, or namespace prefixes          | (none)    | Enable span output                  |
+| `TRACE_FORMAT`      | json                                    | (none)    | Force JSON output                   |
+| `TRACE_ID_FORMAT`   | simple, w3c                             | `simple`  | Trace/span ID format                |
+| `TRACE_SAMPLE_RATE` | 0.0 -- 1.0                              | `1.0`     | Head-based trace sampling rate      |
+| `LOG_FORMAT`        | console, json                           | `console` | Override output format              |
+| `LOG_FILE`          | /path/to/file                           | (none)    | File output (default pipeline only) |
+| `NODE_ENV`          | production                              | (none)    | Auto-enable JSON format             |
 
 ### Examples
 
@@ -355,14 +359,12 @@ const log = createLogger("myapp", [toOtel({ api: otelApi }), console])
 
 ### `loggily/metrics`
 
-Span metrics collection -- ambient or explicit:
+Span metrics collection via explicit collectors:
 
 ```typescript
-import { spanStats } from "loggily/metrics"
-// TRACE=myapp bun run app -> on exit: spanStats() returns aggregated p50/p95/p99
-
-import { withMetrics } from "loggily/metrics"
-const log = withMetrics()(createLogger("myapp"))
+import { withMetrics, createMetricsCollector } from "loggily/metrics"
+const collector = createMetricsCollector()
+const log = withMetrics(collector)(createLogger("myapp"))
 ```
 
 ## Key Types
@@ -394,6 +396,8 @@ setDebugFilter(["myapp"]) // -> set DEBUG env var
 setTraceFilter(["myapp"]) // -> set TRACE env var
 addWriter(fn) // -> use config array
 setLogFormat("json") // -> set LOG_FORMAT env var
+setIdFormat("w3c") // -> set TRACE_ID_FORMAT env var or { idFormat: "w3c" }
+setSampleRate(0.1) // -> set TRACE_SAMPLE_RATE env var or { sampleRate: 0.1 }
   .logger("auth") // -> use .child("auth")
 ```
 
@@ -401,11 +405,17 @@ setLogFormat("json") // -> set LOG_FORMAT env var
 
 ### ID Format
 
-```typescript
-import { setIdFormat } from "loggily"
+```bash
+TRACE_ID_FORMAT=w3c bun run app   # env var (recommended)
+```
 
-setIdFormat("simple") // sp_1, tr_1 (default)
-setIdFormat("w3c") // 16-char hex span, 32-char hex trace (W3C Trace Context)
+```typescript
+// Config object
+const log = createLogger("myapp", [{ idFormat: "w3c" }, console])
+
+// Deprecated setter
+import { setIdFormat } from "loggily"
+setIdFormat("w3c")
 ```
 
 ### traceparent Header
@@ -421,10 +431,17 @@ fetch(url, { headers: { traceparent: header } })
 
 ### Sampling
 
+```bash
+TRACE_SAMPLE_RATE=0.1 bun run app   # env var (recommended)
+```
+
 ```typescript
+// Config object
+const log = createLogger("myapp", [{ sampleRate: 0.1 }, console])
+
+// Deprecated setter
 import { setSampleRate } from "loggily"
-setSampleRate(0.1) // Sample 10% of traces (head-based)
-setSampleRate(1.0) // Sample everything (default)
+setSampleRate(0.1)
 ```
 
 ## Output Format
@@ -462,9 +479,9 @@ import { toOtel } from "loggily/otel"
 
 const log = createLogger("myapp", [
   { level: "info", format: "json" },
-  toOtel({ api: otelApi }),           // forward to OTLP backend
-  { file: "/var/log/app.log" },       // write JSON to file
-  [{ level: "error" }, { file: "/var/log/errors.log" }],  // errors to separate file
+  toOtel({ api: otelApi }), // forward to OTLP backend
+  { file: "/var/log/app.log" }, // write JSON to file
+  [{ level: "error" }, { file: "/var/log/errors.log" }], // errors to separate file
 ])
 ```
 
@@ -480,7 +497,7 @@ async function handleRequest(req: Request) {
   using span = log.span("request", { method: req.method, url: req.url })
 
   // All logs in this async context auto-inherit trace_id/span_id
-  const result = await processRequest(req)  // child spans auto-parent
+  const result = await processRequest(req) // child spans auto-parent
   span.spanData.status = result.status
   return result
 }
@@ -492,24 +509,21 @@ async function handleRequest(req: Request) {
 const log = createLogger("myapp", [
   // objectMode: true → receives raw Event objects, not formatted strings
   { write: (event) => pinoTransport.write(event), objectMode: true },
-  console,  // also print to console
+  console, // also print to console
 ])
 ```
 
 ### Metrics collection
 
 ```typescript
-import { spanStats, spanSummary } from "loggily/metrics"
-
-// Ambient: just import loggily/metrics and spans are auto-recorded
-// After your app runs:
-console.log(spanSummary())
-// myapp:db: 42 spans, mean=3.2ms, p50=2.1ms, p95=8.4ms, p99=12.1ms
-
-// Explicit: custom collector per logger
 import { withMetrics, createMetricsCollector } from "loggily/metrics"
+
 const collector = createMetricsCollector()
 const log = withMetrics(collector)(createLogger("myapp"))
+
+// After your app runs:
+console.log(collector.summary())
+// myapp:db: 42 spans, mean=3.2ms, p50=2.1ms, p95=8.4ms, p99=12.1ms
 ```
 
 ### Worker thread logging
@@ -550,22 +564,23 @@ const log = createLogger("myapp", [
 ```typescript
 const log = createLogger("myapp", [
   { level: "debug" },
-  console,                                           // everything to console
-  [{ ns: "myapp:metrics" }, { file: "/tmp/metrics.log", format: "json" }],  // metrics branch
-  [{ level: "error" }, { file: "/tmp/errors.log", format: "json" }],        // errors branch
+  console, // everything to console
+  [{ ns: "myapp:metrics" }, { file: "/tmp/metrics.log", format: "json" }], // metrics branch
+  [{ level: "error" }, { file: "/tmp/errors.log", format: "json" }], // errors branch
 ])
 ```
 
 ### W3C traceparent headers
 
 ```typescript
-import { setIdFormat, traceparent } from "loggily"
+import { traceparent } from "loggily"
 
-setIdFormat("w3c")  // use W3C-format IDs instead of simple sp_1/tr_1
+// Use W3C-format IDs via config (or TRACE_ID_FORMAT=w3c env var)
+const log = createLogger("myapp", [{ idFormat: "w3c" }, console])
 
 const span = log.span("outbound-request")
 fetch(url, {
-  headers: { traceparent: traceparent(span.spanData) }
+  headers: { traceparent: traceparent(span.spanData) },
 })
 ```
 

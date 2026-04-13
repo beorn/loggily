@@ -44,9 +44,7 @@ export {
   // Span metrics
   type SpanRecord,
   type SpanRecorder,
-  // Internal (used by context.ts and metrics.ts)
-  _setAmbientRecorder,
-  _ambientRecorder,
+  // Internal (used by context.ts)
   _setContextHooks,
   _clearContextHooks,
   createSpanDataProxy,

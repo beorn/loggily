@@ -1,19 +1,13 @@
 /**
  * Metrics collection for loggily spans.
  *
- * Two modes:
- * - **Ambient**: import this module → spans auto-record when TRACE is active
- * - **Explicit**: `withMetrics(collector?)(logger)` for custom collection
+ * Explicit only: `withMetrics(collector)(logger)` for custom collection.
  *
  * @example
  * ```typescript
- * import { spanStats } from "loggily/metrics"
- * // TRACE=myapp bun run app
- * // → on exit: spanStats() returns aggregated p50/p95/p99
- *
- * // Custom collector:
  * import { withMetrics, createMetricsCollector } from "loggily/metrics"
- * const log = withMetrics()(createLogger("myapp"))
+ * const collector = createMetricsCollector()
+ * const log = withMetrics(collector)(createLogger("myapp"))
  * ```
  */
 
@@ -24,8 +18,6 @@ import {
   type Logger,
   type LazyProps,
   type SpanLogger,
-  _setAmbientRecorder,
-  spansAreEnabled,
 } from "./core.js"
 
 export type { SpanRecorder, SpanRecord }
@@ -122,49 +114,22 @@ export function createMetricsCollector(maxEntries = 1000): MetricsCollector {
   }
 }
 
-// ============ Ambient Collector ============
-
-const _ambient = createMetricsCollector()
-
-// Auto-activate ambient recording.
-// Always set — the cost is one ?.recordSpan() call per span (negligible).
-// The TRACE gate already controls whether spans are *created* at all.
-_setAmbientRecorder(_ambient)
-
-/** Get aggregated span stats (from ambient collector). */
-export function spanStats(): Map<string, SpanStats> {
-  return _ambient.all()
-}
-
-/** Get the ambient collector's formatted summary. */
-export function spanSummary(): string {
-  return _ambient.summary()
-}
-
-/** Reset the ambient collector. */
-export function resetSpanStats(): void {
-  _ambient.reset()
-}
-
 // ============ withMetrics ============
 
 /**
  * Compose a logger with a metrics collector.
- * Returns a curried wrapper: `withMetrics(collector?)(logger)`
+ * Returns a curried wrapper: `withMetrics(collector)(logger)`
  *
- * - No arg: uses the built-in ambient collector
- * - Custom collector: records to your collector
- * - Stackable: `withMetrics(a)(withMetrics(b)(logger))` fans out to both
+ * Records span duration to the provided collector on span disposal.
+ * Stackable: `withMetrics(a)(withMetrics(b)(logger))` fans out to both.
  *
  * @example
  * ```typescript
- * const log = withMetrics()(createLogger("myapp"))
- * const log = withMetrics(myCollector)(createLogger("myapp"))
+ * const collector = createMetricsCollector()
+ * const log = withMetrics(collector)(createLogger("myapp"))
  * ```
  */
-export function withMetrics(collector?: SpanRecorder): (logger: ConditionalLogger) => ConditionalLogger {
-  const recorder = collector ?? _ambient
-
+export function withMetrics(collector: SpanRecorder): (logger: ConditionalLogger) => ConditionalLogger {
   return (logger: ConditionalLogger): ConditionalLogger => {
     // Wrap the logger's span method to intercept disposal
     return new Proxy(logger, {
@@ -180,7 +145,7 @@ export function withMetrics(collector?: SpanRecorder): (logger: ConditionalLogge
               originalDispose.call(span)
               // After original disposal computed duration, record it
               if (span.spanData?.duration != null) {
-                recorder.recordSpan({ name: span.name, durationMs: span.spanData.duration })
+                collector.recordSpan({ name: span.name, durationMs: span.spanData.duration })
               }
             }
             return span
@@ -190,8 +155,8 @@ export function withMetrics(collector?: SpanRecorder): (logger: ConditionalLogge
           // Child loggers inherit the metrics wrapper
           return (namespace?: string, childProps?: Record<string, unknown>): Logger => {
             const child = target.logger(namespace, childProps)
-            // Re-wrap the child — withMetrics(recorder) applied recursively
-            return withMetrics(recorder)(child as unknown as ConditionalLogger) as unknown as Logger
+            // Re-wrap the child — withMetrics(collector) applied recursively
+            return withMetrics(collector)(child as unknown as ConditionalLogger) as unknown as Logger
           }
         }
         return (target as unknown as Record<string | symbol, unknown>)[prop]

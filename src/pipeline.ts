@@ -1,5 +1,7 @@
 import { colors as pc } from "./colors.js"
 import { createFileWriter } from "./file-writer.js"
+import { setIdFormat, setSampleRate } from "./tracing.js"
+import type { IdFormat } from "./tracing.js"
 
 // ============ Types ============
 
@@ -267,7 +269,7 @@ interface Output {
 
 // ============ Discrimination ============
 
-const VALID_CONFIG_KEYS = new Set(["level", "ns", "format", "spans"])
+const VALID_CONFIG_KEYS = new Set(["level", "ns", "format", "spans", "idFormat", "sampleRate"])
 const SINK_KEYS = new Set(["file", "otel"])
 
 function isPojo(obj: unknown): obj is Record<string, unknown> {
@@ -305,6 +307,10 @@ export interface ConfigObject {
   ns?: string | string[]
   format?: LogFormat
   spans?: boolean
+  /** ID format for trace/span IDs: "simple" (default) or "w3c" (W3C Trace Context) */
+  idFormat?: "simple" | "w3c"
+  /** Head-based sampling rate for new traces: 0.0 (none) to 1.0 (all, default) */
+  sampleRate?: number
 }
 
 /** File output descriptor */
@@ -428,6 +434,8 @@ export function buildPipeline(elements: ConfigElement[], parentConfig?: Partial<
       if (obj.format === "console" || obj.format === "json") config.format = obj.format
       if (obj.spans === true) spansEnabled = true
       if (obj.spans === false) spansEnabled = false
+      if (obj.idFormat === "simple" || obj.idFormat === "w3c") setIdFormat(obj.idFormat)
+      if (typeof obj.sampleRate === "number") setSampleRate(obj.sampleRate)
       continue
     }
 

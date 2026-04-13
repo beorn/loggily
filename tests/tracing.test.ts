@@ -42,6 +42,8 @@ beforeEach(() => {
     LOG_LEVEL: process.env.LOG_LEVEL,
     LOG_FORMAT: process.env.LOG_FORMAT,
     TRACE_FORMAT: process.env.TRACE_FORMAT,
+    TRACE_ID_FORMAT: process.env.TRACE_ID_FORMAT,
+    TRACE_SAMPLE_RATE: process.env.TRACE_SAMPLE_RATE,
     NODE_ENV: process.env.NODE_ENV,
   }
   // Clean env so tests start from a known state
@@ -49,6 +51,8 @@ beforeEach(() => {
   delete process.env.DEBUG
   delete process.env.LOG_FORMAT
   delete process.env.TRACE_FORMAT
+  delete process.env.TRACE_ID_FORMAT
+  delete process.env.TRACE_SAMPLE_RATE
   delete process.env.NODE_ENV
   process.env.LOG_LEVEL = "trace"
   setIdFormat("simple")
@@ -566,6 +570,166 @@ describe("auto-tagging with context", () => {
       // Per-call data wins over context
       expect(parsed.trace_id).toBe("custom-trace")
     }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5b. Env Vars and Config Object for ID Format / Sample Rate
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("TRACE_ID_FORMAT env var", () => {
+  test("TRACE_ID_FORMAT=w3c sets W3C format via withEnvDefaults", () => {
+    process.env.TRACE_ID_FORMAT = "w3c"
+    const log = createLogger("test")
+    const span = log.span!("work")
+
+    expect(span.spanData.id).toMatch(/^[0-9a-f]{16}$/)
+    expect(span.spanData.traceId).toMatch(/^[0-9a-f]{32}$/)
+    span.end()
+  })
+
+  test("TRACE_ID_FORMAT=simple keeps simple format", () => {
+    process.env.TRACE_ID_FORMAT = "simple"
+    const log = createLogger("test")
+    const span = log.span!("work")
+
+    expect(span.spanData.id).toBe("sp_1")
+    expect(span.spanData.traceId).toBe("tr_1")
+    span.end()
+  })
+
+  test("TRACE_ID_FORMAT is case-insensitive", () => {
+    process.env.TRACE_ID_FORMAT = "W3C"
+    const log = createLogger("test")
+    const span = log.span!("work")
+
+    expect(span.spanData.id).toMatch(/^[0-9a-f]{16}$/)
+    span.end()
+  })
+
+  test("invalid TRACE_ID_FORMAT is ignored", () => {
+    process.env.TRACE_ID_FORMAT = "bogus"
+    const log = createLogger("test")
+    const span = log.span!("work")
+
+    // Falls back to simple (the default)
+    expect(span.spanData.id).toBe("sp_1")
+    span.end()
+  })
+
+  afterEach(() => {
+    delete process.env.TRACE_ID_FORMAT
+  })
+})
+
+describe("TRACE_SAMPLE_RATE env var", () => {
+  test("TRACE_SAMPLE_RATE=0.0 suppresses all span output", () => {
+    process.env.TRACE = "1"
+    process.env.TRACE_SAMPLE_RATE = "0.0"
+    const log = createLogger("test")
+
+    for (let i = 0; i < 5; i++) {
+      using span = log.span!(`work-${i}`)
+    }
+
+    expect(consoleMock.findSpans()).toHaveLength(0)
+  })
+
+  test("TRACE_SAMPLE_RATE=1.0 keeps all span output", () => {
+    process.env.TRACE = "1"
+    process.env.TRACE_SAMPLE_RATE = "1.0"
+    const log = createLogger("test")
+
+    for (let i = 0; i < 5; i++) {
+      using span = log.span!(`work-${i}`)
+    }
+
+    expect(consoleMock.findSpans()).toHaveLength(5)
+  })
+
+  test("invalid TRACE_SAMPLE_RATE is ignored", () => {
+    process.env.TRACE = "1"
+    process.env.TRACE_SAMPLE_RATE = "not-a-number"
+    // Should not throw, falls back to default (1.0)
+    const log = createLogger("test")
+
+    for (let i = 0; i < 3; i++) {
+      using span = log.span!(`work-${i}`)
+    }
+
+    expect(consoleMock.findSpans()).toHaveLength(3)
+  })
+
+  test("out-of-range TRACE_SAMPLE_RATE is ignored", () => {
+    process.env.TRACE = "1"
+    process.env.TRACE_SAMPLE_RATE = "2.0"
+    // Out of range, should be ignored — default 1.0
+    const log = createLogger("test")
+
+    for (let i = 0; i < 3; i++) {
+      using span = log.span!(`work-${i}`)
+    }
+
+    expect(consoleMock.findSpans()).toHaveLength(3)
+  })
+
+  afterEach(() => {
+    delete process.env.TRACE_SAMPLE_RATE
+  })
+})
+
+describe("config object idFormat", () => {
+  test("{ idFormat: 'w3c' } in config array sets W3C format", () => {
+    const log = createLogger("test", [{ level: "trace", idFormat: "w3c" }, console])
+    const span = log.span!("work")
+
+    expect(span.spanData.id).toMatch(/^[0-9a-f]{16}$/)
+    expect(span.spanData.traceId).toMatch(/^[0-9a-f]{32}$/)
+    span.end()
+  })
+
+  test("{ idFormat: 'simple' } in config array sets simple format", () => {
+    // First set to W3C, then override via config
+    setIdFormat("w3c")
+    const log = createLogger("test", [{ level: "trace", idFormat: "simple" }, console])
+    const span = log.span!("work")
+
+    expect(span.spanData.id).toBe("sp_1")
+    span.end()
+  })
+})
+
+describe("config object sampleRate", () => {
+  test("{ sampleRate: 0.0 } in config array suppresses all spans", () => {
+    const log = createLogger("test", [{ level: "trace", sampleRate: 0.0 }, console])
+    process.env.TRACE = "1"
+
+    for (let i = 0; i < 5; i++) {
+      using span = log.span!(`work-${i}`)
+    }
+
+    expect(consoleMock.findSpans()).toHaveLength(0)
+  })
+
+  test("{ sampleRate: 1.0 } in config array keeps all spans", () => {
+    const log = createLogger("test", [{ level: "trace", sampleRate: 1.0 }, console])
+    process.env.TRACE = "1"
+
+    for (let i = 0; i < 5; i++) {
+      using span = log.span!(`work-${i}`)
+    }
+
+    expect(consoleMock.findSpans()).toHaveLength(5)
+  })
+
+  test("{ sampleRate: ... } validates range", () => {
+    expect(() => {
+      createLogger("test", [{ level: "trace", sampleRate: -0.1 }, console])
+    }).toThrow("between 0.0 and 1.0")
+
+    expect(() => {
+      createLogger("test", [{ level: "trace", sampleRate: 1.5 }, console])
+    }).toThrow("between 0.0 and 1.0")
   })
 })
 
