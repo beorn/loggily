@@ -34,8 +34,6 @@ const dbLog = log.child("db", { pool: "main" }) // namespace: "myapp:db"
 // → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
 ```
 
-Colorized, human-readable output in development; structured JSON in production (`NODE_ENV=production`). Same code, same calls.
-
 ## Why the `?.`
 
 Disabled logs should not build strings, serialize objects, or call functions just to throw the result away.
@@ -84,6 +82,7 @@ Objects configure, arrays branch, values write. [Full guide →](https://loggily
 - **Async context** — [AsyncLocalStorage propagation](https://loggily.dev/guide/context): every log in a request's async chain inherits trace/span IDs automatically.
 - **OpenTelemetry bridge** — [`toOtel({ api })`](https://loggily.dev/guide/otel) forwards events to any OTLP backend (Jaeger, Grafana, Datadog). Transparent pass-through.
 - **Worker threads** — [pipeline-based forwarding](https://loggily.dev/guide/workers) via `postMessage`. Same events, same pipeline.
+- **Dev & production** — colorized console in development, structured JSON in production (`NODE_ENV=production`). Same code.
 - **Composable plugins** — `pipe(baseCreateLogger, withSpans(), myPlugin())` to build custom factories.
 - **~3 KB, zero dependencies.**
 
