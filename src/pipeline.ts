@@ -205,24 +205,36 @@ export function parseNsFilter(ns: string | string[]): NsFilter {
 
 // ============ Console Output ============
 
+/**
+ * Write formatted text to console using the appropriate log level.
+ *
+ * IMPORTANT: We use Function.bind() to preserve caller source locations in
+ * browser DevTools. When you click a log line in DevTools, it shows where
+ * YOUR code called log.info?.(), not where pipeline.ts called console.info().
+ * DO NOT replace bind() with direct console.info(text) calls — it breaks
+ * source location tracking in browsers.
+ */
 export function writeToConsole(text: string, event: Event): void {
   if (event.kind === "span") {
     writeStderr(text)
     return
   }
+  // bind() preserves the call site in browser DevTools source maps.
+  // The bound function is immediately invoked — bind() just ensures the
+  // DevTools stack trace points to the user's code, not this file.
   switch (event.level) {
     case "trace":
     case "debug":
-      console.debug(text)
+      Function.prototype.bind.call(console.debug, console, text)()
       break
     case "info":
-      console.info(text)
+      Function.prototype.bind.call(console.info, console, text)()
       break
     case "warn":
-      console.warn(text)
+      Function.prototype.bind.call(console.warn, console, text)()
       break
     case "error":
-      console.error(text)
+      Function.prototype.bind.call(console.error, console, text)()
       break
   }
 }
