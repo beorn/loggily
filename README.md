@@ -75,28 +75,16 @@ Works with: [OpenTelemetry](https://loggily.dev/guide/otel) (Jaeger, Grafana, Da
 
 See the [Destinations guide](https://loggily.dev/guide/destinations) for copy-paste recipes.
 
-## Why this exists
+## About
 
 Tired of choosing between logging and production performance. Wanted structured JSON for production AND beautiful colorized output for development, in both browser and terminal, without the overhead when logs are off.
 
+**Requirements:** Node.js ≥ 23.6 or Bun ≥ 1.0. ESM-only. TypeScript 5.2+ for `using` (`.end()` works on any version). [Browser supported](https://loggily.dev/guide/browser) via conditional export.
+
+**When not to use Loggily:** if you need auto-instrumentation (HTTP, database, gRPC) use OpenTelemetry's SDK directly; if you need log rotation or dozens of transport plugins, Pino's ecosystem is deeper.
+
+**Docs:** [Get Started](https://loggily.dev/guide/journey) · [Full docs](https://loggily.dev/) · [Comparison](https://loggily.dev/guide/comparison) · [Migration from debug](https://loggily.dev/guide/migration-from-debug)
+
 > **Status:** Early release (0.x). The core API is stable, but details may evolve before 1.0.
-
-## Requirements
-
-Node.js ≥ 23.6 or Bun ≥ 1.0. ESM-only. TypeScript 5.2+ for `using` (`.end()` works on any version). [Browser supported](https://loggily.dev/guide/browser) via conditional export.
-
-## When not to use Loggily
-
-- **You need auto-instrumentation** (HTTP, database, gRPC). Use OpenTelemetry's SDK directly — Loggily's bridge forwards events but doesn't instrument frameworks.
-- **You need log rotation or dozens of transport plugins.** Pino's transport ecosystem is deeper.
-
-## Documentation
-
-- **[Get Started](https://loggily.dev/guide/journey)** — progressive guide from first log to full observability
-- **[Full docs](https://loggily.dev/)** — guides, API reference, migration guides
-- [Comparison](https://loggily.dev/guide/comparison) — what Loggily does, compatibility, when to use something else
-- [Migration from debug](https://loggily.dev/guide/migration-from-debug) — step-by-step guide
-
-## License
 
 [MIT](LICENSE)
