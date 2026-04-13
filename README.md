@@ -92,100 +92,58 @@ Loggily uses `Symbol.dispose` (TC39 Explicit Resource Management) for span clean
 - **Browser support** -- bundlers auto-select the browser entry point via `browser` condition.
 - **~3 KB, zero dependencies.**
 
-## Usage Walkthrough
-
-### Zero config
+## Usage
 
 ```typescript
 import { createLogger } from "loggily"
-const log = createLogger("myapp")
-log.info?.("started")
-```
-
-### Configured pipeline
-
-The config array supports all element types:
-
-```typescript
-const log = createLogger("myapp", [
-  // Config object — sets scope for subsequent elements
-  { level: "debug", ns: "-sql", format: "json", spans: true },
-
-  // Console output
-  console,
-
-  // File sink — with optional level/ns/format overrides
-  { file: "/tmp/app.log", level: "info", format: "json" },
-
-  // Stage function — transform, filter, or enrich events
-  (event) => {
-    if (event.kind === "log" && event.message.includes("secret")) return null
-    return { ...event, props: { ...event.props, host: hostname() } }
-  },
-
-  // Branch array — sub-pipeline with own scope
-  [{ level: "error" }, { file: "/tmp/errors.log", format: "json" }],
-
-  // Writable — any object with a write method (Pino transports, streams)
-  { write: (event) => sendToService(event), objectMode: true },
-])
-```
-
-### Child loggers
-
-```typescript
-const authLog = log.child("auth") // namespace: "myapp:auth"
-const reqLog = log.child({ requestId: "abc-123" }) // context fields
-const dbLog = log.child("db", { pool: "main" }) // both
-```
-
-`.child()` is the canonical method. The older `.logger()` still works but is deprecated.
-
-### Spans
-
-```typescript
-{
-  using span = log.span("import", { file: "data.csv" })
-  span.info?.("parsing")
-  span.spanData.rows = 42
-}
-// SPAN myapp:import (15ms) {rows: 42, file: "data.csv"}
-```
-
-### Error overloads
-
-```typescript
-log.error?.(new Error("timeout")) // Error only
-log.error?.(new Error("timeout"), "request failed") // Error + custom message
-log.error?.(new Error("timeout"), "request failed", { url: "/api" }) // Error + message + data
-log.error?.("manual error", { code: "ETIMEOUT" }) // String message + data
-```
-
-### OpenTelemetry
-
-```typescript
-import * as otelApi from "@opentelemetry/api"
 import { toOtel } from "loggily/otel"
-
-// Forward to OTLP backend AND console — toOtel() is transparent
-const log = createLogger("myapp", [toOtel({ api: otelApi }), console])
-```
-
-### Metrics
-
-```typescript
 import { spanStats } from "loggily/metrics"
+import * as otelApi from "@opentelemetry/api"
 
-// After spans run, get aggregated timing data
-const stats = spanStats()
-// Map { "myapp:db" => { count: 42, p50: 3.2, p95: 8.4, p99: 12.1, ... } }
+// --- 1. Create a logger with a pipeline ---
+
+const log = createLogger("myapp", [
+  { level: "debug" },
+  toOtel({ api: otelApi }),                                    // forward to OTLP
+  { write: (event) => pinoTransport.write(event), objectMode: true },  // Pino transport
+  { file: "/tmp/app.log", format: "json" },                   // JSON file
+  [{ level: "error" }, { file: "/tmp/errors.log" }],           // errors branch
+  console,                                                     // dev console
+])
+
+// --- 2. Log ---
+
+log.info?.("server started", { port: 3000 })
+log.debug?.("cache hit", { key: "user:42" })
+log.error?.(new Error("timeout"), "request failed", { url: "/api" })
+
+// --- 3. Child loggers ---
+
+const db = log.child("db", { pool: "main" })   // namespace: "myapp:db"
+db.info?.("connected")
+
+// --- 4. Spans ---
+
+{
+  using span = db.span("query", { table: "users" })
+  const users = await db.query("SELECT * FROM users")
+  span.spanData.count = users.length
+}
+// → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
+// → forwarded to OTLP, Pino transport, and JSON file
+
+// --- 5. Metrics ---
+
+for (const [name, s] of spanStats()) {
+  if (s.p95 > 100) console.warn(`${name} is slow: p95=${s.p95}ms`)
+}
 ```
 
-### Pino transports
+Or start with zero config and add features as you need them:
 
 ```typescript
-// Any writable with objectMode receives raw Event objects
-const log = createLogger("myapp", [{ write: (event) => pinoTransport.write(event), objectMode: true }, console])
+const log = createLogger("myapp")  // reads LOG_LEVEL, DEBUG, TRACE from env
+log.info?.("started")
 ```
 
 ### Composition with plugins

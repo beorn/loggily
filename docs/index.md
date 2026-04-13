@@ -56,51 +56,34 @@ yarn add loggily
 
 ```typescript
 import { createLogger } from "loggily"
+import { toOtel } from "loggily/otel"
+import { spanStats } from "loggily/metrics"
+import * as otelApi from "@opentelemetry/api"
 
-const log = createLogger("myapp", [{ level: "debug" }, console])
+// One pipeline: console + OTEL + a Pino transport
+const log = createLogger("myapp", [
+  { level: "debug" },
+  toOtel({ api: otelApi }),
+  { write: (event) => pinoTransport.write(event), objectMode: true },
+  console,
+])
 
-// ?. skips the entire call — including argument evaluation — when the level is disabled
+// Structured logging — ?. skips everything when the level is disabled
 log.info?.("server started", { port: 3000 })
 log.debug?.("cache hit", { key: "user:42" })
 log.error?.(new Error("connection lost"))
-```
 
-### Spans
-
-```typescript
+// Spans — automatic timing, parent-child tracking, trace IDs
 {
   using span = log.span("db:query", { table: "users" })
   const users = await db.query("SELECT * FROM users")
   span.spanData.count = users.length
 }
-// SPAN myapp:db:query (45ms) {count: 100, table: "users"}
-```
+// → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
+// → also forwarded to OTLP backend and Pino transport
 
-### Metrics
-
-```typescript
-import { spanStats } from "loggily/metrics"
-
-// After spans run, get p50/p95/p99 aggregates
-const stats = spanStats()
-// Map { "myapp:db:query" => { count: 42, p50: 3.2, p95: 8.4, p99: 12.1, ... } }
-```
-
-### OpenTelemetry
-
-```typescript
-import * as otelApi from "@opentelemetry/api"
-import { toOtel } from "loggily/otel"
-
-// Forward to OTLP AND console — toOtel() is transparent
-const log = createLogger("myapp", [toOtel({ api: otelApi }), console])
-```
-
-### Pino Transports
-
-```typescript
-import { createLogger } from "loggily"
-
-// Any Pino transport works — objectMode receives raw Event objects
-const log = createLogger("myapp", [{ write: (event) => pinoTransport.write(event), objectMode: true }, console])
+// Metrics — spans are auto-recorded, check p50/p95/p99 any time
+for (const [name, s] of spanStats()) {
+  if (s.p95 > 100) console.warn(`${name} is slow: p95=${s.p95}ms`)
+}
 ```
