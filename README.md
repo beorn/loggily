@@ -21,14 +21,14 @@ log.error?.(new Error("connection lost"))
 
 ## Getting Started
 
-```bash
-npm install loggily
+```console
+$ npm install loggily
 
-DEBUG='*' node app                        # show all debug output
-DEBUG='myapp:db' node app                 # only database logs
-LOG_FILE=/tmp/app.log node app            # write to file
-NODE_ENV=production node app              # structured JSON output
-TRACE=1 node app                          # enable span timing
+$ DEBUG='*' node app                        # show all debug output
+$ DEBUG='myapp:db' node app                 # only database logs
+$ LOG_FILE=/tmp/app.log node app            # write to file
+$ NODE_ENV=production node app              # structured JSON output
+$ TRACE=1 node app                          # enable span timing
 ```
 
 ```typescript
