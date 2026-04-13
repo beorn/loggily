@@ -24,7 +24,7 @@ features:
     details: "One pipeline, both environments. Bundlers auto-select the browser entry point. Node.js, Bun, and browsers — same API, same config."
   - title: "Send Anywhere"
     details: "OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus, W3C Trace Context. Same DEBUG= patterns as the debug package."
-  - title: "Spans, Metrics, Context"
+  - title: "All-in-One Observability"
     details: "Spans with parent-child tracking and trace IDs. Metrics (p50/p95/p99). Worker threads. AsyncLocalStorage propagation. ~3 KB, zero dependencies."
 ---
 
