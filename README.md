@@ -10,7 +10,7 @@ Debugs, logs, and spans — one API. Replace `debug` + your JSON logger + ad-hoc
 ```typescript
 import { createLogger } from "loggily"
 
-const log = createLogger("myapp", [{ level: "debug" }, console])
+const log = createLogger("myapp") // zero config — reads LOG_LEVEL, DEBUG from env
 
 log.info?.("server started", { port: 3000 })
 log.debug?.("cache hit", { key: "user:42" })
