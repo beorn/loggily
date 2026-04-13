@@ -7,80 +7,56 @@
 
 Debugs, logs, and spans — one API. Replace `debug` + your JSON logger + ad-hoc timers with one namespace tree and one output pipeline. Pure TypeScript, zero dependencies, ~3 KB.
 
+```bash
+npm install loggily
+```
+
 ```typescript
 import { createLogger } from "loggily"
+import { toOtel } from "loggily/otel"
 
-const log = createLogger("myapp", [{ level: "debug" }, console])
+// Config pipeline — objects configure, arrays branch, values write
+const log = createLogger("myapp", [
+  { level: "debug", metrics: true },     // config object — sets scope
+  toOtel({ api: otelApi }),              // stage — forwards to Jaeger/Grafana/Datadog
+  pinoTransport,                         // writable — { write } receives events
+  { file: "...", format: "json" },       // file sink — formatted strings
+  [{ level: "warn" }, { file: "..." }],  // branch — sub-pipeline with own scope
+  console,                               // colorized dev output, JSON in production
+])
 
+// Structured logging — ?.  means disabled logs are free (nothing evaluates)
 log.info?.("server started", { port: 3000 })
-log.debug?.("cache hit", { key: "user:42" })
+log.debug?.(`state: ${JSON.stringify(computeExpensiveState())}`) // skipped if debug off
 log.error?.(new Error("connection lost"))
 
-// Child loggers
+// Child loggers — extend namespace, add context
 const dbLog = log.child("db", { pool: "main" }) // namespace: "myapp:db"
 
-// Spans — time any operation
+// Spans — time any operation, auto-track parent/child + trace IDs
 {
   using span = dbLog.span("query", { table: "users" })
   const users = await queryUsers()
   span.spanData.count = users.length
 }
 // → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
+
+// Metrics — p50/p95/p99 from spans
+log.metrics.summary() // myapp:db:query: 42 spans, mean=3.2ms, p95=8.4ms
+
+// Composable — build custom factories
+const myCreateLogger = pipe(baseCreateLogger, withSpans(), myPlugin())
 ```
-
-## Why the `?.`
-
-Optional chaining is an ergonomic and efficient way to handle disabled logs. Most loggers still evaluate arguments even when the level is off — Loggily short-circuits the entire call:
-
-```typescript
-// Most loggers — computeExpensiveState() runs even when debug is off
-log.debug(`state: ${JSON.stringify(computeExpensiveState())}`)
-
-// Loggily — nothing runs when debug is off
-log.debug?.(`state: ${JSON.stringify(computeExpensiveState())}`)
-```
-
-[~22x faster](https://loggily.dev/guide/benchmarks) than a conventional noop logger in benchmarks with expensive disabled arguments.
-
-## Install
 
 ```bash
-npm install loggily
+DEBUG=myapp:db bun app    # namespace hierarchy — same patterns as debug package
+NODE_ENV=production       # same code, structured JSON output
+TRACE=1                   # enable span output
 ```
 
-## Config Pipeline
+**Why the `?.`?** An [ergonomic and efficient](https://loggily.dev/guide/benchmarks) way to handle disabled logs — [~22x faster](https://loggily.dev/guide/benchmarks) than conventional noop loggers. Also supports [async context propagation](https://loggily.dev/guide/context), [worker threads](https://loggily.dev/guide/workers), and [browser](https://loggily.dev/guide/browser). ~3 KB, zero dependencies.
 
-The second argument is an array where each element type has a distinct role:
-
-```typescript
-const log = createLogger("myapp", [
-  { level: "debug", metrics: true },     // config object — sets scope
-  toOtel({ api: otelApi }),              // stage — transforms/forwards
-  pinoTransport,                         // writable — { write } receives events
-  { file: "...", format: "json" },       // file sink — formatted strings
-  [{ level: "warn" }, { file: "..." }],  // branch — sub-pipeline with own scope
-  console,                               // console — colorized, human-readable
-])
-```
-
-Objects configure, arrays branch, values write. [Full guide →](https://loggily.dev/guide/config-array)
-
-## Features
-
-- **Ergonomic and efficient** — free if silenced: `?.` short-circuits the entire call. [~22x faster](https://loggily.dev/guide/benchmarks) than noop loggers.
-- **Namespace hierarchy** — `DEBUG=myapp:db` shows only database output. Same filter patterns as the `debug` package.
-- **Spans** — `using span = log.span("name")`. Duration, parent-child tracking, trace IDs, custom data. Built-in [metrics collection](https://loggily.dev/guide/metrics) (p50/p95/p99).
-- **Child loggers** — `log.child("auth")` extends namespace, `log.child({ requestId })` adds context.
-- **Async context** — [AsyncLocalStorage propagation](https://loggily.dev/guide/context): every log in a request's async chain inherits trace/span IDs automatically.
-- **OpenTelemetry bridge** — [`toOtel({ api })`](https://loggily.dev/guide/otel) forwards events to any OTLP backend (Jaeger, Grafana, Datadog). Transparent pass-through.
-- **Worker threads** — [pipeline-based forwarding](https://loggily.dev/guide/workers) via `postMessage`. Same events, same pipeline.
-- **Dev & production** — colorized console in development, structured JSON in production (`NODE_ENV=production`). Same code.
-- **Composable plugins** — `pipe(baseCreateLogger, withSpans(), myPlugin())` to build custom factories.
-- **~3 KB, zero dependencies.**
-
-### Compatibility
-
-Works with: [OpenTelemetry](https://loggily.dev/guide/otel) (Jaeger, Grafana, Datadog, any OTLP backend) · [Pino transports](https://loggily.dev/guide/destinations#pino) (object-mode writables) · Sentry · Elasticsearch / OpenSearch · AWS CloudWatch · Prometheus (`log.metrics`) · [W3C Trace Context](https://loggily.dev/guide/tracing) (`traceparent()`) · [`DEBUG=` patterns](https://loggily.dev/guide/namespaces) · Browser · Worker threads
+Works with: [OpenTelemetry](https://loggily.dev/guide/otel) (Jaeger, Grafana, Datadog, any OTLP backend) · [Pino transports](https://loggily.dev/guide/destinations#pino) · Sentry · Elasticsearch · AWS CloudWatch · Prometheus · [W3C Trace Context](https://loggily.dev/guide/tracing) · [`DEBUG=` patterns](https://loggily.dev/guide/namespaces)
 
 See the [Destinations guide](https://loggily.dev/guide/destinations) for copy-paste recipes.
 
