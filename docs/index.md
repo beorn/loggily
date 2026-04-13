@@ -17,15 +17,13 @@ features:
   - title: "Free If Silenced"
     details: "The optional chaining trick short-circuits disabled log calls entirely — not just the log call, but all argument evaluation too. ~22x faster than conventional noop loggers in benchmarks."
   - title: "Three Tools in One"
-    details: "Replace debug (namespace filtering), your JSON logger (structured production output), and ad-hoc timers (spans with trace IDs and metrics). One import, one config, one API."
+    details: "Replace debug (namespace filtering), your JSON logger (structured production output), and ad-hoc timers (spans with trace IDs, metrics, and AsyncLocalStorage propagation). Worker threads included. One import, one config, one API. ~3 KB, zero dependencies."
   - title: "Beautiful Dev, Structured Prod"
     details: "Colorized, human-readable console output in development. Structured JSON in production. Same code, no compromise. Switch with NODE_ENV."
   - title: "Browser and Terminal"
     details: "One pipeline, both environments. Bundlers auto-select the browser entry point. Node.js, Bun, and browsers — same API, same config."
   - title: "Send Anywhere"
     details: "OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus, W3C Trace Context. Same DEBUG= patterns as the debug package."
-  - title: "All-in-One Observability"
-    details: "Spans with parent-child tracking and trace IDs. Metrics (p50/p95/p99). Worker threads. AsyncLocalStorage propagation. ~3 KB, zero dependencies."
 ---
 
 ::: code-group
