@@ -23,7 +23,9 @@ export function createConsoleMock() {
   vi.spyOn(console, "warn").mockImplementation(capture("warn"))
   vi.spyOn(console, "error").mockImplementation(capture("error"))
 
-  vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string | Uint8Array) => {
+  vi.spyOn(process.stderr, "write").mockImplementation(((
+    chunk: string | Uint8Array,
+  ) => {
     output.push({ level: "stderr", message: String(chunk) })
     return true
   }) as typeof process.stderr.write)

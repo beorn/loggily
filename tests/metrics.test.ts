@@ -1,6 +1,16 @@
 import { describe, test, expect, beforeEach, vi, afterEach } from "vitest"
-import { createLogger, enableSpans, disableSpans, setLogLevel, setTraceFilter } from "../src/index.ts"
-import { createMetricsCollector, withMetrics, type MetricsCollector } from "../src/metrics.ts"
+import {
+  createLogger,
+  enableSpans,
+  disableSpans,
+  setLogLevel,
+  setTraceFilter,
+} from "../src/index.ts"
+import {
+  createMetricsCollector,
+  withMetrics,
+  type MetricsCollector,
+} from "../src/metrics.ts"
 
 beforeEach(() => {
   enableSpans()
@@ -152,7 +162,10 @@ describe("{ metrics: true } config", () => {
   test("creates a collector accessible via log.metrics", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
-    const log = createLogger("test:config-metrics", [{ level: "debug", metrics: true }, console])
+    const log = createLogger("test:config-metrics", [
+      { level: "debug", metrics: true },
+      console,
+    ])
 
     expect(log.metrics).toBeDefined()
     expect(typeof log.metrics!.stats).toBe("function")
@@ -163,7 +176,10 @@ describe("{ metrics: true } config", () => {
   test("log.metrics.stats() returns data after spans run", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
-    const log = createLogger("test:config-stats", [{ level: "debug", metrics: true }, console])
+    const log = createLogger("test:config-stats", [
+      { level: "debug", metrics: true },
+      console,
+    ])
 
     {
       using _span = log.span?.("db")
@@ -183,7 +199,10 @@ describe("{ metrics: true } config", () => {
   test("child loggers inherit the metrics collector", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
-    const log = createLogger("test:child-metrics", [{ level: "debug", metrics: true }, console])
+    const log = createLogger("test:child-metrics", [
+      { level: "debug", metrics: true },
+      console,
+    ])
 
     const child = log.child("sub")
     {

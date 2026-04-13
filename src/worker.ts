@@ -38,8 +38,20 @@
  * ```
  */
 
-import { createLogger, baseCreateLogger, pipe, withSpans, type ConditionalLogger } from "./core.js"
-import type { Event, LogEvent, SpanEvent, Stage, ConfigElement } from "./pipeline.js"
+import {
+  createLogger,
+  baseCreateLogger,
+  pipe,
+  withSpans,
+  type ConditionalLogger,
+} from "./core.js"
+import type {
+  Event,
+  LogEvent,
+  SpanEvent,
+  Stage,
+  ConfigElement,
+} from "./pipeline.js"
 
 // ============ Console Message Type ============
 
@@ -70,7 +82,9 @@ export function isWorkerEvent(msg: unknown): msg is Event {
 }
 
 /** Type guard for WorkerConsoleMessage */
-export function isWorkerConsoleMessage(msg: unknown): msg is WorkerConsoleMessage {
+export function isWorkerConsoleMessage(
+  msg: unknown,
+): msg is WorkerConsoleMessage {
   return (
     typeof msg === "object" &&
     (msg as WorkerConsoleMessage)?.type === "console" &&
@@ -80,7 +94,9 @@ export function isWorkerConsoleMessage(msg: unknown): msg is WorkerConsoleMessag
 }
 
 /** Type guard for any worker message (console or pipeline event) */
-export function isWorkerMessage(msg: unknown): msg is WorkerConsoleMessage | Event {
+export function isWorkerMessage(
+  msg: unknown,
+): msg is WorkerConsoleMessage | Event {
   return isWorkerConsoleMessage(msg) || isWorkerEvent(msg)
 }
 
@@ -105,12 +121,22 @@ let originalConsole: typeof console | null = null
  * console.log("processing", { file: "test.md" })
  * ```
  */
-export function forwardConsole(postMessage: PostMessageFn, namespace?: string): void {
+export function forwardConsole(
+  postMessage: PostMessageFn,
+  namespace?: string,
+): void {
   if (!originalConsole) {
     originalConsole = { ...console }
   }
 
-  for (const level of ["log", "debug", "info", "warn", "error", "trace"] as const) {
+  for (const level of [
+    "log",
+    "debug",
+    "info",
+    "warn",
+    "error",
+    "trace",
+  ] as const) {
     console[level] = (...args: unknown[]) => {
       try {
         // Sanitize non-cloneable values before postMessage (structuredClone rejects them)
@@ -123,7 +149,13 @@ export function forwardConsole(postMessage: PostMessageFn, namespace?: string): 
                 ? { name: a.name, message: a.message, stack: a.stack }
                 : a,
         )
-        postMessage({ type: "console", level, namespace, args: safe, timestamp: Date.now() })
+        postMessage({
+          type: "console",
+          level,
+          namespace,
+          args: safe,
+          timestamp: Date.now(),
+        })
       } catch {
         originalConsole?.[level](...args)
       }
@@ -152,7 +184,9 @@ export function restoreConsole(): void {
  * The main thread uses handleWorkerEvents() or createWorkerLogHandler()
  * to dispatch them through a local logger pipeline.
  */
-export function workerTransportStage(postMessage: (msg: unknown) => void): Stage {
+export function workerTransportStage(
+  postMessage: (msg: unknown) => void,
+): Stage {
   return (event: Event): null => {
     try {
       postMessage(event)
@@ -287,17 +321,25 @@ function safeStringify(value: unknown): string {
 }
 
 /** Format console args into a message string and optional data object */
-function formatConsoleArgs(args: unknown[]): { message: string; data: Record<string, unknown> | undefined } {
+function formatConsoleArgs(args: unknown[]): {
+  message: string
+  data: Record<string, unknown> | undefined
+} {
   const message =
     args.length === 0
       ? ""
       : args.length === 1 && typeof args[0] === "string"
         ? args[0]
-        : args.map((a) => (typeof a === "string" ? a : safeStringify(a))).join(" ")
+        : args
+            .map((a) => (typeof a === "string" ? a : safeStringify(a)))
+            .join(" ")
 
   const lastArg = args[args.length - 1]
   const data =
-    args.length > 1 && typeof lastArg === "object" && lastArg !== null && !Array.isArray(lastArg)
+    args.length > 1 &&
+    typeof lastArg === "object" &&
+    lastArg !== null &&
+    !Array.isArray(lastArg)
       ? (lastArg as Record<string, unknown>)
       : undefined
 
@@ -364,7 +406,9 @@ export function createWorkerConsoleHandler(
 
     let logger = loggers.get(ns)
     if (!logger) {
-      logger = options.logger ? (options.logger as ConditionalLogger) : createLogger(ns)
+      logger = options.logger
+        ? (options.logger as ConditionalLogger)
+        : createLogger(ns)
       loggers.set(ns, logger)
     }
     return logger

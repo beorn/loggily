@@ -27,7 +27,8 @@ import {
 import { createConsoleMock } from "./helpers.ts"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const parseJSON = (s: string): Record<string, any> => JSON.parse(s) as Record<string, any>
+const parseJSON = (s: string): Record<string, any> =>
+  JSON.parse(s) as Record<string, any>
 
 let consoleMock: ReturnType<typeof createConsoleMock>
 
@@ -330,7 +331,11 @@ describe("context propagation", () => {
   test("runInSpanContext scopes context to callback", () => {
     enableContextPropagation()
 
-    const ctx = { spanId: "custom-span", traceId: "custom-trace", parentId: null }
+    const ctx = {
+      spanId: "custom-span",
+      traceId: "custom-trace",
+      parentId: null,
+    }
 
     const result = runInSpanContext(ctx, () => {
       const current = getCurrentSpan()
@@ -541,7 +546,9 @@ describe("auto-tagging with context", () => {
       using span = log.span!("request")
       log.info?.("tagged message")
 
-      const output = consoleMock.output.find((o) => o.message.includes("tagged message"))
+      const output = consoleMock.output.find((o) =>
+        o.message.includes("tagged message"),
+      )
       expect(output).toBeDefined()
       expect(output!.message).toContain("trace_id")
       expect(output!.message).toContain("span_id")
@@ -680,7 +687,10 @@ describe("TRACE_SAMPLE_RATE env var", () => {
 
 describe("config object idFormat", () => {
   test("{ idFormat: 'w3c' } in config array sets W3C format", () => {
-    const log = createLogger("test", [{ level: "trace", idFormat: "w3c" }, console])
+    const log = createLogger("test", [
+      { level: "trace", idFormat: "w3c" },
+      console,
+    ])
     const span = log.span!("work")
 
     expect(span.spanData.id).toMatch(/^[0-9a-f]{16}$/)
@@ -691,7 +701,10 @@ describe("config object idFormat", () => {
   test("{ idFormat: 'simple' } in config array sets simple format", () => {
     // First set to W3C, then override via config
     setIdFormat("w3c")
-    const log = createLogger("test", [{ level: "trace", idFormat: "simple" }, console])
+    const log = createLogger("test", [
+      { level: "trace", idFormat: "simple" },
+      console,
+    ])
     const span = log.span!("work")
 
     expect(span.spanData.id).toBe("sp_1")
@@ -701,7 +714,10 @@ describe("config object idFormat", () => {
 
 describe("config object sampleRate", () => {
   test("{ sampleRate: 0.0 } in config array suppresses all spans", () => {
-    const log = createLogger("test", [{ level: "trace", sampleRate: 0.0 }, console])
+    const log = createLogger("test", [
+      { level: "trace", sampleRate: 0.0 },
+      console,
+    ])
     process.env.TRACE = "1"
 
     for (let i = 0; i < 5; i++) {
@@ -712,7 +728,10 @@ describe("config object sampleRate", () => {
   })
 
   test("{ sampleRate: 1.0 } in config array keeps all spans", () => {
-    const log = createLogger("test", [{ level: "trace", sampleRate: 1.0 }, console])
+    const log = createLogger("test", [
+      { level: "trace", sampleRate: 1.0 },
+      console,
+    ])
     process.env.TRACE = "1"
 
     for (let i = 0; i < 5; i++) {

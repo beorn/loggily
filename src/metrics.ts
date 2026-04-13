@@ -129,7 +129,9 @@ export function createMetricsCollector(maxEntries = 1000): MetricsCollector {
  * const log = withMetrics(collector)(createLogger("myapp"))
  * ```
  */
-export function withMetrics(collector: SpanRecorder): (logger: ConditionalLogger) => ConditionalLogger {
+export function withMetrics(
+  collector: SpanRecorder,
+): (logger: ConditionalLogger) => ConditionalLogger {
   return (logger: ConditionalLogger): ConditionalLogger => {
     // Wrap the logger's span method to intercept disposal
     return new Proxy(logger, {
@@ -143,12 +145,19 @@ export function withMetrics(collector: SpanRecorder): (logger: ConditionalLogger
           return (namespace?: string, props?: LazyProps): SpanLogger => {
             const span = originalSpan.call(target, namespace, props)
             // Wrap disposal to record to our collector
-            const originalDispose = (span as unknown as { [Symbol.dispose]: () => void })[Symbol.dispose]
-            ;(span as unknown as { [Symbol.dispose]: () => void })[Symbol.dispose] = () => {
+            const originalDispose = (
+              span as unknown as { [Symbol.dispose]: () => void }
+            )[Symbol.dispose]
+            ;(span as unknown as { [Symbol.dispose]: () => void })[
+              Symbol.dispose
+            ] = () => {
               originalDispose.call(span)
               // After original disposal computed duration, record it
               if (span.spanData?.duration != null) {
-                collector.recordSpan({ name: span.name, durationMs: span.spanData.duration })
+                collector.recordSpan({
+                  name: span.name,
+                  durationMs: span.spanData.duration,
+                })
               }
             }
             return span
@@ -165,10 +174,15 @@ export function withMetrics(collector: SpanRecorder): (logger: ConditionalLogger
         }
         if (prop === "logger") {
           // Child loggers inherit the metrics wrapper
-          return (namespace?: string, childProps?: Record<string, unknown>): Logger => {
+          return (
+            namespace?: string,
+            childProps?: Record<string, unknown>,
+          ): Logger => {
             const child = target.logger(namespace, childProps)
             // Re-wrap the child — withMetrics(collector) applied recursively
-            return withMetrics(collector)(child as unknown as ConditionalLogger) as unknown as Logger
+            return withMetrics(collector)(
+              child as unknown as ConditionalLogger,
+            ) as unknown as Logger
           }
         }
         return (target as unknown as Record<string | symbol, unknown>)[prop]

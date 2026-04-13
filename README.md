@@ -34,7 +34,13 @@ Readable, colorized output in development (colors don't render on GitHub -- run 
 Set `NODE_ENV=production` and the same calls emit structured JSON:
 
 ```json
-{ "time": "2024-01-15T14:32:15.123Z", "level": "info", "name": "myapp", "msg": "server started", "port": 3000 }
+{
+  "time": "2024-01-15T14:32:15.123Z",
+  "level": "info",
+  "name": "myapp",
+  "msg": "server started",
+  "port": 3000
+}
 ```
 
 ## Why the `?.`
@@ -136,13 +142,17 @@ const log = createLogger("myapp", [
 
 // Custom writable -- any { write } receives raw Event objects
 const log2 = createLogger("ingest", [
-  { write: (event) => fetch("/ingest", { method: "POST", body: JSON.stringify(event) }) },
+  {
+    write: (event) =>
+      fetch("/ingest", { method: "POST", body: JSON.stringify(event) }),
+  },
   console,
 ])
 
 // Custom stage -- functions transform, filter, or enrich events
 const log3 = createLogger("filtered", [
-  (event) => (event.kind === "log" && event.message.includes("secret") ? null : event),
+  (event) =>
+    event.kind === "log" && event.message.includes("secret") ? null : event,
   (event) => ({ ...event, props: { ...event.props, host: os.hostname() } }),
   console,
 ])

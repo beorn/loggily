@@ -41,9 +41,21 @@ import {
   formatJSONEvent,
 } from "./pipeline.js"
 
-import { createMetricsCollector as _createMetricsCollector, withMetrics as _withMetrics } from "./metrics.js"
+import {
+  createMetricsCollector as _createMetricsCollector,
+  withMetrics as _withMetrics,
+} from "./metrics.js"
 
-export type { Event, LogEvent, SpanEvent, Stage, LogLevel, OutputLogLevel, LogFormat, ConfigElement }
+export type {
+  Event,
+  LogEvent,
+  SpanEvent,
+  Stage,
+  LogLevel,
+  OutputLogLevel,
+  LogFormat,
+  ConfigElement,
+}
 export { LOG_LEVEL_PRIORITY, safeStringify }
 
 // ============ Metrics ============
@@ -60,7 +72,9 @@ export interface SpanRecorder {
 // ============ Types ============
 
 export type LazyMessage = string | (() => string)
-export type LazyProps = Record<string, unknown> | (() => Record<string, unknown>)
+export type LazyProps =
+  | Record<string, unknown>
+  | (() => Record<string, unknown>)
 
 export interface SpanData {
   readonly id: string
@@ -148,15 +162,23 @@ export function resetIds(): void {
 // ============ Context Propagation Hooks ============
 
 let _getContextTags: (() => Record<string, string>) | null = null
-let _getContextParent: (() => { spanId: string; traceId: string } | null) | null = null
-let _enterContext: ((spanId: string, traceId: string, parentId: string | null) => void) | null = null
+let _getContextParent:
+  | (() => { spanId: string; traceId: string } | null)
+  | null = null
+let _enterContext:
+  | ((spanId: string, traceId: string, parentId: string | null) => void)
+  | null = null
 let _exitContext: ((spanId: string) => void) | null = null
 
 /** @internal */
 export function _setContextHooks(hooks: {
   getContextTags: () => Record<string, string>
   getContextParent: () => { spanId: string; traceId: string } | null
-  enterContext: (spanId: string, traceId: string, parentId: string | null) => void
+  enterContext: (
+    spanId: string,
+    traceId: string,
+    parentId: string | null,
+  ) => void
   exitContext: (spanId: string) => void
 }): void {
   _getContextTags = hooks.getContextTags
@@ -184,8 +206,18 @@ interface SpanDataFields {
   duration: number | null
 }
 
-export function createSpanDataProxy(getFields: () => SpanDataFields, attrs: Record<string, unknown>): SpanData {
-  const READONLY_KEYS = new Set(["id", "traceId", "parentId", "startTime", "endTime", "duration"])
+export function createSpanDataProxy(
+  getFields: () => SpanDataFields,
+  attrs: Record<string, unknown>,
+): SpanData {
+  const READONLY_KEYS = new Set([
+    "id",
+    "traceId",
+    "parentId",
+    "startTime",
+    "endTime",
+    "duration",
+  ])
   return new Proxy(attrs, {
     get(_target, prop) {
       if (READONLY_KEYS.has(prop as string)) {
@@ -242,7 +274,11 @@ interface MutableSpanData {
   attrs: Record<string, unknown>
 }
 
-function createLoggerImpl(name: string, props: Record<string, unknown>, pipeline: Pipeline): Logger {
+function createLoggerImpl(
+  name: string,
+  props: Record<string, unknown>,
+  pipeline: Pipeline,
+): Logger {
   const emitLog = (
     level: OutputLogLevel,
     msgOrError: LazyMessage | Error,
@@ -265,7 +301,8 @@ function createLoggerImpl(name: string, props: Record<string, unknown>, pipeline
           error_message: err.message,
           error_stack: err.stack,
           error_code: (err as { code?: string }).code,
-          error_cause: err.cause !== undefined ? serializeCause(err.cause) : undefined,
+          error_cause:
+            err.cause !== undefined ? serializeCause(err.cause) : undefined,
         }
       } else {
         message = err.message
@@ -276,7 +313,8 @@ function createLoggerImpl(name: string, props: Record<string, unknown>, pipeline
           error_type: err.name,
           error_stack: err.stack,
           error_code: (err as { code?: string }).code,
-          error_cause: err.cause !== undefined ? serializeCause(err.cause) : undefined,
+          error_cause:
+            err.cause !== undefined ? serializeCause(err.cause) : undefined,
         }
       }
     } else {
@@ -284,7 +322,11 @@ function createLoggerImpl(name: string, props: Record<string, unknown>, pipeline
       const contextTags = _getContextTags?.()
       data =
         contextTags && Object.keys(contextTags).length > 0
-          ? { ...contextTags, ...props, ...(dataOrMsg as Record<string, unknown>) }
+          ? {
+              ...contextTags,
+              ...props,
+              ...(dataOrMsg as Record<string, unknown>),
+            }
           : Object.keys(props).length > 0 || dataOrMsg
             ? { ...props, ...(dataOrMsg as Record<string, unknown>) }
             : undefined
@@ -328,7 +370,10 @@ function createLoggerImpl(name: string, props: Record<string, unknown>, pipeline
     ) => emitLog("error", msgOrError, dataOrMsg, extraData),
 
     /** @deprecated Use .child() instead */
-    logger(namespace?: string, childProps?: Record<string, unknown>): ConditionalLogger {
+    logger(
+      namespace?: string,
+      childProps?: Record<string, unknown>,
+    ): ConditionalLogger {
       return this.child(namespace ?? "", childProps)
     },
 
@@ -343,9 +388,14 @@ function createLoggerImpl(name: string, props: Record<string, unknown>, pipeline
       childProps?: Record<string, unknown>,
     ): ConditionalLogger {
       if (typeof namespaceOrContext === "string") {
-        const childName = namespaceOrContext ? `${name}:${namespaceOrContext}` : name
+        const childName = namespaceOrContext
+          ? `${name}:${namespaceOrContext}`
+          : name
         const mergedProps = { ...props, ...childProps }
-        return wrapConditional(createLoggerImpl(childName, mergedProps, pipeline), () => pipeline.level)
+        return wrapConditional(
+          createLoggerImpl(childName, mergedProps, pipeline),
+          () => pipeline.level,
+        )
       }
       // Object -> context fields, same namespace
       return wrapConditional(
@@ -364,17 +414,29 @@ function createLoggerImpl(name: string, props: Record<string, unknown>, pipeline
 
 // ============ ConditionalLogger Proxy ============
 
-function wrapConditional(logger: Logger, getLevel: () => LogLevel): ConditionalLogger {
+function wrapConditional(
+  logger: Logger,
+  getLevel: () => LogLevel,
+): ConditionalLogger {
   return new Proxy(logger as ConditionalLogger, {
     get(target, prop: string | symbol) {
-      if (typeof prop === "string" && prop in LOG_LEVEL_PRIORITY && prop !== "silent") {
-        if (LOG_LEVEL_PRIORITY[prop as keyof typeof LOG_LEVEL_PRIORITY] < LOG_LEVEL_PRIORITY[getLevel()]) {
+      if (
+        typeof prop === "string" &&
+        prop in LOG_LEVEL_PRIORITY &&
+        prop !== "silent"
+      ) {
+        if (
+          LOG_LEVEL_PRIORITY[prop as keyof typeof LOG_LEVEL_PRIORITY] <
+          LOG_LEVEL_PRIORITY[getLevel()]
+        ) {
           return undefined
         }
       }
       // span is optional on ConditionalLogger: return undefined if base impl is the error-thrower
       if (prop === "span") {
-        const val = (target as unknown as Record<string | symbol, unknown>)[prop]
+        const val = (target as unknown as Record<string | symbol, unknown>)[
+          prop
+        ]
         // If span is the default error-throwing stub, return undefined (making it optional)
         if (val === baseSpanStub) return undefined
         return val
@@ -385,7 +447,10 @@ function wrapConditional(logger: Logger, getLevel: () => LogLevel): ConditionalL
 }
 
 // Sentinel reference for detecting the base span stub
-const baseSpanStub = function baseSpanStub(_namespace?: string, _childProps?: LazyProps): SpanLogger {
+const baseSpanStub = function baseSpanStub(
+  _namespace?: string,
+  _childProps?: LazyProps,
+): SpanLogger {
   throw new Error(
     "loggily: span() requires the withSpans() plugin. Use pipe(baseCreateLogger, withSpans()) or the default createLogger.",
   )
@@ -431,15 +496,31 @@ function augmentWithSpans(
           namespaceOrContext?: string | Record<string, unknown>,
           childProps?: Record<string, unknown>,
         ): ConditionalLogger {
-          const childLogger = target.child(namespaceOrContext as string, childProps)
+          const childLogger = target.child(
+            namespaceOrContext as string,
+            childProps,
+          )
           // Child loggers inherit span state (parent/trace context)
-          return augmentWithSpans(childLogger, spanState.parentSpanId, spanState.traceId, spanState.traceSampled)
+          return augmentWithSpans(
+            childLogger,
+            spanState.parentSpanId,
+            spanState.traceId,
+            spanState.traceSampled,
+          )
         }
       }
       if (prop === "logger") {
-        return function logger(namespace?: string, childProps?: Record<string, unknown>): ConditionalLogger {
+        return function logger(
+          namespace?: string,
+          childProps?: Record<string, unknown>,
+        ): ConditionalLogger {
           const childLogger = target.logger(namespace, childProps)
-          return augmentWithSpans(childLogger, spanState.parentSpanId, spanState.traceId, spanState.traceSampled)
+          return augmentWithSpans(
+            childLogger,
+            spanState.parentSpanId,
+            spanState.traceId,
+            spanState.traceSampled,
+          )
         }
       }
       return (target as unknown as Record<string | symbol, unknown>)[prop]
@@ -453,7 +534,8 @@ function createSpanMethod(
 ): (namespace?: string, childProps?: LazyProps) => SpanLogger {
   return (namespace?: string, childProps?: LazyProps): SpanLogger => {
     const childName = namespace ? `${logger.name}:${namespace}` : logger.name
-    const resolvedChildProps = typeof childProps === "function" ? childProps() : childProps
+    const resolvedChildProps =
+      typeof childProps === "function" ? childProps() : childProps
     const mergedProps = { ...logger.props, ...resolvedChildProps }
     const newSpanId = generateSpanId()
 
@@ -485,7 +567,12 @@ function createSpanMethod(
     // Create a child logger for the span to emit logs through
     const childLogger = logger.child(namespace ?? "", resolvedChildProps)
     // Augment the child with span capability, setting this span as parent
-    const spanAugmented = augmentWithSpans(childLogger, newSpanId, finalTraceId, sampled)
+    const spanAugmented = augmentWithSpans(
+      childLogger,
+      newSpanId,
+      finalTraceId,
+      sampled,
+    )
 
     _enterContext?.(newSpanId, finalTraceId, resolvedParentId)
 
@@ -621,9 +708,15 @@ export interface PluginCtx {
   [key: string]: unknown
 }
 
-export type LoggerPlugin = (factory: LoggerFactory, ctx: PluginCtx) => LoggerFactory
+export type LoggerPlugin = (
+  factory: LoggerFactory,
+  ctx: PluginCtx,
+) => LoggerFactory
 
-export function pipe(base: LoggerFactory, ...plugins: LoggerPlugin[]): LoggerFactory {
+export function pipe(
+  base: LoggerFactory,
+  ...plugins: LoggerPlugin[]
+): LoggerFactory {
   const ctx: PluginCtx = {}
   return plugins.reduce((factory, plugin) => plugin(factory, ctx), base)
 }
@@ -652,9 +745,13 @@ const _writers: Array<(formatted: string, level: string) => void> = []
 let _suppressConsole = false
 
 // File writer factory — set by index.ts (avoids node:fs in core.ts for browser compat)
-let _logFileWriterFactory: ((path: string) => { write: (s: string) => void; close: () => void }) | null = null
+let _logFileWriterFactory:
+  | ((path: string) => { write: (s: string) => void; close: () => void })
+  | null = null
 /** @internal */
-export function _setLogFileWriterFactory(factory: typeof _logFileWriterFactory): void {
+export function _setLogFileWriterFactory(
+  factory: typeof _logFileWriterFactory,
+): void {
   _logFileWriterFactory = factory
 }
 
@@ -699,10 +796,14 @@ export function withEnvDefaults(): LoggerPlugin {
       // We need to pass props AND a config array. But factory only accepts one or the other.
       // Solution: create via factory with config array, then the child() with props.
       const logger = factory(name, [{ level: "trace" as LogLevel }, envStage])
-      return applyNamespaceGating(logger.child(configOrProps as Record<string, unknown>))
+      return applyNamespaceGating(
+        logger.child(configOrProps as Record<string, unknown>),
+      )
     }
 
-    return applyNamespaceGating(factory(name, [{ level: "trace" as LogLevel }, envStage]))
+    return applyNamespaceGating(
+      factory(name, [{ level: "trace" as LogLevel }, envStage]),
+    )
   }
 }
 
@@ -714,9 +815,16 @@ export function withEnvDefaults(): LoggerPlugin {
 function applyNamespaceGating(logger: ConditionalLogger): ConditionalLogger {
   return new Proxy(logger, {
     get(target, prop: string | symbol) {
-      if (typeof prop === "string" && prop in LOG_LEVEL_PRIORITY && prop !== "silent") {
+      if (
+        typeof prop === "string" &&
+        prop in LOG_LEVEL_PRIORITY &&
+        prop !== "silent"
+      ) {
         const nsLevel = readEnvLevelForNamespace(target.name)
-        if (LOG_LEVEL_PRIORITY[prop as keyof typeof LOG_LEVEL_PRIORITY] < LOG_LEVEL_PRIORITY[nsLevel]) {
+        if (
+          LOG_LEVEL_PRIORITY[prop as keyof typeof LOG_LEVEL_PRIORITY] <
+          LOG_LEVEL_PRIORITY[nsLevel]
+        ) {
           return undefined
         }
       }
@@ -732,14 +840,19 @@ function createEnvPipeline(): Pipeline {
   if (logFile && _logFileWriterFactory) {
     const writer = _logFileWriterFactory(logFile)
     fileSink = (event: Event) => {
-      const fmt = currentFormat() === "json" ? formatJSONEvent : formatConsoleEvent
+      const fmt =
+        currentFormat() === "json" ? formatJSONEvent : formatConsoleEvent
       writer.write(fmt(event))
     }
     disposables.push(() => writer.close())
   }
 
   const dispatch = (event: Event): void => {
-    if (event.kind === "log" && LOG_LEVEL_PRIORITY[event.level] < LOG_LEVEL_PRIORITY[currentLevel()]) return
+    if (
+      event.kind === "log" &&
+      LOG_LEVEL_PRIORITY[event.level] < LOG_LEVEL_PRIORITY[currentLevel()]
+    )
+      return
     if (event.kind === "span") {
       const trace = currentTrace()
       if (!trace.enabled) return
@@ -748,7 +861,8 @@ function createEnvPipeline(): Pipeline {
     const ns = currentNs()
     if (ns && !ns(event.namespace)) return
 
-    const formatter = currentFormat() === "json" ? formatJSONEvent : formatConsoleEvent
+    const formatter =
+      currentFormat() === "json" ? formatJSONEvent : formatConsoleEvent
     const text = formatter(event)
     const lvl = event.kind === "log" ? event.level : "span"
 
@@ -802,11 +916,19 @@ export function withConfigMetrics(): LoggerPlugin {
 }
 
 /** Default createLogger — includes withEnvDefaults + withSpans + withConfigMetrics. */
-export const createLogger: LoggerFactory = pipe(baseCreateLogger, withEnvDefaults(), withSpans(), withConfigMetrics())
+export const createLogger: LoggerFactory = pipe(
+  baseCreateLogger,
+  withEnvDefaults(),
+  withSpans(),
+  withConfigMetrics(),
+)
 
 /** Test helper — all levels, console output. */
 export function createTestLogger(name: string): ConditionalLogger {
-  return pipe(baseCreateLogger, withSpans())(name, [{ level: "trace" }, "console"])
+  return pipe(baseCreateLogger, withSpans())(name, [
+    { level: "trace" },
+    "console",
+  ])
 }
 
 // ============ Legacy Setters ============
@@ -859,14 +981,20 @@ export function setOutputMode(_mode: OutputMode): void {
 export function getOutputMode(): OutputMode {
   return "console"
 }
-export function addWriter(writer: (formatted: string, level: string) => void): () => void {
+export function addWriter(
+  writer: (formatted: string, level: string) => void,
+): () => void {
   _writers.push(writer)
   return () => {
     const i = _writers.indexOf(writer)
     if (i !== -1) _writers.splice(i, 1)
   }
 }
-export function writeSpan(namespace: string, duration: number, attrs: Record<string, unknown>): void {
+export function writeSpan(
+  namespace: string,
+  duration: number,
+  attrs: Record<string, unknown>,
+): void {
   createEnvPipeline().dispatch({
     kind: "span",
     time: Date.now(),

@@ -25,7 +25,8 @@ import {
 import { createConsoleMock } from "./helpers.ts"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const parseJSON = (s: string): Record<string, any> => JSON.parse(s) as Record<string, any>
+const parseJSON = (s: string): Record<string, any> =>
+  JSON.parse(s) as Record<string, any>
 
 /** A writable that captures formatted output strings.
  *  Uses a class so the pipeline recognizes it as a writable (not a config POJO). */
@@ -129,7 +130,10 @@ describe("lazy string interpolation", () => {
   })
 
   test("lazy messages work in JSON format", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     log.info?.(() => "json lazy")
 
     const parsed = parseJSON(consoleMock.output[0]!.message)
@@ -169,7 +173,10 @@ describe("child loggers with context", () => {
   })
 
   test("child context is included in every log message", () => {
-    const log = createLogger("app", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("app", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const child = log.child({ requestId: "abc" })
 
     child.info?.("first")
@@ -182,7 +189,10 @@ describe("child loggers with context", () => {
   })
 
   test("child context merges with per-call data", () => {
-    const log = createLogger("app", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("app", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const child = log.child({ requestId: "abc" })
 
     child.info?.("msg", { extra: "data" })
@@ -193,7 +203,10 @@ describe("child loggers with context", () => {
   })
 
   test("nested children accumulate context", () => {
-    const log = createLogger("app", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("app", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const child1 = log.child({ requestId: "abc" })
     const child2 = child1.child({ userId: "user-1" })
 
@@ -205,7 +218,10 @@ describe("child loggers with context", () => {
   })
 
   test("child context overrides parent props on conflict", () => {
-    const log = createLogger("app", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("app", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const parent = log.child({ env: "prod" })
     const child = parent.child({ env: "test" })
 
@@ -254,7 +270,10 @@ describe("child loggers with context", () => {
 
 describe("JSON format configuration", () => {
   test("format: 'json' in config produces JSON output", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
 
     log.info?.("json message", { key: "value" })
 
@@ -267,7 +286,10 @@ describe("JSON format configuration", () => {
   })
 
   test("console format produces human-readable output", () => {
-    const log = createLogger("test", [{ level: "trace", format: "console" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "console" },
+      console,
+    ])
 
     log.info?.("console message")
 
@@ -280,7 +302,10 @@ describe("JSON format configuration", () => {
   })
 
   test("JSON format includes child props", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const child = log.child({ app: "myapp", version: "1.0" })
 
     child.info?.("message")
@@ -291,7 +316,10 @@ describe("JSON format configuration", () => {
   })
 
   test("JSON format handles errors", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const err = new Error("json error")
 
     log.error?.(err)
@@ -302,7 +330,10 @@ describe("JSON format configuration", () => {
   })
 
   test("JSON format works with spans", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
 
     {
       using span = log.span!("work")
@@ -325,7 +356,10 @@ describe("JSON format configuration", () => {
   })
 
   test("JSON output has standard fields: time, level, name, msg", () => {
-    const log = createLogger("myapp", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("myapp", [
+      { level: "trace", format: "json" },
+      console,
+    ])
 
     log.info?.("request handled")
 
@@ -348,7 +382,10 @@ describe("createFileWriter", () => {
   let writer: FileWriter | null = null
 
   beforeEach(() => {
-    testFile = join(tmpdir(), `logger-test-${Date.now()}-${Math.random().toString(36).slice(2)}.log`)
+    testFile = join(
+      tmpdir(),
+      `logger-test-${Date.now()}-${Math.random().toString(36).slice(2)}.log`,
+    )
   })
 
   afterEach(() => {
@@ -371,7 +408,10 @@ describe("createFileWriter", () => {
   })
 
   test("flushes on buffer size threshold", () => {
-    writer = createFileWriter(testFile, { bufferSize: 10, flushInterval: 60000 })
+    writer = createFileWriter(testFile, {
+      bufferSize: 10,
+      flushInterval: 60000,
+    })
 
     // Write enough to exceed 10 bytes
     writer.write("hello world this is a long line")
@@ -382,7 +422,10 @@ describe("createFileWriter", () => {
   })
 
   test("flush() writes buffer to disk", () => {
-    writer = createFileWriter(testFile, { bufferSize: 999999, flushInterval: 60000 })
+    writer = createFileWriter(testFile, {
+      bufferSize: 999999,
+      flushInterval: 60000,
+    })
 
     writer.write("buffered line")
     // Not yet flushed (buffer is large, interval is long)
@@ -393,7 +436,10 @@ describe("createFileWriter", () => {
   })
 
   test("close() flushes remaining buffer and closes fd", () => {
-    writer = createFileWriter(testFile, { bufferSize: 999999, flushInterval: 60000 })
+    writer = createFileWriter(testFile, {
+      bufferSize: 999999,
+      flushInterval: 60000,
+    })
 
     writer.write("final line")
     writer.close()
@@ -429,7 +475,10 @@ describe("createFileWriter", () => {
   })
 
   test("flushes on interval", async () => {
-    writer = createFileWriter(testFile, { bufferSize: 999999, flushInterval: 50 })
+    writer = createFileWriter(testFile, {
+      bufferSize: 999999,
+      flushInterval: 50,
+    })
 
     writer.write("interval line")
 
@@ -507,8 +556,14 @@ describe("pipeline-based configuration", () => {
   test("namespace filtering works in config", () => {
     const { lines, writer } = createCapture()
 
-    const log1 = createLogger("myapp", [{ level: "trace", ns: "myapp" }, writer])
-    const log2 = createLogger("other", [{ level: "trace", ns: "myapp" }, writer])
+    const log1 = createLogger("myapp", [
+      { level: "trace", ns: "myapp" },
+      writer,
+    ])
+    const log2 = createLogger("other", [
+      { level: "trace", ns: "myapp" },
+      writer,
+    ])
 
     log1.info?.("included")
     log2.info?.("excluded")
@@ -520,7 +575,10 @@ describe("pipeline-based configuration", () => {
   test("namespace exclusion pattern works", () => {
     const { lines, writer } = createCapture()
 
-    const log = createLogger("myapp", [{ level: "trace", ns: ["*", "-myapp:sql"] }, writer])
+    const log = createLogger("myapp", [
+      { level: "trace", ns: ["*", "-myapp:sql"] },
+      writer,
+    ])
     const sqlChild = log.logger("sql")
 
     log.info?.("app message")
@@ -557,7 +615,10 @@ describe("pipeline-based configuration", () => {
 
   test("JSON format works with writer", () => {
     const { lines, writer } = createCapture()
-    const log = createLogger("test", [{ level: "trace", format: "json" }, writer])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      writer,
+    ])
 
     log.info?.("json via writer", { key: "value" })
 
@@ -574,7 +635,10 @@ describe("pipeline-based configuration", () => {
 describe("DEBUG wildcard patterns", () => {
   test("myapp:* matches myapp and children", () => {
     const { lines, writer } = createCapture()
-    const log = createLogger("myapp", [{ level: "debug", ns: "myapp:*" }, writer])
+    const log = createLogger("myapp", [
+      { level: "debug", ns: "myapp:*" },
+      writer,
+    ])
 
     log.info?.("root msg")
     const db = log.child("db")
@@ -587,7 +651,10 @@ describe("DEBUG wildcard patterns", () => {
 
   test("specific:* doesn't match unrelated namespaces", () => {
     const { lines, writer } = createCapture()
-    const log = createLogger("other", [{ level: "debug", ns: "myapp:*" }, writer])
+    const log = createLogger("other", [
+      { level: "debug", ns: "myapp:*" },
+      writer,
+    ])
 
     log.info?.("should not match")
     expect(lines).toHaveLength(0)
@@ -595,7 +662,10 @@ describe("DEBUG wildcard patterns", () => {
 
   test("wildcard with exclusion", () => {
     const { lines, writer } = createCapture()
-    const log = createLogger("myapp", [{ level: "debug", ns: "myapp:*,-myapp:sql" }, writer])
+    const log = createLogger("myapp", [
+      { level: "debug", ns: "myapp:*,-myapp:sql" },
+      writer,
+    ])
 
     const db = log.child("db")
     db.info?.("db msg")
@@ -662,7 +732,11 @@ describe("full composition chain", () => {
     const prev = process.env.LOG_LEVEL
     process.env.LOG_LEVEL = "info"
     try {
-      const myCreateLogger = pipe(baseCreateLogger, withSpans(), withEnvDefaults())
+      const myCreateLogger = pipe(
+        baseCreateLogger,
+        withSpans(),
+        withEnvDefaults(),
+      )
       const log = myCreateLogger("test")
 
       expect(log.info).toBeDefined()
@@ -683,7 +757,12 @@ describe("full composition chain", () => {
         return factory(name, config)
       }
 
-      const myCreateLogger = pipe(baseCreateLogger, trackPlugin, withSpans(), withEnvDefaults())
+      const myCreateLogger = pipe(
+        baseCreateLogger,
+        trackPlugin,
+        withSpans(),
+        withEnvDefaults(),
+      )
       const log = myCreateLogger("test")
 
       expect(calls).toEqual(["creating: test"])
@@ -786,7 +865,8 @@ describe("namespace-aware conditional gating", () => {
 
 describe("deprecated v1 global setters still work", () => {
   test("setLogLevel sets LOG_LEVEL env var", () => {
-    const { setLogLevel, getLogLevel } = require("../src/index.ts") as typeof import("../src/index.ts")
+    const { setLogLevel, getLogLevel } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
     setLogLevel("debug")
     expect(getLogLevel()).toBe("debug")
     setLogLevel("info")
@@ -802,7 +882,8 @@ describe("deprecated v1 global setters still work", () => {
   })
 
   test("setDebugFilter sets DEBUG env var", () => {
-    const { setDebugFilter, getDebugFilter } = require("../src/index.ts") as typeof import("../src/index.ts")
+    const { setDebugFilter, getDebugFilter } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
     setDebugFilter(["myapp", "-myapp:sql"])
     expect(getDebugFilter()).toEqual(["myapp", "-myapp:sql"])
     setDebugFilter(null)
@@ -810,14 +891,16 @@ describe("deprecated v1 global setters still work", () => {
   })
 
   test("setLogFormat sets LOG_FORMAT env var", () => {
-    const { setLogFormat, getLogFormat } = require("../src/index.ts") as typeof import("../src/index.ts")
+    const { setLogFormat, getLogFormat } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
     setLogFormat("json")
     expect(getLogFormat()).toBe("json")
     setLogFormat("console")
   })
 
   test("addWriter registers and unregisters", () => {
-    const { addWriter } = require("../src/index.ts") as typeof import("../src/index.ts")
+    const { addWriter } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
     const calls: string[] = []
     const unsub = addWriter((formatted) => calls.push(formatted))
     expect(typeof unsub).toBe("function")
@@ -825,7 +908,8 @@ describe("deprecated v1 global setters still work", () => {
   })
 
   test("setSuppressConsole toggles runtime state", () => {
-    const { setSuppressConsole } = require("../src/index.ts") as typeof import("../src/index.ts")
+    const { setSuppressConsole } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
     setSuppressConsole(true)
     setSuppressConsole(false)
   })

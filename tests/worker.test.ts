@@ -63,7 +63,9 @@ beforeEach(() => {
   })
 
   // Spans use process.stderr.write to bypass Ink's patchConsole
-  vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string | Uint8Array) => {
+  vi.spyOn(process.stderr, "write").mockImplementation(((
+    chunk: string | Uint8Array,
+  ) => {
     consoleOutput.push({ level: "stderr", message: String(chunk) })
     return true
   }) as typeof process.stderr.write)
@@ -101,7 +103,9 @@ describe("isWorkerConsoleMessage", () => {
     expect(isWorkerConsoleMessage({})).toBe(false)
     expect(isWorkerConsoleMessage({ type: "other" })).toBe(false)
     expect(isWorkerConsoleMessage({ type: "console" })).toBe(false)
-    expect(isWorkerConsoleMessage({ type: "console", level: "log" })).toBe(false)
+    expect(isWorkerConsoleMessage({ type: "console", level: "log" })).toBe(
+      false,
+    )
   })
 })
 
@@ -149,7 +153,15 @@ describe("isWorkerSpanEvent", () => {
 
 describe("isWorkerEvent", () => {
   test("returns true for log and span events", () => {
-    expect(isWorkerEvent({ kind: "log", time: 1, namespace: "t", level: "info", message: "m" })).toBe(true)
+    expect(
+      isWorkerEvent({
+        kind: "log",
+        time: 1,
+        namespace: "t",
+        level: "info",
+        message: "m",
+      }),
+    ).toBe(true)
     expect(
       isWorkerEvent({
         kind: "span",
@@ -172,8 +184,23 @@ describe("isWorkerEvent", () => {
 
 describe("isWorkerMessage", () => {
   test("returns true for console messages and events", () => {
-    expect(isWorkerMessage({ type: "console", level: "log", args: [], timestamp: 1 })).toBe(true)
-    expect(isWorkerMessage({ kind: "log", time: 1, namespace: "t", level: "info", message: "m" })).toBe(true)
+    expect(
+      isWorkerMessage({
+        type: "console",
+        level: "log",
+        args: [],
+        timestamp: 1,
+      }),
+    ).toBe(true)
+    expect(
+      isWorkerMessage({
+        kind: "log",
+        time: 1,
+        namespace: "t",
+        level: "info",
+        message: "m",
+      }),
+    ).toBe(true)
     expect(
       isWorkerMessage({
         kind: "span",
@@ -224,7 +251,14 @@ describe("forwardConsole", () => {
     console.trace("trace")
 
     expect(messages).toHaveLength(6)
-    expect(messages.map((m) => m.level)).toEqual(["log", "debug", "info", "warn", "error", "trace"])
+    expect(messages.map((m) => m.level)).toEqual([
+      "log",
+      "debug",
+      "info",
+      "warn",
+      "error",
+      "trace",
+    ])
   })
 
   test("includes namespace if provided", () => {
@@ -444,7 +478,9 @@ describe("workerTransportStage", () => {
     const failingPostMessage = (msg: unknown) => {
       callCount++
       if (callCount === 1) {
-        throw new DOMException("Failed to execute 'postMessage': could not be cloned")
+        throw new DOMException(
+          "Failed to execute 'postMessage': could not be cloned",
+        )
       }
       posted.push(msg)
     }
@@ -505,7 +541,9 @@ describe("createWorkerLogger", () => {
     log.warn?.("w")
     log.error?.("e")
 
-    const logEvents = posted.filter((e) => (e as Event).kind === "log") as LogEvent[]
+    const logEvents = posted.filter(
+      (e) => (e as Event).kind === "log",
+    ) as LogEvent[]
     expect(logEvents).toHaveLength(5)
     expect(logEvents[0]!.level).toBe("trace")
     expect(logEvents[1]!.level).toBe("debug")
@@ -521,7 +559,9 @@ describe("createWorkerLogger", () => {
     const log = createWorkerLogger(mockPostMessage, "test")
     log.error?.(new Error("test error"))
 
-    const logEvents = posted.filter((e) => (e as Event).kind === "log") as LogEvent[]
+    const logEvents = posted.filter(
+      (e) => (e as Event).kind === "log",
+    ) as LogEvent[]
     expect(logEvents.length).toBeGreaterThanOrEqual(1)
     const event = logEvents[0]!
     expect(event.message).toBe("test error")
@@ -537,7 +577,9 @@ describe("createWorkerLogger", () => {
     const child = log.child("child")
     child.info?.("from child")
 
-    const logEvents = posted.filter((e) => (e as Event).kind === "log") as LogEvent[]
+    const logEvents = posted.filter(
+      (e) => (e as Event).kind === "log",
+    ) as LogEvent[]
     expect(logEvents.length).toBeGreaterThanOrEqual(1)
     const event = logEvents[0]!
     expect(event.namespace).toBe("parent:child")
@@ -548,11 +590,17 @@ describe("createWorkerLogger", () => {
     const posted: unknown[] = []
     const mockPostMessage = (msg: unknown) => posted.push(msg)
 
-    const log = createWorkerLogger(mockPostMessage, "parent", { version: "1.0" })
+    const log = createWorkerLogger(mockPostMessage, "parent", {
+      version: "1.0",
+    })
     log.info?.("with props")
 
-    const logEvents = posted.filter((e) => (e as Event).kind === "log") as LogEvent[]
-    expect(logEvents[0]!.props).toEqual(expect.objectContaining({ version: "1.0" }))
+    const logEvents = posted.filter(
+      (e) => (e as Event).kind === "log",
+    ) as LogEvent[]
+    expect(logEvents[0]!.props).toEqual(
+      expect.objectContaining({ version: "1.0" }),
+    )
   })
 })
 
@@ -570,7 +618,9 @@ describe("createWorkerLogger spans", () => {
       span.spanData.count = 42
     }
 
-    const spanEvents = posted.filter((e) => (e as Event).kind === "span") as SpanEvent[]
+    const spanEvents = posted.filter(
+      (e) => (e as Event).kind === "span",
+    ) as SpanEvent[]
     expect(spanEvents).toHaveLength(1)
     const end = spanEvents[0]!
     expect(end.namespace).toBe("test:work")
@@ -592,11 +642,15 @@ describe("createWorkerLogger spans", () => {
       }
     }
 
-    const spanEvents = posted.filter((e) => (e as Event).kind === "span") as SpanEvent[]
+    const spanEvents = posted.filter(
+      (e) => (e as Event).kind === "span",
+    ) as SpanEvent[]
     // Inner and outer span end events
     expect(spanEvents.length).toBeGreaterThanOrEqual(2)
 
-    const innerSpan = spanEvents.find((e) => e.namespace === "test:outer:inner")!
+    const innerSpan = spanEvents.find(
+      (e) => e.namespace === "test:outer:inner",
+    )!
     const outerSpan = spanEvents.find((e) => e.namespace === "test:outer")!
     // Both share the same trace ID
     expect(innerSpan.traceId).toBe(outerSpan.traceId)
@@ -616,7 +670,9 @@ describe("createWorkerLogger spans", () => {
       span.debug?.("details")
     }
 
-    const logEvents = posted.filter((e) => (e as Event).kind === "log") as LogEvent[]
+    const logEvents = posted.filter(
+      (e) => (e as Event).kind === "log",
+    ) as LogEvent[]
     expect(logEvents).toHaveLength(2)
     expect(logEvents[0]!.namespace).toBe("test:work")
     expect(logEvents[0]!.message).toBe("processing")
@@ -789,8 +845,12 @@ describe("full logger end-to-end", () => {
 
     // Should have log outputs and span output
     expect(consoleOutput.length).toBeGreaterThanOrEqual(4) // 3 logs + 1 span
-    expect(consoleOutput.some((o) => o.message.includes("starting work"))).toBe(true)
-    expect(consoleOutput.some((o) => o.message.includes("processing"))).toBe(true)
+    expect(consoleOutput.some((o) => o.message.includes("starting work"))).toBe(
+      true,
+    )
+    expect(consoleOutput.some((o) => o.message.includes("processing"))).toBe(
+      true,
+    )
     expect(consoleOutput.some((o) => o.message.includes("done"))).toBe(true)
   })
 

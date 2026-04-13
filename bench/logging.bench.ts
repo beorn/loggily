@@ -112,7 +112,11 @@ group("span lifecycle", () => {
 
 group("pipeline dispatch", () => {
   summary(() => {
-    const multiLog = createLogger("bench", [{ level: "trace" }, noopSink, [{ level: "error" }, noopSink]])
+    const multiLog = createLogger("bench", [
+      { level: "trace" },
+      noopSink,
+      [{ level: "error" }, noopSink],
+    ])
 
     bench("single output", () => {
       noopLog.info?.("msg")
@@ -123,7 +127,11 @@ group("pipeline dispatch", () => {
     })
 
     bench("with stage function", () => {
-      const stageLog = createLogger("bench", [{ level: "trace" }, (e) => e, noopSink])
+      const stageLog = createLogger("bench", [
+        { level: "trace" },
+        (e) => e,
+        noopSink,
+      ])
       stageLog.info?.("msg")
     })
   })

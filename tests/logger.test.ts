@@ -5,7 +5,13 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
-import { createLogger, resetIds, type Logger, type SpanLogger, type ConditionalLogger } from "../src/index.ts"
+import {
+  createLogger,
+  resetIds,
+  type Logger,
+  type SpanLogger,
+  type ConditionalLogger,
+} from "../src/index.ts"
 import { createConsoleMock } from "./helpers.ts"
 
 // Console mock instance for all tests
@@ -112,16 +118,19 @@ describe("logging methods", () => {
     ["warn", ["warn", "error"], 2],
     ["error", ["error"], 1],
     ["info", ["info", "warn", "error"], 3],
-  ] as const)("level %s filters to %j", (threshold, expectedLevels, expectedCount) => {
-    const log = createLogger("test", [{ level: threshold }, console])
+  ] as const)(
+    "level %s filters to %j",
+    (threshold, expectedLevels, expectedCount) => {
+      const log = createLogger("test", [{ level: threshold }, console])
 
-    log.debug?.("d")
-    log.info?.("i")
-    log.warn?.("w")
-    log.error?.("e")
+      log.debug?.("d")
+      log.info?.("i")
+      log.warn?.("w")
+      log.error?.("e")
 
-    expect(consoleMock.output).toHaveLength(expectedCount)
-  })
+      expect(consoleMock.output).toHaveLength(expectedCount)
+    },
+  )
 
   test("error accepts Error object", () => {
     const log = createLogger("test", [{ level: "trace" }, console])
@@ -356,10 +365,22 @@ describe("console method usage (patchConsole compatibility)", () => {
 describe("createLogger", () => {
   // Test enabled/disabled levels with parameterized tests
   test.each([
-    ["trace", { trace: true, debug: true, info: true, warn: true, error: true }],
-    ["debug", { trace: false, debug: true, info: true, warn: true, error: true }],
-    ["warn", { trace: false, debug: false, info: false, warn: true, error: true }],
-    ["error", { trace: false, debug: false, info: false, warn: false, error: true }],
+    [
+      "trace",
+      { trace: true, debug: true, info: true, warn: true, error: true },
+    ],
+    [
+      "debug",
+      { trace: false, debug: true, info: true, warn: true, error: true },
+    ],
+    [
+      "warn",
+      { trace: false, debug: false, info: false, warn: true, error: true },
+    ],
+    [
+      "error",
+      { trace: false, debug: false, info: false, warn: false, error: true },
+    ],
   ] as const)("at level %s, methods defined: %o", (level, expected) => {
     const log = createLogger("test", [{ level }, console])
 
@@ -433,7 +454,10 @@ describe("createLogger with props object", () => {
     const log = createLogger("test", { service: "api", version: "1.0" })
     log.info?.("hello")
 
-    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<string, unknown>
+    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<
+      string,
+      unknown
+    >
     expect(parsed.service).toBe("api")
     expect(parsed.version).toBe("1.0")
     expect(parsed.msg).toBe("hello")
@@ -442,7 +466,10 @@ describe("createLogger with props object", () => {
 
 describe("JSON format output", () => {
   test("format: json produces JSON output", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
 
     log.info!("test message", { key: "value" })
 
@@ -483,7 +510,10 @@ describe("JSON format output", () => {
   })
 
   test("JSON output includes all props", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const child = log.child({ app: "myapp", version: "1.0" })
 
     child.info!("message")
@@ -495,7 +525,10 @@ describe("JSON format output", () => {
   })
 
   test("JSON output handles errors", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const err = new Error("test error")
 
     log.error!(err)
@@ -509,7 +542,10 @@ describe("JSON format output", () => {
 
   test("JSON span output includes duration", () => {
     process.env.TRACE = "1"
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
 
     {
       using span = log.span!("work")
@@ -534,7 +570,10 @@ describe("JSON format output", () => {
   })
 
   test("JSON handles circular references", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
 
     const circular: Record<string, unknown> = { name: "test" }
     circular.self = circular
@@ -852,10 +891,16 @@ describe("DEBUG namespace filtering", () => {
 
 describe("ns config in pipeline", () => {
   test("ns in config array filters namespaces", () => {
-    const log = createLogger("myapp", [{ level: "trace", ns: "myapp" }, console])
+    const log = createLogger("myapp", [
+      { level: "trace", ns: "myapp" },
+      console,
+    ])
     log.info!("visible")
 
-    const other = createLogger("other", [{ level: "trace", ns: "myapp" }, console])
+    const other = createLogger("other", [
+      { level: "trace", ns: "myapp" },
+      console,
+    ])
     other.info!("hidden")
 
     expect(consoleMock.output).toHaveLength(1)
@@ -863,7 +908,10 @@ describe("ns config in pipeline", () => {
   })
 
   test("ns with negative pattern in config array", () => {
-    const log = createLogger("myapp", [{ level: "trace", ns: "myapp,-myapp:noisy" }, console])
+    const log = createLogger("myapp", [
+      { level: "trace", ns: "myapp,-myapp:noisy" },
+      console,
+    ])
     const noisy = log.logger("noisy")
 
     log.info!("visible")

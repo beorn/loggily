@@ -6,7 +6,12 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest"
-import { createLogger, type Event, type LogEvent, type SpanEvent } from "loggily"
+import {
+  createLogger,
+  type Event,
+  type LogEvent,
+  type SpanEvent,
+} from "loggily"
 import { createConsoleMock } from "./helpers.ts"
 
 describe("Pino transport compatibility", () => {
@@ -18,7 +23,9 @@ describe("Pino transport compatibility", () => {
       vi.spyOn(console, "info").mockImplementation(() => {}),
       vi.spyOn(console, "warn").mockImplementation(() => {}),
       vi.spyOn(console, "error").mockImplementation(() => {}),
-      vi.spyOn(process.stderr, "write").mockImplementation((() => true) as typeof process.stderr.write),
+      vi
+        .spyOn(process.stderr, "write")
+        .mockImplementation((() => true) as typeof process.stderr.write),
     ]
   })
 
@@ -42,9 +49,15 @@ describe("Pino transport compatibility", () => {
 
   test("objectMode: false receives formatted strings", () => {
     const messages: string[] = []
-    const transport = { write: (msg: string) => messages.push(msg), objectMode: false as const }
+    const transport = {
+      write: (msg: string) => messages.push(msg),
+      objectMode: false as const,
+    }
 
-    const log = createLogger("test", [{ level: "info", format: "json" }, transport])
+    const log = createLogger("test", [
+      { level: "info", format: "json" },
+      transport,
+    ])
     log.info?.("structured", { count: 42 })
 
     expect(messages).toHaveLength(1)
@@ -80,8 +93,12 @@ describe("Pino transport compatibility", () => {
     const log = createLogger("test", [{ level: "info" }, "console", transport])
     log.info?.("dual output")
 
-    expect(mock.output.some((o) => o.message.includes("dual output"))).toBe(true)
-    expect(events.some((e) => (e as LogEvent).message === "dual output")).toBe(true)
+    expect(mock.output.some((o) => o.message.includes("dual output"))).toBe(
+      true,
+    )
+    expect(events.some((e) => (e as LogEvent).message === "dual output")).toBe(
+      true,
+    )
   })
 
   test("transport receives span events", () => {
@@ -95,7 +112,9 @@ describe("Pino transport compatibility", () => {
       span.info?.("working")
     }
 
-    const spanEvent = events.find((e) => e.kind === "span") as SpanEvent | undefined
+    const spanEvent = events.find((e) => e.kind === "span") as
+      | SpanEvent
+      | undefined
     expect(spanEvent).toBeDefined()
     expect(spanEvent!.name).toBe("test:operation")
     expect(typeof spanEvent!.duration).toBe("number")
@@ -105,9 +124,15 @@ describe("Pino transport compatibility", () => {
     const all: Event[] = []
     const errorsOnly: Event[] = []
     const allTransport = { write: (obj: unknown) => all.push(obj as Event) }
-    const errorTransport = { write: (obj: unknown) => errorsOnly.push(obj as Event) }
+    const errorTransport = {
+      write: (obj: unknown) => errorsOnly.push(obj as Event),
+    }
 
-    const log = createLogger("test", [{ level: "debug" }, allTransport, [{ level: "error" }, errorTransport]])
+    const log = createLogger("test", [
+      { level: "debug" },
+      allTransport,
+      [{ level: "error" }, errorTransport],
+    ])
 
     log.debug?.("debug")
     log.info?.("info")
@@ -122,7 +147,10 @@ describe("Pino transport compatibility", () => {
     const events: Event[] = []
     const transport = { write: (obj: unknown) => events.push(obj as Event) }
 
-    const log = createLogger("app", [{ level: "debug", ns: "app:db" }, transport])
+    const log = createLogger("app", [
+      { level: "debug", ns: "app:db" },
+      transport,
+    ])
 
     log.info?.("root msg")
     const db = log.child("db")

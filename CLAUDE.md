@@ -26,7 +26,11 @@ import { createLogger } from "loggily"
 const log = createLogger("myapp")
 
 // Or with explicit config array
-const log = createLogger("myapp", [{ level: "debug" }, console, { file: "/tmp/app.log", format: "json" }])
+const log = createLogger("myapp", [
+  { level: "debug" },
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
 
 log.info?.("starting")
 log.error?.(new Error("failed"))
@@ -266,7 +270,12 @@ import { baseCreateLogger, pipe, withSpans, withEnvDefaults } from "loggily"
 const myCreateLogger = pipe(createLogger, withSentry({ dsn: "..." }))
 
 // Or build from scratch:
-const customFactory = pipe(baseCreateLogger, withEnvDefaults(), withSpans(), myPlugin())
+const customFactory = pipe(
+  baseCreateLogger,
+  withEnvDefaults(),
+  withSpans(),
+  myPlugin(),
+)
 ```
 
 `withEnvDefaults()` reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, `TRACE`, etc. from env vars.
@@ -284,7 +293,11 @@ const log = createTestLogger("test") // all levels enabled, console output
 
 ```typescript
 import { buildPipeline } from "loggily"
-const pipeline = buildPipeline([{ level: "debug" }, console, { file: "/tmp/app.log", format: "json" }])
+const pipeline = buildPipeline([
+  { level: "debug" },
+  console,
+  { file: "/tmp/app.log", format: "json" },
+])
 ```
 
 ## Subpath Exports
@@ -469,7 +482,12 @@ setSampleRate(0.1)
 ### JSON (production / LOG_FORMAT=json)
 
 ```json
-{ "time": "2024-01-15T14:32:15.123Z", "level": "info", "name": "myapp", "msg": "starting" }
+{
+  "time": "2024-01-15T14:32:15.123Z",
+  "level": "info",
+  "name": "myapp",
+  "msg": "starting"
+}
 ```
 
 ## Browser Support

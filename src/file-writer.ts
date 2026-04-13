@@ -44,7 +44,10 @@ export interface FileWriter {
  * unsubscribe()
  * writer.close()
  */
-export function createFileWriter(filePath: string, options: FileWriterOptions = {}): FileWriter {
+export function createFileWriter(
+  filePath: string,
+  options: FileWriterOptions = {},
+): FileWriter {
   const bufferSize = options.bufferSize ?? 4096
   const flushInterval = options.flushInterval ?? 100
 

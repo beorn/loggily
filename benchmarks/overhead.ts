@@ -10,7 +10,13 @@
  * Run: bun benchmarks/overhead.ts
  */
 
-import { addWriter, createLogger, setLogLevel, setSuppressConsole, disableSpans } from "../src/index.ts"
+import {
+  addWriter,
+  createLogger,
+  setLogLevel,
+  setSuppressConsole,
+  disableSpans,
+} from "../src/index.ts"
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -45,7 +51,10 @@ function formatNs(ns: number): string {
   return `${ns.toFixed(1)}ns`
 }
 
-function printResults(title: string, results: Array<{ name: string; opsPerSec: number; nsPerOp: number }>) {
+function printResults(
+  title: string,
+  results: Array<{ name: string; opsPerSec: number; nsPerOp: number }>,
+) {
   console.log(`\n${title}`)
   console.log("─".repeat(70))
 
@@ -62,7 +71,12 @@ function printResults(title: string, results: Array<{ name: string; opsPerSec: n
 // ── Expensive argument simulation ────────────────────────────────────────────
 
 function expensiveArg(): string {
-  return JSON.stringify({ a: 1, b: 2, c: [3, 4, 5], d: { e: "hello", f: true } })
+  return JSON.stringify({
+    a: 1,
+    b: 2,
+    c: [3, 4, 5],
+    d: { e: "hello", f: true },
+  })
 }
 
 // ── Noop stream (shared sink type for fair enabled comparisons) ──────────────
@@ -183,10 +197,26 @@ console.log(`Platform: ${process.platform} ${process.arch}`)
 
   const results = [
     measure("noop(expensive)", () => noop(), N),
-    measure("loggily: log.debug?.(expensive)", () => loggilyLog.debug?.(`state: ${expensiveArg()}`), N),
-    measure("pino: log.debug(expensive)", () => pinoDisabled.debug(`state: ${expensiveArg()}`), N),
-    measure("winston: log.debug(expensive)", () => winstonDisabled.debug(`state: ${expensiveArg()}`), N),
-    measure("debug: debug(expensive)", () => debugFn(`state: ${expensiveArg()}`), N),
+    measure(
+      "loggily: log.debug?.(expensive)",
+      () => loggilyLog.debug?.(`state: ${expensiveArg()}`),
+      N,
+    ),
+    measure(
+      "pino: log.debug(expensive)",
+      () => pinoDisabled.debug(`state: ${expensiveArg()}`),
+      N,
+    ),
+    measure(
+      "winston: log.debug(expensive)",
+      () => winstonDisabled.debug(`state: ${expensiveArg()}`),
+      N,
+    ),
+    measure(
+      "debug: debug(expensive)",
+      () => debugFn(`state: ${expensiveArg()}`),
+      N,
+    ),
   ]
 
   printResults("DISABLED DEBUG — expensive argument (JSON.stringify)", results)
@@ -203,12 +233,23 @@ console.log(`Platform: ${process.platform} ${process.arch}`)
   setLogLevel("info") // info enabled
 
   const results = [
-    measure("loggily: log.info?.(str)", () => loggilyLog.info?.("hello"), N / 10),
+    measure(
+      "loggily: log.info?.(str)",
+      () => loggilyLog.info?.("hello"),
+      N / 10,
+    ),
     measure("pino: log.info(str)", () => pinoEnabled.info("hello"), N / 10),
-    measure("winston: log.info(str)", () => winstonEnabled.info("hello"), N / 10),
+    measure(
+      "winston: log.info(str)",
+      () => winstonEnabled.info("hello"),
+      N / 10,
+    ),
   ]
 
-  printResults("ENABLED INFO — cheap argument (string literal) — all to noop sink", results)
+  printResults(
+    "ENABLED INFO — cheap argument (string literal) — all to noop sink",
+    results,
+  )
 }
 
 // 4. Enabled info — structured data
@@ -218,12 +259,27 @@ console.log(`Platform: ${process.platform} ${process.arch}`)
   const structuredData = { key: "value", count: 42 }
 
   const results = [
-    measure("loggily: log.info?.(str, data)", () => loggilyLog.info?.("request", structuredData), N / 10),
-    measure("pino: log.info(obj, str)", () => pinoEnabled.info(structuredData, "request"), N / 10),
-    measure("winston: log.info(str, data)", () => winstonEnabled.info("request", structuredData), N / 10),
+    measure(
+      "loggily: log.info?.(str, data)",
+      () => loggilyLog.info?.("request", structuredData),
+      N / 10,
+    ),
+    measure(
+      "pino: log.info(obj, str)",
+      () => pinoEnabled.info(structuredData, "request"),
+      N / 10,
+    ),
+    measure(
+      "winston: log.info(str, data)",
+      () => winstonEnabled.info("request", structuredData),
+      N / 10,
+    ),
   ]
 
-  printResults("ENABLED INFO — structured data ({ key, count }) — all to noop sink", results)
+  printResults(
+    "ENABLED INFO — structured data ({ key, count }) — all to noop sink",
+    results,
+  )
 }
 
 // 5. Enabled warn — with Error object
@@ -233,9 +289,21 @@ console.log(`Platform: ${process.platform} ${process.arch}`)
   const err = new Error("something broke")
 
   const results = [
-    measure("loggily: log.warn?.(Error)", () => loggilyLog.warn?.(err as unknown as string), N / 10),
-    measure("pino: log.warn(Error)", () => pinoEnabled.warn({ err }, "something broke"), N / 10),
-    measure("winston: log.warn(str, Error)", () => winstonEnabled.warn("something broke", { error: err }), N / 10),
+    measure(
+      "loggily: log.warn?.(Error)",
+      () => loggilyLog.warn?.(err as unknown as string),
+      N / 10,
+    ),
+    measure(
+      "pino: log.warn(Error)",
+      () => pinoEnabled.warn({ err }, "something broke"),
+      N / 10,
+    ),
+    measure(
+      "winston: log.warn(str, Error)",
+      () => winstonEnabled.warn("something broke", { error: err }),
+      N / 10,
+    ),
   ]
 
   printResults("ENABLED WARN — Error object — all to noop sink", results)
@@ -263,6 +331,10 @@ console.log(`Platform: ${process.platform} ${process.arch}`)
 
 console.log("\n" + "─".repeat(70))
 console.log("Key: ops/s = operations per second, /op = time per operation")
-console.log("loggily uses ?. for zero-overhead: disabled calls skip argument evaluation")
-console.log("Enabled benchmarks: all loggers write to noop sinks (fair comparison)")
+console.log(
+  "loggily uses ?. for zero-overhead: disabled calls skip argument evaluation",
+)
+console.log(
+  "Enabled benchmarks: all loggers write to noop sinks (fair comparison)",
+)
 console.log("")

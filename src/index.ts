@@ -68,7 +68,11 @@ export {
   writeSpan,
 } from "./core.js"
 
-export { createFileWriter, type FileWriter, type FileWriterOptions } from "./file-writer.js"
+export {
+  createFileWriter,
+  type FileWriter,
+  type FileWriterOptions,
+} from "./file-writer.js"
 
 // Wire file writer into core for LOG_FILE env var support
 import { createFileWriter as _cfw } from "./file-writer.js"
@@ -89,4 +93,9 @@ export {
 export { buildPipeline, type Pipeline, serializeCause } from "./pipeline.js"
 
 // Re-export config types for typed pipeline construction
-export type { ConfigElement, ConfigObject, FileDescriptor, Writable } from "./pipeline.js"
+export type {
+  ConfigElement,
+  ConfigObject,
+  FileDescriptor,
+  Writable,
+} from "./pipeline.js"

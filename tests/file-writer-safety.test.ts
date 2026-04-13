@@ -33,7 +33,10 @@ describe("file-writer safety", () => {
   })
 
   test("buffer is preserved when writeSync throws", () => {
-    const writer = createFileWriter("/fake/path.log", { bufferSize: 999999, flushInterval: 60000 })
+    const writer = createFileWriter("/fake/path.log", {
+      bufferSize: 999999,
+      flushInterval: 60000,
+    })
 
     // Write some data
     writer.write("important data")
@@ -62,7 +65,10 @@ describe("file-writer safety", () => {
   })
 
   test("close() runs closeSync and removeListener even when flush() throws", () => {
-    const writer = createFileWriter("/fake/path.log", { bufferSize: 999999, flushInterval: 60000 })
+    const writer = createFileWriter("/fake/path.log", {
+      bufferSize: 999999,
+      flushInterval: 60000,
+    })
     writer.write("some data")
 
     // Make writeSync always throw so flush() fails during close()

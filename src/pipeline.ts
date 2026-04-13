@@ -71,7 +71,8 @@ export function serializeCause(cause: unknown, maxDepth: number = 3): unknown {
       message: cause.message,
       stack: cause.stack,
     }
-    if ((cause as { code?: string }).code) result.code = (cause as { code?: string }).code
+    if ((cause as { code?: string }).code)
+      result.code = (cause as { code?: string }).code
     if (cause.cause !== undefined) {
       result.cause = serializeCause(cause.cause, maxDepth - 1)
     }
@@ -87,8 +88,13 @@ export function safeStringify(value: unknown): string {
     if (typeof val === "bigint") return val.toString()
     if (typeof val === "symbol") return val.toString()
     if (val instanceof Error) {
-      const result: Record<string, unknown> = { message: val.message, stack: val.stack, name: val.name }
-      if ((val as { code?: string }).code) result.code = (val as { code?: string }).code
+      const result: Record<string, unknown> = {
+        message: val.message,
+        stack: val.stack,
+        name: val.name,
+      }
+      if ((val as { code?: string }).code)
+        result.code = (val as { code?: string }).code
       if (val.cause !== undefined) result.cause = serializeCause(val.cause)
       return result
     }
@@ -101,7 +107,9 @@ export function safeStringify(value: unknown): string {
 }
 
 export function formatConsoleEvent(event: Event): string {
-  const time = pc.dim(new Date(event.time).toISOString().split("T")[1]?.split(".")[0] || "")
+  const time = pc.dim(
+    new Date(event.time).toISOString().split("T")[1]?.split(".")[0] || "",
+  )
   const ns = pc.cyan(event.namespace)
 
   if (event.kind === "span") {
@@ -177,7 +185,8 @@ function matchesPattern(namespace: string, pattern: string): boolean {
 }
 
 export function parseNsFilter(ns: string | string[]): NsFilter {
-  const patterns = typeof ns === "string" ? ns.split(",").map((s) => s.trim()) : ns
+  const patterns =
+    typeof ns === "string" ? ns.split(",").map((s) => s.trim()) : ns
   const includes: string[] = []
   const excludes: string[] = []
 
@@ -246,7 +255,10 @@ function createConsoleSink(format: LogFormat): (event: Event) => void {
   return (event: Event) => writeToConsole(formatter(event), event)
 }
 
-function createFileSink(path: string, format: LogFormat): { write: (event: Event) => void; dispose: () => void } {
+function createFileSink(
+  path: string,
+  format: LogFormat,
+): { write: (event: Event) => void; dispose: () => void } {
   const writer = createFileWriter(path)
   const formatter = format === "json" ? formatJSONEvent : formatConsoleEvent
   return {
@@ -256,10 +268,17 @@ function createFileSink(path: string, format: LogFormat): { write: (event: Event
 }
 
 function isNodeStream(obj: unknown): boolean {
-  return typeof obj === "object" && obj !== null && ("_write" in obj || "writable" in obj || "fd" in obj)
+  return (
+    typeof obj === "object" &&
+    obj !== null &&
+    ("_write" in obj || "writable" in obj || "fd" in obj)
+  )
 }
 
-function createWritableSink(writable: Writable, format: LogFormat): (event: Event) => void {
+function createWritableSink(
+  writable: Writable,
+  format: LogFormat,
+): (event: Event) => void {
   // Node.js streams (process.stderr, fs streams) default to string mode
   // Plain { write } objects default to object mode (raw Events)
   const useObjectMode = writable.objectMode ?? !isNodeStream(writable)
@@ -287,7 +306,15 @@ interface Output {
 
 // ============ Discrimination ============
 
-const VALID_CONFIG_KEYS = new Set(["level", "ns", "format", "spans", "metrics", "idFormat", "sampleRate"])
+const VALID_CONFIG_KEYS = new Set([
+  "level",
+  "ns",
+  "format",
+  "spans",
+  "metrics",
+  "idFormat",
+  "sampleRate",
+])
 const SINK_KEYS = new Set(["file", "otel"])
 
 function isPojo(obj: unknown): obj is Record<string, unknown> {
@@ -363,7 +390,10 @@ interface ScopeConfig {
   format: LogFormat
 }
 
-export function buildPipeline(elements: ConfigElement[], parentConfig?: Partial<ScopeConfig>): Pipeline {
+export function buildPipeline(
+  elements: ConfigElement[],
+  parentConfig?: Partial<ScopeConfig>,
+): Pipeline {
   const config: ScopeConfig = {
     level: parentConfig?.level ?? readEnvLevel(),
     ns: parentConfig?.ns ?? readEnvNs(),
@@ -419,10 +449,14 @@ export function buildPipeline(elements: ConfigElement[], parentConfig?: Partial<
       const keys = Object.keys(obj)
 
       const hasSinkKey = keys.some((k) => SINK_KEYS.has(k))
-      const hasUnknownKey = keys.some((k) => !VALID_CONFIG_KEYS.has(k) && !SINK_KEYS.has(k))
+      const hasUnknownKey = keys.some(
+        (k) => !VALID_CONFIG_KEYS.has(k) && !SINK_KEYS.has(k),
+      )
 
       if (hasUnknownKey) {
-        const unknown = keys.find((k) => !VALID_CONFIG_KEYS.has(k) && !SINK_KEYS.has(k))
+        const unknown = keys.find(
+          (k) => !VALID_CONFIG_KEYS.has(k) && !SINK_KEYS.has(k),
+        )
         throw new Error(
           `loggily: unknown config key "${unknown}" in config object. Valid keys: ${[...VALID_CONFIG_KEYS, ...SINK_KEYS].join(", ")}`,
         )
@@ -430,8 +464,12 @@ export function buildPipeline(elements: ConfigElement[], parentConfig?: Partial<
 
       if (hasSinkKey) {
         if (typeof obj.file === "string") {
-          const outputLevel = isValidLogLevel(obj.level) ? obj.level : config.level
-          const outputNs = obj.ns ? parseNsFilter(obj.ns as string | string[]) : config.ns
+          const outputLevel = isValidLogLevel(obj.level)
+            ? obj.level
+            : config.level
+          const outputNs = obj.ns
+            ? parseNsFilter(obj.ns as string | string[])
+            : config.ns
           const outputFormat = (obj.format as LogFormat) ?? config.format
           const sink = createFileSink(obj.file, outputFormat)
           disposables.push(sink.dispose)
@@ -443,18 +481,23 @@ export function buildPipeline(elements: ConfigElement[], parentConfig?: Partial<
           })
         }
         if (obj.otel !== undefined) {
-          throw new Error("loggily: OTEL sink is not yet implemented. See loggily/otel for the planned bridge.")
+          throw new Error(
+            "loggily: OTEL sink is not yet implemented. See loggily/otel for the planned bridge.",
+          )
         }
         continue
       }
 
       // Scope config — update inherited config
       if (isValidLogLevel(obj.level)) config.level = obj.level
-      if (obj.ns !== undefined) config.ns = parseNsFilter(obj.ns as string | string[])
-      if (obj.format === "console" || obj.format === "json") config.format = obj.format
+      if (obj.ns !== undefined)
+        config.ns = parseNsFilter(obj.ns as string | string[])
+      if (obj.format === "console" || obj.format === "json")
+        config.format = obj.format
       if (obj.spans === true) spansEnabled = true
       if (obj.spans === false) spansEnabled = false
-      if (obj.idFormat === "simple" || obj.idFormat === "w3c") setIdFormat(obj.idFormat)
+      if (obj.idFormat === "simple" || obj.idFormat === "w3c")
+        setIdFormat(obj.idFormat)
       if (typeof obj.sampleRate === "number") setSampleRate(obj.sampleRate)
       continue
     }
@@ -464,7 +507,10 @@ export function buildPipeline(elements: ConfigElement[], parentConfig?: Partial<
       outputs.push({
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
         nsFilter: config.ns,
-        write: createWritableSink(process.stderr as unknown as Writable, config.format),
+        write: createWritableSink(
+          process.stderr as unknown as Writable,
+          config.format,
+        ),
       })
       continue
     }
@@ -486,7 +532,11 @@ export function buildPipeline(elements: ConfigElement[], parentConfig?: Partial<
       if (result !== undefined) e = result
     }
     for (const output of outputs) {
-      if (e.kind === "log" && LOG_LEVEL_PRIORITY[e.level] < output.levelPriority) continue
+      if (
+        e.kind === "log" &&
+        LOG_LEVEL_PRIORITY[e.level] < output.levelPriority
+      )
+        continue
       if (output.nsFilter && !output.nsFilter(e.namespace)) continue
       output.write(e)
     }
@@ -509,7 +559,12 @@ export function buildPipeline(elements: ConfigElement[], parentConfig?: Partial<
 export function readEnvLevel(): LogLevel {
   const env = getEnv("LOG_LEVEL")?.toLowerCase()
   let level: LogLevel =
-    env === "trace" || env === "debug" || env === "info" || env === "warn" || env === "error" || env === "silent"
+    env === "trace" ||
+    env === "debug" ||
+    env === "info" ||
+    env === "warn" ||
+    env === "error" ||
+    env === "silent"
       ? env
       : "info"
 
@@ -529,7 +584,12 @@ export function readEnvLevel(): LogLevel {
 export function readEnvLevelForNamespace(namespace: string): LogLevel {
   const env = getEnv("LOG_LEVEL")?.toLowerCase()
   const baseLevel: LogLevel =
-    env === "trace" || env === "debug" || env === "info" || env === "warn" || env === "error" || env === "silent"
+    env === "trace" ||
+    env === "debug" ||
+    env === "info" ||
+    env === "warn" ||
+    env === "error" ||
+    env === "silent"
       ? env
       : "info"
 
@@ -567,7 +627,8 @@ export function readEnvFormat(): LogFormat {
 export function readEnvTrace(): { enabled: boolean; filter: NsFilter | null } {
   const traceEnv = getEnv("TRACE")
   if (!traceEnv) return { enabled: false, filter: null }
-  if (traceEnv === "1" || traceEnv === "true") return { enabled: true, filter: null }
+  if (traceEnv === "1" || traceEnv === "true")
+    return { enabled: true, filter: null }
   const prefixes = traceEnv.split(",").map((s) => s.trim())
   return {
     enabled: true,

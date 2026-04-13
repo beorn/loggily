@@ -6,7 +6,8 @@
 const _process = typeof process !== "undefined" ? process : undefined
 
 const enabled =
-  _process?.env?.["FORCE_COLOR"] !== undefined && _process?.env?.["FORCE_COLOR"] !== "0"
+  _process?.env?.["FORCE_COLOR"] !== undefined &&
+  _process?.env?.["FORCE_COLOR"] !== "0"
     ? true
     : _process?.env?.["NO_COLOR"] !== undefined
       ? false

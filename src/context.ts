@@ -111,7 +111,11 @@ export function getCurrentSpan(): SpanContext | null {
  *
  * @internal
  */
-export function enterSpanContext(spanId: string, traceId: string, parentId: string | null): void {
+export function enterSpanContext(
+  spanId: string,
+  traceId: string,
+  parentId: string | null,
+): void {
   if (!contextEnabled || !storage) return
 
   // Capture the full previous context before overwriting

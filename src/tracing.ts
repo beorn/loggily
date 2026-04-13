@@ -99,7 +99,10 @@ export interface TraceparentOptions {
  * fetch(url, { headers: { traceparent: header } })
  * ```
  */
-export function traceparent(spanData: SpanData, options?: TraceparentOptions): string {
+export function traceparent(
+  spanData: SpanData,
+  options?: TraceparentOptions,
+): string {
   const traceId = padHex(spanData.traceId, 32)
   const spanId = padHex(spanData.id, 16)
   const flags = (options?.sampled ?? true) ? "01" : "00"

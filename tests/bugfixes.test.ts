@@ -17,7 +17,11 @@ import {
   type Event,
   type LogEvent,
 } from "../src/index.ts"
-import { enableContextPropagation, disableContextPropagation, getCurrentSpan } from "../src/context.ts"
+import {
+  enableContextPropagation,
+  disableContextPropagation,
+  getCurrentSpan,
+} from "../src/context.ts"
 import { createConsoleMock } from "./helpers.ts"
 
 let consoleMock: ReturnType<typeof createConsoleMock>
@@ -168,12 +172,18 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("bigint in data does not throw (JSON format)", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     expect(() => {
       log.info?.("bigint test", { value: BigInt(42n) })
     }).not.toThrow()
 
-    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<string, unknown>
+    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<
+      string,
+      unknown
+    >
     expect(parsed.value).toBe("42")
   })
 
@@ -187,7 +197,10 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("symbol in data does not throw (JSON format)", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     expect(() => {
       log.info?.("symbol test", { key: Symbol("mySymbol") })
     }).not.toThrow()
@@ -207,7 +220,10 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("circular reference in data does not throw (JSON format)", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const obj: Record<string, unknown> = { a: 1 }
     obj.self = obj
 
@@ -219,14 +235,20 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("Error object in data is serialized with message and stack", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const err = new Error("test error")
 
     expect(() => {
       log.info?.("error in data", { err })
     }).not.toThrow()
 
-    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<string, unknown>
+    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<
+      string,
+      unknown
+    >
     const errObj = parsed.err as Record<string, unknown>
     expect(errObj).toBeDefined()
     expect(errObj.message).toBe("test error")
@@ -234,7 +256,10 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("nested circular references are handled", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const a: Record<string, unknown> = { name: "a" }
     const b: Record<string, unknown> = { name: "b", ref: a }
     a.ref = b
@@ -245,7 +270,10 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
   })
 
   test("mixed problematic types in one data object", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
     const circular: Record<string, unknown> = { x: 1 }
     circular.self = circular
 
@@ -259,7 +287,10 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
       })
     }).not.toThrow()
 
-    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<string, unknown>
+    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<
+      string,
+      unknown
+    >
     expect(parsed.big).toBe("999")
     expect(parsed.normal).toBe("ok")
   })
@@ -518,7 +549,10 @@ describe("Error.cause chain serialization", () => {
   })
 
   test("Error.cause in safeStringify (JSON format)", () => {
-    const log = createLogger("test", [{ level: "trace", format: "json" }, console])
+    const log = createLogger("test", [
+      { level: "trace", format: "json" },
+      console,
+    ])
 
     const root = new Error("timeout")
     root.cause = new Error("DNS failed")
@@ -526,7 +560,10 @@ describe("Error.cause chain serialization", () => {
     log.info?.("error in data", { err: root })
 
     expect(consoleMock.output).toHaveLength(1)
-    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<string, unknown>
+    const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<
+      string,
+      unknown
+    >
     const errObj = parsed.err as Record<string, unknown>
     expect(errObj.cause).toEqual({
       name: "Error",
