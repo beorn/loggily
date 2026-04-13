@@ -7,6 +7,8 @@
 
 Debugs, logs, and spans — one API. Replace `debug` + your JSON logger + ad-hoc timers with one namespace tree and one output pipeline. Pure TypeScript, zero dependencies, ~3 KB.
 
+## Getting Started
+
 ```bash
 npm install loggily
 ```
