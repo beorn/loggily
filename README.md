@@ -41,7 +41,7 @@ const log = createLogger("myapp", [
 
 // Structured logging
 log.info?.("server started", { port: 3000 })
-log.debug?.(`state: ${JSON.stringify(getState())}`) // skipped if debug off
+log.debug?.(`state: ${expensiveFunc()}`) // skipped if debug off
 log.error?.(new Error("connection lost"))
 
 // Child loggers — extend namespace, add context
