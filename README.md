@@ -36,7 +36,7 @@ const dbLog = log.child("db", { pool: "main" }) // namespace: "myapp:db"
 
 ## Why the `?.`
 
-Disabled logs should not build strings, serialize objects, or call functions just to throw the result away.
+Optional chaining is an ergonomic and efficient way to handle disabled logs. Most loggers still evaluate arguments even when the level is off — Loggily short-circuits the entire call:
 
 ```typescript
 // Most loggers — computeExpensiveState() runs even when debug is off
