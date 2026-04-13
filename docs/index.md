@@ -14,14 +14,14 @@ hero:
       link: https://github.com/beorn/loggily
 
 features:
-  - title: "The ?. Optional Chaining Trick"
-    details: "Short-circuits the entire call when a log level is disabled — nothing evaluates, not the string interpolation, not the function calls, nothing. ~22x faster than conventional noop loggers."
-  - title: "One Pipeline, Six Element Types"
-    details: "Objects configure, arrays branch, values write. Config objects, stage functions, file sinks, writable sinks, branch arrays, and console — all in one array. Colorized dev output, structured JSON in production. Same code."
+  - title: "Free If Silenced"
+    details: "The optional chaining trick short-circuits disabled log calls entirely. Nothing evaluates — ~22x faster than conventional noop loggers."
+  - title: "One Config Array"
+    details: "Objects configure, arrays branch, values write. Six element types, one pipeline. Colorized dev output, structured JSON in production."
   - title: "Send Anywhere"
-    details: "OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus, W3C Trace Context. DEBUG= patterns work the same as the debug package."
-  - title: "Spans, Metrics, Workers, Async Context"
-    details: "using span = log.span('name') for timing with parent-child tracking and trace IDs. Span metrics (p50/p95/p99). Worker thread forwarding via postMessage. AsyncLocalStorage propagation. ~3 KB, zero dependencies."
+    details: "OpenTelemetry, Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus, W3C Trace Context. Same DEBUG= patterns as the debug package."
+  - title: "Full Observability Stack"
+    details: "Spans with trace IDs. Metrics (p50/p95/p99). Worker threads. AsyncLocalStorage propagation. ~3 KB, zero dependencies."
 ---
 
 ## Install
