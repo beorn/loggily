@@ -16,10 +16,8 @@ hero:
 features:
   - title: "Free If Silenced"
     details: "The optional chaining trick short-circuits disabled log calls entirely — not just the log call, but all argument evaluation too. ~22x faster than conventional noop loggers in benchmarks."
-  - title: "Three Tools in One"
-    details: "Replace debug (namespace filtering), your JSON logger (structured production output), and ad-hoc timers. One import, one config, one API. ~3 KB, zero dependencies."
   - title: "All-in-One Observability"
-    details: "<b>Spans</b> with parent-child tracking and trace IDs. <b>Metrics</b> (p50/p95/p99). <b>Worker threads</b> via postMessage. <b>AsyncLocalStorage</b> propagation across async chains."
+    details: "Replace debug + your JSON logger + ad-hoc timers with one API. <b>Namespace filtering</b>, <b>structured logs</b>, <b>spans</b> with trace IDs, <b>metrics</b> (p50/p95/p99), <b>worker threads</b>, <b>AsyncLocalStorage</b> propagation. ~3 KB, zero dependencies."
   - title: "Beautiful Dev, Structured Prod"
     details: "Colorized, human-readable console output in development. Structured JSON in production. Same code, no compromise. Switch with NODE_ENV."
   - title: "Browser and Terminal"
