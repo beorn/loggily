@@ -16,15 +16,13 @@ hero:
 features:
   - title: "Free If Silenced"
     details: "The optional chaining trick short-circuits disabled log calls entirely. Nothing evaluates — ~22x faster than conventional noop loggers."
-  - title: "One Config Array"
-    details: "Objects configure, arrays branch, values write. Six element types, one pipeline. Colorized dev output, structured JSON in production."
+  - title: "One Pipeline, Every Destination"
+    details: "Console, files, OpenTelemetry, Pino transports, custom writables — wire them all in one config array. Objects configure, arrays branch, values write. Colorized dev output, structured JSON in production. Same code."
   - title: "Send Anywhere"
     details: "OpenTelemetry, Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus, W3C Trace Context. Same DEBUG= patterns as the debug package."
   - title: "Full Observability Stack"
     details: "Spans with trace IDs. Metrics (p50/p95/p99). Worker threads. AsyncLocalStorage propagation. ~3 KB, zero dependencies."
 ---
-
-## Install
 
 ::: code-group
 
@@ -46,7 +44,13 @@ yarn add loggily
 
 :::
 
-## Getting Started
+```console
+$ DEBUG='*' node app                        # show all debug output
+$ DEBUG='myapp:db' node app                 # only database logs
+$ LOG_FILE=/tmp/app.log node app            # write to file
+$ NODE_ENV=production node app              # structured JSON output
+$ TRACE=1 node app                          # enable span timing
+```
 
 ```typescript
 import { createLogger } from "loggily"
@@ -84,12 +88,4 @@ log.metrics.summary() // myapp:db:query: 42 spans, mean=3.2ms, p95=8.4ms
 
 // Composable — build custom factories
 const myCreateLogger = pipe(baseCreateLogger, withSpans(), myPlugin())
-```
-
-```console
-$ DEBUG='*' node app                        # show all debug output
-$ DEBUG='myapp:db' node app                 # only database logs
-$ LOG_FILE=/tmp/app.log node app            # write to file
-$ NODE_ENV=production node app              # structured JSON output
-$ TRACE=1 node app                          # enable span timing
 ```
