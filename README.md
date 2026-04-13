@@ -77,7 +77,7 @@ Objects configure, arrays branch, values write. [Full guide →](https://loggily
 
 ## Features
 
-- **Free if silenced** (via optional chaining trick) — `?.` short-circuits the entire call. [~22x faster](https://loggily.dev/guide/benchmarks) than noop loggers.
+- **Ergonomic and efficient** — free if silenced: `?.` short-circuits the entire call. [~22x faster](https://loggily.dev/guide/benchmarks) than noop loggers.
 - **Namespace hierarchy** — `DEBUG=myapp:db` shows only database output. Same filter patterns as the `debug` package.
 - **Spans** — `using span = log.span("name")`. Duration, parent-child tracking, trace IDs, custom data. Built-in [metrics collection](https://loggily.dev/guide/metrics) (p50/p95/p99).
 - **Child loggers** — `log.child("auth")` extends namespace, `log.child({ requestId })` adds context.
