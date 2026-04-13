@@ -68,7 +68,7 @@ const log = createLogger("myapp", [
   toOtel({ api: otelApi }),              // stage — transforms/forwards
   pinoTransport,                         // writable — { write } receives events
   { file: "...", format: "json" },       // file sink — formatted strings
-  [{ level: "error" }, { file: "..." }], // branch — sub-pipeline with own scope
+  [{ level: "warn" }, { file: "..." }],  // branch — sub-pipeline with own scope
   console,                               // console — colorized, human-readable
 ])
 ```
