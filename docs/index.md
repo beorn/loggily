@@ -18,22 +18,22 @@ features:
     title: "Free If Silenced"
     details: "The optional chaining trick makes disabled log calls truly free — the entire call short-circuits, so not even the arguments evaluate. ~22x faster than noop loggers."
     link: /guide/benchmarks
-    linkText: "See benchmarks →"
+    linkText: "See benchmarks "
   - icon: 🔭
     title: "All-in-One Observability"
     details: "One API replaces debug, your JSON logger, and ad-hoc timers. Namespace filtering, structured logs, spans, metrics, worker threads, and async context — ~3 KB, zero dependencies."
     link: /guide/journey
-    linkText: "Get started →"
+    linkText: "Get started "
   - icon: 🌐
     title: "Works Everywhere"
     details: "Same API in browser and server (Node.js, Bun). Beautiful colorized logs in development, performant structured JSON in production — no compromise."
     link: /guide/comparison
-    linkText: "See comparison →"
+    linkText: "See comparison "
   - icon: 🔌
     title: "Send Anywhere"
     details: "Console, files, OpenTelemetry (Jaeger, Grafana, Datadog), Pino transports, Sentry, Elasticsearch, CloudWatch, Prometheus — or write your own sink."
     link: /guide/destinations
-    linkText: "See all destinations →"
+    linkText: "See all destinations "
 ---
 
 ## Quick Look
