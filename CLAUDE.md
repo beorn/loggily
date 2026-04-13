@@ -1,6 +1,6 @@
 # Loggily
 
-Debugs, logs, and spans -- one API. Clarity without the clutter.
+Debugs, logs, and spans — structured and dev, server and browser — one TypeScript API. No output, no overhead.
 
 **Design philosophy**: Opinionated defaults, composable primitives. See [docs/guide/why.md](docs/guide/why.md#design-principles) for full principles.
 
@@ -16,6 +16,8 @@ VitePress docs at `docs/` -- deployed to loggily.dev via GitHub Pages.
 - **CI**: `.github/workflows/docs.yml` -- auto-deploys on push to main
 
 **Do NOT create or edit `docs/site/`** -- docs live directly in `docs/`.
+
+**README & landing page style**: follow the [readme-style guide](../../.claude/skills/docs/readme-style.md) when editing README.md or docs/index.md. Core principles: progressive disclosure, show don't tell, density without clutter, iterate prose not structure.
 
 ## Quick Start
 
