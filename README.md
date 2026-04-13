@@ -76,7 +76,7 @@ See the [Destinations guide](https://loggily.dev/guide/destinations) for copy-pa
 
 ## Why this exists
 
-Loggily was built while developing a terminal UI where disabled debug logs inside the render loop were eating frame time. No existing logger solved the "disabled calls should cost nothing" problem at the language level, so `?.` became the foundation.
+Tired of choosing between logging and production performance. Wanted structured JSON for production AND beautiful colorized output for development, in both browser and terminal, without the overhead when logs are off.
 
 > **Status:** Early release (0.x). The core API is stable, but details may evolve before 1.0.
 
