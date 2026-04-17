@@ -21,6 +21,7 @@ export {
   type ConditionalLogger,
   type Logger,
   type SpanLogger,
+  type SpannedLogger,
   type SpanData,
   type LazyMessage,
   type LazyProps,

@@ -111,6 +111,21 @@ export interface Logger extends Disposable {
 
 export interface SpanLogger extends ConditionalLogger, Disposable {
   readonly spanData: SpanData & { [key: string]: unknown }
+  // Override optional `span` from ConditionalLogger: a SpanLogger is always
+  // produced by `withSpans()`, so nested `.span()` is guaranteed present.
+  span(namespace?: string, props?: LazyProps): SpanLogger
+}
+
+/**
+ * ConditionalLogger + guaranteed `.span()` method.
+ *
+ * The default exported `createLogger` applies `withSpans()`, which attaches a
+ * working `.span()` at runtime. `ConditionalLogger.span` is optional (undefined
+ * on loggers built without `withSpans()`), so consumers of the default factory
+ * need a type that reflects the attached span method to avoid TS2722/TS18048.
+ */
+export type SpannedLogger = ConditionalLogger & {
+  span: (namespace?: string, props?: LazyProps) => SpanLogger
 }
 
 // ============ ConditionalLogger ============
@@ -916,12 +931,18 @@ export function withConfigMetrics(): LoggerPlugin {
 }
 
 /** Default createLogger — includes withEnvDefaults + withSpans + withConfigMetrics. */
-export const createLogger: LoggerFactory = pipe(
+export const createLogger: (
+  name: string,
+  configOrProps?: ConfigElement[] | Record<string, unknown>,
+) => SpannedLogger = pipe(
   baseCreateLogger,
   withEnvDefaults(),
   withSpans(),
   withConfigMetrics(),
-)
+) as (
+  name: string,
+  configOrProps?: ConfigElement[] | Record<string, unknown>,
+) => SpannedLogger
 
 /** Test helper — all levels, console output. */
 export function createTestLogger(name: string): ConditionalLogger {
