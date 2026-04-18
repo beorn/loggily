@@ -40,6 +40,7 @@ import {
   formatConsoleEvent,
   formatJSONEvent,
 } from "./pipeline.js"
+import { createConsoleSink as createStructuredConsoleSink } from "./console-sinks.js"
 
 import {
   createMetricsCollector as _createMetricsCollector,
@@ -302,6 +303,16 @@ function createLoggerImpl(
   ): void => {
     let message: string
     let data: Record<string, unknown> | undefined
+    // Raw user args, in call order (after the message). Console sinks spread
+    // these to console.* so DevTools keeps objects expandable. We preserve
+    // the original references — no JSON-stringifying, no ANSI embedding.
+    //
+    // Convention:
+    //   - `log.error(err, …)` → prepend the Error so DevTools shows its
+    //     clickable stack.
+    //   - Any structured data (merged context + props + user data) goes in
+    //     as a single trailing object so it renders as one expandable node.
+    const userArgs: unknown[] = []
 
     if (msgOrError instanceof Error) {
       const err = msgOrError
@@ -332,6 +343,8 @@ function createLoggerImpl(
             err.cause !== undefined ? serializeCause(err.cause) : undefined,
         }
       }
+      userArgs.push(err)
+      if (data && Object.keys(data).length > 0) userArgs.push(data)
     } else {
       message = resolveMessage(msgOrError)
       const contextTags = _getContextTags?.()
@@ -345,6 +358,7 @@ function createLoggerImpl(
           : Object.keys(props).length > 0 || dataOrMsg
             ? { ...props, ...(dataOrMsg as Record<string, unknown>) }
             : undefined
+      if (data && Object.keys(data).length > 0) userArgs.push(data)
     }
 
     const event: LogEvent = {
@@ -354,6 +368,7 @@ function createLoggerImpl(
       level,
       message,
       props: data,
+      userArgs,
     }
     pipeline.dispatch(event)
   }
@@ -876,13 +891,18 @@ function createEnvPipeline(): Pipeline {
     const ns = currentNs()
     if (ns && !ns(event.namespace)) return
 
-    const formatter =
-      currentFormat() === "json" ? formatJSONEvent : formatConsoleEvent
+    // Legacy writers still receive a pre-formatted string — their contract.
+    const format = currentFormat()
+    const formatter = format === "json" ? formatJSONEvent : formatConsoleEvent
     const text = formatter(event)
     const lvl = event.kind === "log" ? event.level : "span"
-
     for (const w of _writers) w(text, lvl)
-    if (!_suppressConsole) writeToConsole(text, event)
+
+    // Structured console output: browser DevTools sees %c-styled prefix +
+    // expandable objects; Node sees ANSI prefix + util.format-inspectable
+    // objects. The sink is recreated per dispatch so LOG_FORMAT env flips
+    // take effect without logger rebuild.
+    if (!_suppressConsole) createStructuredConsoleSink(format)(event)
     fileSink?.(event)
   }
 

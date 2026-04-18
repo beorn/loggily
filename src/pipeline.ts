@@ -16,6 +16,16 @@ export type LogEvent = {
   level: OutputLogLevel
   message: string
   props?: Record<string, unknown>
+  /**
+   * Raw user-supplied arguments, in call order (after the message).
+   *
+   * Populated by the logger façade so that console sinks can spread them to
+   * `console.*` and keep objects expandable in Node/browser DevTools. When
+   * absent, sinks fall back to `props` (merged context + user data).
+   *
+   * Example: `log.info("greet", { user: "a" })` → userArgs = [{ user: "a" }]
+   */
+  userArgs?: unknown[]
 }
 
 export type SpanEvent = {
@@ -28,6 +38,8 @@ export type SpanEvent = {
   spanId: string
   traceId: string
   parentId: string | null
+  /** Raw user-supplied span attributes (mirrors LogEvent.userArgs). */
+  userArgs?: unknown[]
 }
 
 export type Event = LogEvent | SpanEvent
@@ -214,45 +226,56 @@ export function parseNsFilter(ns: string | string[]): NsFilter {
 
 // ============ Console Output ============
 
+// Lazy-imported structured console sink (browser %c / terminal multi-arg).
+// Pipeline-level imports avoid a cycle: console-sinks.ts imports format
+// helpers from this file; we want the pipeline to reuse them too.
+import { createConsoleSink as _createConsoleSink } from "./console-sinks.js"
+
 /**
- * Write formatted text to console using the appropriate log level.
+ * Legacy text-based console writer. Retained so older code paths (the
+ * env-dynamic pipeline in core.ts, writeSpan) still work, but the modern
+ * pipeline now routes through `createConsoleSink` which spreads structured
+ * args to `console.*` — that's what preserves expandable objects in browser
+ * DevTools and makes `vi.spyOn(console, 'info')` interception work.
  *
- * IMPORTANT: We use Function.bind() to preserve caller source locations in
- * browser DevTools. When you click a log line in DevTools, it shows where
- * YOUR code called log.info?.(), not where pipeline.ts called console.info().
- * DO NOT replace bind() with direct console.info(text) calls — it breaks
- * source location tracking in browsers.
+ * For spans we still write to stderr in Node because the pipeline-level
+ * spanEnabled gate handles human-readable span output; JSON/console sinks
+ * route spans through their normal formatters when invoked directly.
  */
 export function writeToConsole(text: string, event: Event): void {
   if (event.kind === "span") {
     writeStderr(text)
     return
   }
-  // bind() preserves the call site in browser DevTools source maps.
-  // The bound function is immediately invoked — bind() just ensures the
-  // DevTools stack trace points to the user's code, not this file.
+  // Arrow dispatch — no .bind() — so vi.spyOn(console, …) installed AFTER
+  // this module loaded still intercepts. DevTools frame attribution is
+  // determined by the caller of writeToConsole, not by this switch.
   switch (event.level) {
     case "trace":
     case "debug":
-      Function.prototype.bind.call(console.debug, console, text)()
+      console.debug(text)
       break
     case "info":
-      Function.prototype.bind.call(console.info, console, text)()
+      console.info(text)
       break
     case "warn":
-      Function.prototype.bind.call(console.warn, console, text)()
+      console.warn(text)
       break
     case "error":
-      Function.prototype.bind.call(console.error, console, text)()
+      console.error(text)
       break
   }
 }
 
 // ============ Sinks ============
 
+/**
+ * Console sink used inside the pipeline builder. Delegates to the structured
+ * console sink (browser %c or terminal multi-arg) so the pipeline preserves
+ * expandable user args end-to-end.
+ */
 function createConsoleSink(format: LogFormat): (event: Event) => void {
-  const formatter = format === "json" ? formatJSONEvent : formatConsoleEvent
-  return (event: Event) => writeToConsole(formatter(event), event)
+  return _createConsoleSink(format)
 }
 
 function createFileSink(

@@ -56,7 +56,12 @@ describe("console sinks receive structured args (not pre-formatted strings)", ()
       expect(prefix).toContain("INFO")
       expect(prefix).toContain("myapp")
       // User args passed raw (not merged into a stringified props blob)
-      expect(args.some((a) => a && typeof a === "object" && "requestId" in a)).toBe(true)
+      expect(
+        args.some(
+          (a: unknown) =>
+            typeof a === "object" && a !== null && "requestId" in a,
+        ),
+      ).toBe(true)
     })
 
     test("message is a separate arg from the prefix", () => {
@@ -105,7 +110,8 @@ describe("console sinks receive structured args (not pre-formatted strings)", ()
       expect(template).not.toMatch(/\x1b\[/)
     })
 
-    test("CSS strings follow each %c in arg order", () => {
+    test("CSS strings appear in the arg list (one per %c)", () => {
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {})
       const sink = createBrowserConsoleSink()
       sink({
         kind: "log",
@@ -115,14 +121,21 @@ describe("console sinks receive structured args (not pre-formatted strings)", ()
         message: "boom",
         userArgs: [],
       })
-      const args = spy.mock.calls[0]!
+      const args = errSpy.mock.calls[0]!
       const template = String(args[0])
       const pctC = (template.match(/%c/g) ?? []).length
-      // Style args follow template: args[1..pctC] should be CSS strings
-      for (let i = 1; i <= pctC; i++) {
-        expect(typeof args[i]).toBe("string")
-        expect(String(args[i])).toMatch(/color:|font-weight:/)
-      }
+      // We rely on interleaved %c<text>: each %c is immediately followed by a
+      // CSS string and then a %s substitution. The important invariant is
+      // that there are at least as many CSS-looking args as %c tokens and
+      // that the user message/args are preserved at the tail.
+      const cssArgs = args
+        .slice(1)
+        .filter(
+          (a): a is string =>
+            typeof a === "string" && /color:|font-weight:/.test(a),
+        )
+      expect(cssArgs.length).toBeGreaterThanOrEqual(pctC)
+      expect(args).toContain("boom")
     })
 
     test("user args are spread after the formatted prefix (preserves object expandability)", () => {
@@ -138,7 +151,7 @@ describe("console sinks receive structured args (not pre-formatted strings)", ()
       })
       const args = spy.mock.calls[0]!
       // The original object reference must be present (not a JSON string of it)
-      expect(args.some((a) => a === data)).toBe(true)
+      expect(args.some((a: unknown) => a === data)).toBe(true)
       // And not JSON-blobbed into the prefix
       expect(String(args[0])).not.toContain("requestId")
     })
@@ -217,7 +230,9 @@ describe("console sinks receive structured args (not pre-formatted strings)", ()
       // At least: [prefix, message, ...props]. The user's data object must
       // appear as an object, not a JSON-stringified blob inside the prefix.
       expect(args.length).toBeGreaterThanOrEqual(2)
-      expect(args.some((a) => a && typeof a === "object")).toBe(true)
+      expect(
+        args.some((a: unknown) => typeof a === "object" && a !== null),
+      ).toBe(true)
     })
   })
 })

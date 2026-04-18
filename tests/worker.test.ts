@@ -24,7 +24,23 @@ import {
 import { resetIds, baseCreateLogger, pipe, withSpans } from "../src/index.ts"
 import type { Event, LogEvent, SpanEvent } from "../src/pipeline.ts"
 
-// Capture console output from main thread handler
+// Capture console output from main thread handler.
+// Multi-arg capture: concatenates every arg so tests that assert
+// `.message.toContain(...)` still work with the structured sink (which
+// spreads level prefix, message, and user args across multiple args).
+function formatArg(a: unknown): string {
+  if (typeof a === "string") return a
+  if (a instanceof Error) return `${a.name}: ${a.message}`
+  if (typeof a === "bigint") return a.toString()
+  if (typeof a === "object" && a !== null) {
+    try {
+      return JSON.stringify(a)
+    } catch {
+      return String(a)
+    }
+  }
+  return String(a)
+}
 let consoleOutput: { level: string; message: string }[] = []
 
 // Save/restore env vars
@@ -42,25 +58,17 @@ beforeEach(() => {
   delete process.env.TRACE
   process.env.LOG_LEVEL = "trace"
 
-  // Mock console methods for main thread
-  vi.spyOn(console, "log").mockImplementation((msg) => {
-    consoleOutput.push({ level: "log", message: String(msg) })
-  })
-  vi.spyOn(console, "debug").mockImplementation((msg) => {
-    consoleOutput.push({ level: "debug", message: String(msg) })
-  })
-  vi.spyOn(console, "info").mockImplementation((msg) => {
-    consoleOutput.push({ level: "info", message: String(msg) })
-  })
-  vi.spyOn(console, "warn").mockImplementation((msg) => {
-    consoleOutput.push({ level: "warn", message: String(msg) })
-  })
-  vi.spyOn(console, "error").mockImplementation((msg) => {
-    consoleOutput.push({ level: "error", message: String(msg) })
-  })
-  vi.spyOn(console, "trace").mockImplementation((msg) => {
-    consoleOutput.push({ level: "trace", message: String(msg) })
-  })
+  // Mock console methods for main thread — join all args so tests that
+  // look for message/data keywords match regardless of sink spreading.
+  const capture = (level: string) => (...args: unknown[]) => {
+    consoleOutput.push({ level, message: args.map(formatArg).join(" ") })
+  }
+  vi.spyOn(console, "log").mockImplementation(capture("log"))
+  vi.spyOn(console, "debug").mockImplementation(capture("debug"))
+  vi.spyOn(console, "info").mockImplementation(capture("info"))
+  vi.spyOn(console, "warn").mockImplementation(capture("warn"))
+  vi.spyOn(console, "error").mockImplementation(capture("error"))
+  vi.spyOn(console, "trace").mockImplementation(capture("trace"))
 
   // Spans use process.stderr.write to bypass Ink's patchConsole
   vi.spyOn(process.stderr, "write").mockImplementation(((
