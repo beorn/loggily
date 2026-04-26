@@ -48,8 +48,7 @@ export type ConsoleSink = (event: Event) => void
  */
 export function isBrowserRuntime(): boolean {
   return (
-    typeof globalThis !== "undefined" &&
-    typeof (globalThis as { window?: unknown }).window !== "undefined" &&
+    typeof (globalThis as { window?: unknown })?.window !== "undefined" &&
     typeof (globalThis as { document?: unknown }).document !== "undefined"
   )
 }
@@ -131,7 +130,7 @@ export function createTerminalConsoleSink(format: LogFormat = "console"): Consol
 /** Emit one line to process.stderr when available (no-op in browser). */
 function writeStderrLine(text: string): void {
   const p = typeof process !== "undefined" ? process : undefined
-  if (p && p.stderr && typeof p.stderr.write === "function") {
+  if (p?.stderr && typeof p.stderr.write === "function") {
     p.stderr.write(text + "\n")
     return
   }
