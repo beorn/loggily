@@ -67,6 +67,8 @@ export {
   setOutputMode,
   getOutputMode,
   addWriter,
+  addWriterFor,
+  type WriterFn,
   writeSpan,
 } from "./core.js"
 

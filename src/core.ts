@@ -39,6 +39,7 @@ import {
   writeToConsole,
   formatConsoleEvent,
   formatJSONEvent,
+  parseNsFilter,
 } from "./pipeline.js"
 import { createConsoleSink as createStructuredConsoleSink } from "./console-sinks.js"
 
@@ -770,8 +771,27 @@ function currentTrace(): { enabled: boolean; filter: NsFilter | null } {
   return readEnvTrace()
 }
 
+/**
+ * Writer signature for {@link addWriter} / {@link addWriterFor}.
+ *
+ * Receives the pre-formatted text (per the active LOG_FORMAT) plus the
+ * structural fields needed to route or filter writes downstream:
+ * - `level`: log level (or `"span"`) for level-aware sinks
+ * - `namespace`: required for namespace-glob routing via {@link addWriterFor}
+ * - `event`: full structured Event so JSONL sinks can re-serialize with
+ *   custom fields (e.g., {@link createLogger}'s `props` end up here).
+ *
+ * Two-arg writers (legacy shape) keep working — JS ignores extra arguments.
+ */
+export type WriterFn = (
+  formatted: string,
+  level: string,
+  namespace: string,
+  event: Event,
+) => void
+
 // Runtime state for legacy addWriter/setSuppressConsole
-const _writers: Array<(formatted: string, level: string) => void> = []
+const _writers: Array<WriterFn> = []
 let _suppressConsole = false
 
 // File writer factory — set by index.ts (avoids node:fs in core.ts for browser compat)
@@ -891,12 +911,13 @@ function createEnvPipeline(): Pipeline {
     const ns = currentNs()
     if (ns && !ns(event.namespace)) return
 
-    // Legacy writers still receive a pre-formatted string — their contract.
+    // Writers receive pre-formatted text + structural fields. Two-arg
+    // legacy writers ignore the trailing namespace + event args.
     const format = currentFormat()
     const formatter = format === "json" ? formatJSONEvent : formatConsoleEvent
     const text = formatter(event)
     const lvl = event.kind === "log" ? event.level : "span"
-    for (const w of _writers) w(text, lvl)
+    for (const w of _writers) w(text, lvl, event.namespace, event)
 
     // Structured console output: browser DevTools sees %c-styled prefix +
     // expandable objects; Node sees ANSI prefix + util.format-inspectable
@@ -1022,14 +1043,33 @@ export function setOutputMode(_mode: OutputMode): void {
 export function getOutputMode(): OutputMode {
   return "console"
 }
-export function addWriter(
-  writer: (formatted: string, level: string) => void,
-): () => void {
+export function addWriter(writer: WriterFn): () => void {
   _writers.push(writer)
   return () => {
     const i = _writers.indexOf(writer)
     if (i !== -1) _writers.splice(i, 1)
   }
+}
+
+/**
+ * Register a writer that only fires for events whose namespace matches the
+ * given DEBUG-style pattern (e.g. `"bg-recall:*"`, `"injection:*"`,
+ * `"myapp,-myapp:noisy"`). Returns the same unsubscribe handle as
+ * {@link addWriter}.
+ *
+ * Per-namespace fan-out enables routing different subsystems to different
+ * files (or in-memory sinks) without each subsystem needing its own
+ * env-var + appendFileSync impl.
+ */
+export function addWriterFor(
+  pattern: string | string[],
+  writer: WriterFn,
+): () => void {
+  const matches = parseNsFilter(pattern)
+  return addWriter((formatted, level, namespace, event) => {
+    if (!matches(namespace)) return
+    writer(formatted, level, namespace, event)
+  })
 }
 export function writeSpan(
   namespace: string,
