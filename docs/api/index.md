@@ -98,7 +98,7 @@ These functions still work but are deprecated. They map to environment variables
 | `enableSpans()` / `disableSpans()` / `spansAreEnabled()` | `TRACE=1` env var                                |
 | `setTraceFilter(ns)` / `getTraceFilter()`                | `TRACE=namespace` env var                        |
 | `setDebugFilter(ns)` / `getDebugFilter()`                | `{ ns }` in config array or `DEBUG` env          |
-| `addWriter(fn)`                                          | Stage functions or `{ file }` in config array    |
+| `addWriterFor(pattern, fn)`                              | `addWriter({ ns: pattern }, fn)` — same primitive |
 | `setOutputMode(mode)` / `getOutputMode()`                | Omit `console` from config array                 |
 | `setSuppressConsole(bool)`                               | Omit `console` from config array                 |
 

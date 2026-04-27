@@ -87,7 +87,7 @@ The array is read sequentially. Each element plays one of four roles:
 3. **Stage functions** (`(event) => event | null | void`) transform or filter events in the pipeline
 4. **Branch arrays** create sub-pipelines with their own scope
 
-This replaces the deprecated global setters (`setLogLevel`, `addWriter`, `enableSpans`, `setDebugFilter`) with a composable, per-logger configuration model. These functions still work but are deprecated -- they map to environment variables internally.
+This replaces the deprecated global setters (`setLogLevel`, `enableSpans`, `setDebugFilter`, `addWriterFor`) with a composable, per-logger configuration model. These functions still work but are deprecated -- they map to environment variables or to the canonical primitive (`addWriter` with the unified config-object overload) internally.
 
 ### Core principles
 

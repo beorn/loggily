@@ -132,14 +132,52 @@ Create a buffered file writer that flushes automatically.
 | `flush()`     | Write buffer to disk immediately      |
 | `close()`     | Flush remaining buffer and close file |
 
-## Deprecated Writer API
+## addWriter (low-level)
+
+`addWriter` registers a function that receives **formatted output** alongside the structured `Event` so you can route, filter, or fan-out without hand-rolling a config array. Three forms:
 
 ```typescript
-// Deprecated — use { file } in config array or custom stage functions instead
-import { addWriter } from "loggily"
+import { addWriter, createFileWriter } from "loggily"
 
-const unsub = addWriter((formatted: string, level: string) => {
-  // receives formatted output
+// 1. Catch-all — every record reaches the writer
+const unsub = addWriter((formatted, level, namespace, event) => {
+  console.error(formatted)
 })
-unsub() // unsubscribe
+
+// 2. Scoped — only records matching the config reach the writer.
+//    The config object accepts the same `{ ns, level }` shape used in
+//    createLogger config arrays, so the mental model is uniform.
+const file = createFileWriter("/tmp/bg-recall.log")
+addWriter(
+  { ns: "bg-recall:*" },
+  (formatted) => file.write(formatted),
+)
+
+// 3. Multi-dimensional filter
+addWriter(
+  { ns: "bg-recall:*", level: "warn" },
+  (formatted, level, namespace, event) => {
+    // Only bg-recall:* records at warn-or-above
+  },
+)
+
+unsub() // call the returned handle to remove the writer
 ```
+
+### Config keys
+
+| Key     | Type                   | Description                                            |
+| ------- | ---------------------- | ------------------------------------------------------ |
+| `ns`    | `string \| string[]`   | DEBUG-style namespace pattern (supports `*` and `-ns`) |
+| `level` | `LogLevel`             | Records below the level skip the writer                |
+
+### When to use addWriter vs config array
+
+- **Config array** (`createLogger("x", [console, { file }])`) — declarative, sets up sinks at logger creation time. Best for stable destinations.
+- **`addWriter`** — imperative, runs at any time, returns an unsubscribe handle. Best for host-app startup wiring (`if (process.env.LOGGILY_FILE) addWriter({ ns: "app:*" }, fileWriter)`) or test instrumentation.
+
+Both reach the same pipeline.
+
+### `addWriterFor` (deprecated)
+
+`addWriterFor(pattern, writer)` is a deprecated alias for `addWriter({ ns: pattern }, writer)`. Migrate at your own pace; it's removed in `1.0`.

@@ -421,7 +421,7 @@ setLogLevel("debug") // -> set LOG_LEVEL env var
 enableSpans() // -> set TRACE=1 env var
 setDebugFilter(["myapp"]) // -> set DEBUG env var
 setTraceFilter(["myapp"]) // -> set TRACE env var
-addWriter(fn) // -> use config array
+addWriterFor(pattern, fn) // -> use addWriter({ ns: pattern }, fn) — same primitive
 setLogFormat("json") // -> set LOG_FORMAT env var
 setIdFormat("w3c") // -> set TRACE_ID_FORMAT env var or { idFormat: "w3c" }
 setSampleRate(0.1) // -> set TRACE_SAMPLE_RATE env var or { sampleRate: 0.1 }

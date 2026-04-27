@@ -773,12 +773,13 @@ function currentTrace(): { enabled: boolean; filter: NsFilter | null } {
 }
 
 /**
- * Writer signature for {@link addWriter} / {@link addWriterFor}.
+ * Writer signature for {@link addWriter}.
  *
  * Receives the pre-formatted text (per the active LOG_FORMAT) plus the
  * structural fields needed to route or filter writes downstream:
  * - `level`: log level (or `"span"`) for level-aware sinks
- * - `namespace`: required for namespace-glob routing via {@link addWriterFor}
+ * - `namespace`: emitting namespace; the `{ ns }` filter on
+ *   {@link addWriter} routes by this value
  * - `event`: full structured Event so JSONL sinks can re-serialize with
  *   custom fields (e.g., {@link createLogger}'s `props` end up here).
  *
