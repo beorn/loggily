@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0
+
+- **Removed `addWriterFor`** — use `addWriter({ ns: pattern }, writer)`.
+  Mechanically equivalent — the alias was a one-line delegate. All
+  consumers migrated in 0.9.0; removed here so the API surface has one
+  way to register a writer, not two.
+
 ## 0.9.0
 
 - **`addWriter` unified overload** — `addWriter(writer)` (catch-all) and
@@ -8,8 +15,7 @@
   and `level` (records below the level skip the writer). One mental model
   for catch-all + namespace-scoped + level-scoped registration.
 - **`addWriterFor` deprecated** — kept as a one-line alias delegating to
-  `addWriter({ ns: pattern }, writer)`. Callers can migrate at their own
-  pace; removal scheduled for 1.0.
+  `addWriter({ ns: pattern }, writer)`. Removed in 0.10.0.
 
 ## 0.8.0
 

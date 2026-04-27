@@ -1056,7 +1056,6 @@ export function getOutputMode(): OutputMode {
  *   - **scoped**: `addWriter({ ns, level }, writer)` — only records matching
  *     the namespace pattern and at-or-above the level reach the writer.
  *     Same `ConfigObject` shape used in `createLogger("x", [config, sink])`.
- *   - **legacy alias**: see {@link addWriterFor} (deprecated; use scoped form).
  *
  * `ConfigObject` filters supported here:
  *
@@ -1106,18 +1105,6 @@ function _addRawWriter(writer: WriterFn): () => void {
     const i = _writers.indexOf(writer)
     if (i !== -1) _writers.splice(i, 1)
   }
-}
-
-/**
- * @deprecated Use `addWriter({ ns: pattern }, writer)` instead — same
- * semantics, unified with the catch-all form. This alias keeps the prior
- * API working for one release; remove in 1.0.
- */
-export function addWriterFor(
-  pattern: string | string[],
-  writer: WriterFn,
-): () => void {
-  return addWriter({ ns: pattern }, writer)
 }
 export function writeSpan(
   namespace: string,

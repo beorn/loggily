@@ -1,9 +1,9 @@
 /**
- * addWriter — unified overload (catch-all + scoped) — supersedes addWriterFor.
+ * addWriter — unified overload (catch-all + scoped).
  *
- * Validates the new API that subsumes addWriterFor by accepting an optional
- * ConfigObject as the first argument: namespace pattern + level filter both
- * route through the same primitive.
+ * Validates the writer-registration primitive: a bare WriterFn is a
+ * catch-all; passing a ConfigObject ({ ns, level }) as the first arg
+ * routes the writer through namespace + level filters.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
@@ -139,18 +139,6 @@ describe("addWriter — overloaded form (writer | config + writer)", () => {
     expect(() => (addWriter as any)({ ns: "x:*" })).toThrow(
       /writer fn required/,
     )
-  })
-
-  test("addWriterFor still works (deprecated alias)", () => {
-    const { addWriterFor, createLogger } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
-    const captured: string[] = []
-    track(addWriterFor("bg-recall:*", (_fmt, _lvl, ns) => captured.push(ns)))
-
-    createLogger("bg-recall:trigger").warn?.("a")
-    createLogger("injection:wrap").warn?.("b")
-
-    expect(captured).toEqual(["bg-recall:trigger"])
   })
 
   test("unsubscribe stops further writes (scoped form)", () => {

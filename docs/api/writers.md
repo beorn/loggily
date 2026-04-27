@@ -177,7 +177,3 @@ unsub() // call the returned handle to remove the writer
 - **`addWriter`** — imperative, runs at any time, returns an unsubscribe handle. Best for host-app startup wiring (`if (process.env.LOGGILY_FILE) addWriter({ ns: "app:*" }, fileWriter)`) or test instrumentation.
 
 Both reach the same pipeline.
-
-### `addWriterFor` (deprecated)
-
-`addWriterFor(pattern, writer)` is a deprecated alias for `addWriter({ ns: pattern }, writer)`. Migrate at your own pace; it's removed in `1.0`.
