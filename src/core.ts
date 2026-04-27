@@ -27,6 +27,7 @@ import {
   type LogFormat,
   type NsFilter,
   type ConfigElement,
+  type ConfigObject,
   LOG_LEVEL_PRIORITY,
   buildPipeline,
   safeStringify,
@@ -1043,7 +1044,62 @@ export function setOutputMode(_mode: OutputMode): void {
 export function getOutputMode(): OutputMode {
   return "console"
 }
-export function addWriter(writer: WriterFn): () => void {
+/**
+ * Register a writer for log records. A writer is the terminal stage of a
+ * sub-pipeline — it receives formatted records that pass any filters
+ * declared by the optional config.
+ *
+ * Three forms:
+ *
+ *   - **catch-all**: `addWriter(writer)` — every record reaches the writer.
+ *   - **scoped**: `addWriter({ ns, level }, writer)` — only records matching
+ *     the namespace pattern and at-or-above the level reach the writer.
+ *     Same `ConfigObject` shape used in `createLogger("x", [config, sink])`.
+ *   - **legacy alias**: see {@link addWriterFor} (deprecated; use scoped form).
+ *
+ * `ConfigObject` filters supported here:
+ *
+ *   - `ns: string | string[]` — DEBUG-style glob (e.g. `"bg-recall:*"`,
+ *     `"myapp,-myapp:noisy"`). Substring excludes count.
+ *   - `level: LogLevel` — record's level must be >= this. `"trace"` < `"debug"`
+ *     < `"info"` < `"warn"` < `"error"` < `"silent"`.
+ *
+ * Returns an unsubscribe handle.
+ *
+ * Per-namespace fan-out replaces hand-rolled `appendFileSync(path, line)`
+ * patterns: every subsystem writes through `createLogger("ns:thing")`, and
+ * the host registers per-namespace writers via this function instead of
+ * each subsystem reinventing its own env-var + writer.
+ */
+export function addWriter(writer: WriterFn): () => void
+export function addWriter(config: ConfigObject, writer: WriterFn): () => void
+export function addWriter(
+  arg1: ConfigObject | WriterFn,
+  arg2?: WriterFn,
+): () => void {
+  if (typeof arg1 === "function") return _addRawWriter(arg1)
+  if (!arg2) {
+    throw new Error(
+      "addWriter: writer fn required when first argument is a config object",
+    )
+  }
+  const config = arg1
+  const matches = config.ns ? parseNsFilter(config.ns) : null
+  const minPriority = config.level
+    ? LOG_LEVEL_PRIORITY[config.level]
+    : null
+  return _addRawWriter((formatted, level, namespace, event) => {
+    if (matches && !matches(namespace)) return
+    if (minPriority !== null) {
+      const recordPriority =
+        LOG_LEVEL_PRIORITY[level as LogLevel] ?? LOG_LEVEL_PRIORITY.info
+      if (recordPriority < minPriority) return
+    }
+    arg2(formatted, level, namespace, event)
+  })
+}
+
+function _addRawWriter(writer: WriterFn): () => void {
   _writers.push(writer)
   return () => {
     const i = _writers.indexOf(writer)
@@ -1052,24 +1108,15 @@ export function addWriter(writer: WriterFn): () => void {
 }
 
 /**
- * Register a writer that only fires for events whose namespace matches the
- * given DEBUG-style pattern (e.g. `"bg-recall:*"`, `"injection:*"`,
- * `"myapp,-myapp:noisy"`). Returns the same unsubscribe handle as
- * {@link addWriter}.
- *
- * Per-namespace fan-out enables routing different subsystems to different
- * files (or in-memory sinks) without each subsystem needing its own
- * env-var + appendFileSync impl.
+ * @deprecated Use `addWriter({ ns: pattern }, writer)` instead — same
+ * semantics, unified with the catch-all form. This alias keeps the prior
+ * API working for one release; remove in 1.0.
  */
 export function addWriterFor(
   pattern: string | string[],
   writer: WriterFn,
 ): () => void {
-  const matches = parseNsFilter(pattern)
-  return addWriter((formatted, level, namespace, event) => {
-    if (!matches(namespace)) return
-    writer(formatted, level, namespace, event)
-  })
+  return addWriter({ ns: pattern }, writer)
 }
 export function writeSpan(
   namespace: string,

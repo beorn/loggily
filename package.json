@@ -1,6 +1,6 @@
 {
   "name": "loggily",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Debugs, logs, and spans — one API. Disabled logs skip argument evaluation entirely via optional chaining. ~3KB, zero dependencies.",
   "keywords": [
     "browser",

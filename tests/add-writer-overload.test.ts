@@ -1,0 +1,169 @@
+/**
+ * addWriter — unified overload (catch-all + scoped) — supersedes addWriterFor.
+ *
+ * Validates the new API that subsumes addWriterFor by accepting an optional
+ * ConfigObject as the first argument: namespace pattern + level filter both
+ * route through the same primitive.
+ */
+
+import { afterEach, beforeEach, describe, expect, test } from "vitest"
+
+const unsubs: Array<() => void> = []
+
+beforeEach(() => {
+  const { setSuppressConsole } =
+    require("../src/index.ts") as typeof import("../src/index.ts")
+  setSuppressConsole(true)
+})
+
+afterEach(() => {
+  while (unsubs.length) unsubs.pop()?.()
+  const { setSuppressConsole } =
+    require("../src/index.ts") as typeof import("../src/index.ts")
+  setSuppressConsole(false)
+})
+
+function track(unsub: () => void): () => void {
+  unsubs.push(unsub)
+  return unsub
+}
+
+describe("addWriter — overloaded form (writer | config + writer)", () => {
+  test("addWriter(writer) — catch-all, every namespace routes", () => {
+    const { addWriter, createLogger } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
+    const captured: string[] = []
+    track(addWriter((_fmt, _lvl, ns) => captured.push(ns)))
+
+    createLogger("a:b").warn?.("hi")
+    createLogger("c:d").warn?.("hi")
+    createLogger("e").warn?.("hi")
+
+    expect(captured).toEqual(["a:b", "c:d", "e"])
+  })
+
+  test("addWriter({ ns }, writer) — namespace scope only", () => {
+    const { addWriter, createLogger } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
+    const captured: string[] = []
+    track(
+      addWriter({ ns: "bg-recall:*" }, (_fmt, _lvl, ns) =>
+        captured.push(ns),
+      ),
+    )
+
+    createLogger("bg-recall:trigger").warn?.("a")
+    createLogger("injection:wrap").warn?.("b")
+    createLogger("bg-recall:hint").warn?.("c")
+
+    expect(captured).toEqual(["bg-recall:trigger", "bg-recall:hint"])
+  })
+
+  test("addWriter({ level }, writer) — level filter only", () => {
+    const { addWriter, createLogger, setLogLevel } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
+    setLogLevel("trace") // ensure all levels emit through the pipeline
+    track(() => setLogLevel("info"))
+
+    const captured: string[] = []
+    track(
+      addWriter({ level: "warn" }, (_fmt, lvl) => captured.push(lvl)),
+    )
+
+    const log = createLogger("a:b")
+    log.trace?.("t")
+    log.debug?.("d")
+    log.info?.("i")
+    log.warn?.("w")
+    log.error?.("e")
+
+    expect(captured).toEqual(["warn", "error"])
+  })
+
+  test("addWriter({ ns, level }, writer) — both filters apply", () => {
+    const { addWriter, createLogger, setLogLevel } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
+    setLogLevel("trace")
+    track(() => setLogLevel("info"))
+
+    const captured: Array<{ ns: string; lvl: string }> = []
+    track(
+      addWriter({ ns: "bg-recall:*", level: "warn" }, (_fmt, lvl, ns) =>
+        captured.push({ ns, lvl }),
+      ),
+    )
+
+    createLogger("bg-recall:trigger").debug?.("nope") // level too low
+    createLogger("bg-recall:trigger").warn?.("yes") // matches both
+    createLogger("injection:wrap").error?.("nope") // wrong ns
+    createLogger("bg-recall:hint").error?.("yes") // matches both
+
+    expect(captured).toEqual([
+      { ns: "bg-recall:trigger", lvl: "warn" },
+      { ns: "bg-recall:hint", lvl: "error" },
+    ])
+  })
+
+  test("addWriter({}, writer) — empty config behaves like catch-all", () => {
+    const { addWriter, createLogger } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
+    const captured: string[] = []
+    track(addWriter({}, (_fmt, _lvl, ns) => captured.push(ns)))
+
+    createLogger("a").warn?.("a")
+    createLogger("b:c").warn?.("b")
+
+    expect(captured).toEqual(["a", "b:c"])
+  })
+
+  test("addWriter({ ns: array }, writer) — array of patterns with excludes", () => {
+    const { addWriter, createLogger } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
+    const captured: string[] = []
+    track(
+      addWriter(
+        { ns: ["bg-recall:*", "-bg-recall:noisy"] },
+        (_fmt, _lvl, ns) => captured.push(ns),
+      ),
+    )
+
+    createLogger("bg-recall:trigger").warn?.("a")
+    createLogger("bg-recall:noisy").warn?.("b")
+    createLogger("bg-recall:hint").warn?.("c")
+
+    expect(captured).toEqual(["bg-recall:trigger", "bg-recall:hint"])
+  })
+
+  test("addWriter throws when config given without writer", () => {
+    const { addWriter } = require("../src/index.ts") as typeof import("../src/index.ts")
+    expect(() => (addWriter as any)({ ns: "x:*" })).toThrow(
+      /writer fn required/,
+    )
+  })
+
+  test("addWriterFor still works (deprecated alias)", () => {
+    const { addWriterFor, createLogger } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
+    const captured: string[] = []
+    track(addWriterFor("bg-recall:*", (_fmt, _lvl, ns) => captured.push(ns)))
+
+    createLogger("bg-recall:trigger").warn?.("a")
+    createLogger("injection:wrap").warn?.("b")
+
+    expect(captured).toEqual(["bg-recall:trigger"])
+  })
+
+  test("unsubscribe stops further writes (scoped form)", () => {
+    const { addWriter, createLogger } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
+    const captured: string[] = []
+    const unsub = addWriter({ ns: "x:*" }, (_fmt, _lvl, ns) =>
+      captured.push(ns),
+    )
+    createLogger("x:a").warn?.("a")
+    unsub()
+    createLogger("x:b").warn?.("b")
+
+    expect(captured).toEqual(["x:a"])
+  })
+})

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0
+
+- **`addWriter` unified overload** — `addWriter(writer)` (catch-all) and
+  `addWriter({ ns, level }, writer)` (scoped) are now one primitive. The
+  config object accepts `ns` (DEBUG-style glob, including arrays + excludes)
+  and `level` (records below the level skip the writer). One mental model
+  for catch-all + namespace-scoped + level-scoped registration.
+- **`addWriterFor` deprecated** — kept as a one-line alias delegating to
+  `addWriter({ ns: pattern }, writer)`. Callers can migrate at their own
+  pace; removal scheduled for 1.0.
+
 ## 0.8.0
 
 - **OpenTelemetry bridge** — new `loggily/otel` subpath with `toOtel()` stage
