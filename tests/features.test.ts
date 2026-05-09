@@ -724,6 +724,68 @@ describe("baseCreateLogger", () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 7b. Span Laps (stopwatch checkpoints within a span)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("span laps (stopwatch checkpoints)", () => {
+  test("lap() records phase deltas; emitted in span event props", async () => {
+    const prev = process.env.TRACE
+    process.env.TRACE = "1"
+    try {
+      const writer = new CaptureWriter()
+      const log = createLogger("laptest", [
+        { format: "json" },
+        { write: (event: unknown) => writer.write(JSON.stringify(event) + "\n") },
+      ])
+      {
+        using span = log.span("op")
+        await new Promise((r) => setTimeout(r, 5))
+        span.lap("phase-a")
+        await new Promise((r) => setTimeout(r, 5))
+        span.lap("phase-b")
+      }
+
+      const spanLine = writer.lines.find((l) => l.includes('"kind":"span"'))
+      expect(spanLine, "span event was emitted").toBeDefined()
+      const event = parseJSON(spanLine!)
+      expect(event.props).toBeDefined()
+      expect(event.props.laps).toBeDefined()
+      expect(typeof event.props.laps["phase-a"]).toBe("number")
+      expect(typeof event.props.laps["phase-b"]).toBe("number")
+      // Both deltas should be ≥0 (they may be very small under fast clocks).
+      expect(event.props.laps["phase-a"]).toBeGreaterThanOrEqual(0)
+      expect(event.props.laps["phase-b"]).toBeGreaterThanOrEqual(0)
+    } finally {
+      if (prev === undefined) delete process.env.TRACE
+      else process.env.TRACE = prev
+    }
+  })
+
+  test("no laps → laps prop omitted from span event", () => {
+    const prev = process.env.TRACE
+    process.env.TRACE = "1"
+    try {
+      const writer = new CaptureWriter()
+      const log = createLogger("laptest", [
+        { format: "json" },
+        { write: (event: unknown) => writer.write(JSON.stringify(event) + "\n") },
+      ])
+      {
+        using _span = log.span("nolaps")
+      }
+
+      const spanLine = writer.lines.find((l) => l.includes('"kind":"span"'))
+      expect(spanLine).toBeDefined()
+      const event = parseJSON(spanLine!)
+      expect(event.props.laps).toBeUndefined()
+    } finally {
+      if (prev === undefined) delete process.env.TRACE
+      else process.env.TRACE = prev
+    }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 8. Full Composition Chain
 // ─────────────────────────────────────────────────────────────────────────────
 

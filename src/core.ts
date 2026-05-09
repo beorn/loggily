@@ -117,6 +117,28 @@ export interface SpanLogger extends ConditionalLogger, Disposable {
   // Override optional `span` from ConditionalLogger: a SpanLogger is always
   // produced by `withSpans()`, so nested `.span()` is guaranteed present.
   span(namespace?: string, props?: LazyProps): SpanLogger
+  /**
+   * Record a stopwatch-style checkpoint within this span. Each `lap(name)`
+   * captures the time since the previous lap (or span start for the first
+   * lap). On span end, laps are emitted in the span event's props as
+   * `laps: { name1: deltaMs, name2: deltaMs, ... }` for compact output, plus
+   * stored verbatim on `spanData.laps` for programmatic consumers.
+   *
+   * Use laps when you want sub-span timing without the noise of nested span
+   * lines. Nested spans give per-phase log lines + parent context; laps give
+   * one summary line with phase deltas in props.
+   *
+   * @example
+   *   using span = log.span("materialize")
+   *   loadInputs()
+   *   span.lap("inputs")
+   *   computeMatches()
+   *   span.lap("matches")
+   *   writeOutputs()
+   *   span.lap("outputs")
+   *   // Span end → SPAN ... laps: { inputs: 12, matches: 340, outputs: 8 }
+   */
+  lap(name: string): void
 }
 
 /**
@@ -282,6 +304,15 @@ function resolveMessage(msg: LazyMessage): string {
   return typeof msg === "function" ? msg() : msg
 }
 
+interface SpanLap {
+  /** Lap name. */
+  readonly name: string
+  /** Wall time (ms since span start) at lap creation. */
+  readonly elapsedMs: number
+  /** Delta (ms) since previous lap, or since span start for the first lap. */
+  readonly deltaMs: number
+}
+
 interface MutableSpanData {
   id: string
   traceId: string
@@ -290,6 +321,7 @@ interface MutableSpanData {
   endTime: number | null
   duration: number | null
   attrs: Record<string, unknown>
+  laps: SpanLap[]
 }
 
 function createLoggerImpl(
@@ -594,6 +626,7 @@ function createSpanMethod(
       endTime: null,
       duration: null,
       attrs: {},
+      laps: [],
     }
 
     // Create a child logger for the span to emit logs through
@@ -632,6 +665,13 @@ function createSpanMethod(
 
       _exitContext?.(newSpanId)
       if (sampled) {
+        // Emit laps as a flat { name: deltaMs } object — compact for both
+        // console and JSON output. spanData.laps stays available for
+        // programmatic consumers that want elapsedMs / per-lap details.
+        const lapsProp =
+          newSpanData.laps.length > 0
+            ? Object.fromEntries(newSpanData.laps.map((l) => [l.name, l.deltaMs]))
+            : undefined
         const spanEvent: SpanEvent = {
           kind: "span",
           time: newSpanData.endTime,
@@ -641,6 +681,7 @@ function createSpanMethod(
           props: {
             ...mergedProps,
             ...newSpanData.attrs,
+            ...(lapsProp ? { laps: lapsProp } : {}),
           },
           spanId: newSpanData.id,
           traceId: newSpanData.traceId,
@@ -648,6 +689,14 @@ function createSpanMethod(
         }
         logger.dispatch(spanEvent)
       }
+    }
+
+    const lapImpl = (name: string): void => {
+      const now = Date.now()
+      const elapsedMs = now - newSpanData.startTime
+      const lastLap = newSpanData.laps[newSpanData.laps.length - 1]
+      const deltaMs = lastLap ? elapsedMs - lastLap.elapsedMs : elapsedMs
+      newSpanData.laps.push({ name, elapsedMs, deltaMs })
     }
 
     const spanDataProxy = createSpanDataProxy(
@@ -679,6 +728,7 @@ function createSpanMethod(
             }
           }
         }
+        if (prop === "lap") return lapImpl
         if (prop === "name") return childName
         if (prop === "props") return Object.freeze({ ...mergedProps })
         return (target as unknown as Record<string | symbol, unknown>)[prop]
