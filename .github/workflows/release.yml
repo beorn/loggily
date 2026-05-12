@@ -18,6 +18,10 @@ jobs:
           bun-version: latest
       - run: bun install
       - run: bun run test
+      - run: bun run build
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -28,12 +32,13 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           if npm view loggily@$VERSION version 2>/dev/null; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "loggily@$VERSION already published, skipping npm publish"
+            echo "loggily@$VERSION already published, skipping pnpm publish"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
       - if: steps.check.outputs.skip != 'true'
-        run: npm publish --access public
+        # pnpm publish (not npm publish) — pnpm applies publishConfig.exports overrides
+        run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Create GitHub Release
