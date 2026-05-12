@@ -735,7 +735,9 @@ describe("span laps (stopwatch checkpoints)", () => {
       const writer = new CaptureWriter()
       const log = createLogger("laptest", [
         { format: "json" },
-        { write: (event: unknown) => writer.write(JSON.stringify(event) + "\n") },
+        {
+          write: (event: unknown) => writer.write(JSON.stringify(event) + "\n"),
+        },
       ])
       {
         using span = log.span("op")
@@ -768,7 +770,9 @@ describe("span laps (stopwatch checkpoints)", () => {
       const writer = new CaptureWriter()
       const log = createLogger("laptest", [
         { format: "json" },
-        { write: (event: unknown) => writer.write(JSON.stringify(event) + "\n") },
+        {
+          write: (event: unknown) => writer.write(JSON.stringify(event) + "\n"),
+        },
       ])
       {
         using _span = log.span("nolaps")

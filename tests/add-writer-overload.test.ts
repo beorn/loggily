@@ -47,9 +47,7 @@ describe("addWriter — overloaded form (writer | config + writer)", () => {
       require("../src/index.ts") as typeof import("../src/index.ts")
     const captured: string[] = []
     track(
-      addWriter({ ns: "bg-recall:*" }, (_fmt, _lvl, ns) =>
-        captured.push(ns),
-      ),
+      addWriter({ ns: "bg-recall:*" }, (_fmt, _lvl, ns) => captured.push(ns)),
     )
 
     createLogger("bg-recall:trigger").warn?.("a")
@@ -66,9 +64,7 @@ describe("addWriter — overloaded form (writer | config + writer)", () => {
     track(() => setLogLevel("info"))
 
     const captured: string[] = []
-    track(
-      addWriter({ level: "warn" }, (_fmt, lvl) => captured.push(lvl)),
-    )
+    track(addWriter({ level: "warn" }, (_fmt, lvl) => captured.push(lvl)))
 
     const log = createLogger("a:b")
     log.trace?.("t")
@@ -121,9 +117,8 @@ describe("addWriter — overloaded form (writer | config + writer)", () => {
       require("../src/index.ts") as typeof import("../src/index.ts")
     const captured: string[] = []
     track(
-      addWriter(
-        { ns: ["bg-recall:*", "-bg-recall:noisy"] },
-        (_fmt, _lvl, ns) => captured.push(ns),
+      addWriter({ ns: ["bg-recall:*", "-bg-recall:noisy"] }, (_fmt, _lvl, ns) =>
+        captured.push(ns),
       ),
     )
 
@@ -135,7 +130,8 @@ describe("addWriter — overloaded form (writer | config + writer)", () => {
   })
 
   test("addWriter throws when config given without writer", () => {
-    const { addWriter } = require("../src/index.ts") as typeof import("../src/index.ts")
+    const { addWriter } =
+      require("../src/index.ts") as typeof import("../src/index.ts")
     expect(() => (addWriter as any)({ ns: "x:*" })).toThrow(
       /writer fn required/,
     )

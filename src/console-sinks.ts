@@ -83,7 +83,10 @@ function levelLabel(level: OutputLogLevel): string {
  * by `writeSpan`. Filters out `undefined` entries.
  */
 function userArgsOf(event: Event): unknown[] {
-  if ("userArgs" in event && Array.isArray((event as { userArgs?: unknown[] }).userArgs)) {
+  if (
+    "userArgs" in event &&
+    Array.isArray((event as { userArgs?: unknown[] }).userArgs)
+  ) {
     const ua = (event as { userArgs?: unknown[] }).userArgs!
     return ua.filter((v) => v !== undefined)
   }
@@ -106,7 +109,9 @@ function userArgsOf(event: Event): unknown[] {
  * Spans and JSON format still go through the pre-formatted single-arg path —
  * their consumers are log aggregators, not humans.
  */
-export function createTerminalConsoleSink(format: LogFormat = "console"): ConsoleSink {
+export function createTerminalConsoleSink(
+  format: LogFormat = "console",
+): ConsoleSink {
   if (format === "json") {
     // JSON format: one line, one arg — downstream log collectors expect that.
     return (event: Event) => routeSingle(event, formatJSONEvent(event))
@@ -165,7 +170,9 @@ function levelAnsi(level: OutputLogLevel): string {
  * For JSON format we still emit a single string — consumers that explicitly
  * asked for JSON want machine-readable output, not DevTools theatrics.
  */
-export function createBrowserConsoleSink(format: LogFormat = "console"): ConsoleSink {
+export function createBrowserConsoleSink(
+  format: LogFormat = "console",
+): ConsoleSink {
   if (format === "json") {
     return (event: Event) => routeSingle(event, formatJSONEvent(event))
   }
@@ -175,7 +182,9 @@ export function createBrowserConsoleSink(format: LogFormat = "console"): Console
       const spanTemplate = `%c%s %cSPAN %c%s %c(%sms)`
       const args = userArgsOf(event)
       const spanPropsString =
-        args.length > 0 ? ` ${safeStringify(Object.assign({}, ...args.filter(isPlainRecord)))}` : ""
+        args.length > 0
+          ? ` ${safeStringify(Object.assign({}, ...args.filter(isPlainRecord)))}`
+          : ""
       // Spans: compact format; include props inline because DevTools arg
       // ordering would otherwise separate the duration from its context.
       const { durationLabel } = { durationLabel: String(event.duration) }
@@ -252,10 +261,7 @@ function cssLevel(level: OutputLogLevel): string {
  *   2. DevTools attribute the log line to the caller's source location
  *      (arrows don't appear in the stack between the call and `console.*`).
  */
-function invokeForLevel(
-  level: OutputLogLevel,
-  ...args: unknown[]
-): void {
+function invokeForLevel(level: OutputLogLevel, ...args: unknown[]): void {
   switch (level) {
     case "trace":
     case "debug":

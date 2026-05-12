@@ -86,12 +86,12 @@ import { toOtel } from "loggily/otel"
 
 // Config pipeline — objects configure, arrays branch, values write
 const log = createLogger("myapp", [
-  { level: "debug", metrics: true },     // config object — sets scope
-  toOtel({ api: otelApi }),              // stage — forwards to Jaeger/Grafana/Datadog
-  pinoTransport,                         // writable — { write } receives events
-  { file: "...", format: "json" },       // file sink — formatted strings
-  [{ level: "warn" }, { file: "..." }],  // branch — sub-pipeline with own scope
-  console,                               // colorized dev output, JSON in production
+  { level: "debug", metrics: true }, // config object — sets scope
+  toOtel({ api: otelApi }), // stage — forwards to Jaeger/Grafana/Datadog
+  pinoTransport, // writable — { write } receives events
+  { file: "...", format: "json" }, // file sink — formatted strings
+  [{ level: "warn" }, { file: "..." }], // branch — sub-pipeline with own scope
+  console, // colorized dev output, JSON in production
 ])
 
 // Structured logging

@@ -670,7 +670,9 @@ function createSpanMethod(
         // programmatic consumers that want elapsedMs / per-lap details.
         const lapsProp =
           newSpanData.laps.length > 0
-            ? Object.fromEntries(newSpanData.laps.map((l) => [l.name, l.deltaMs]))
+            ? Object.fromEntries(
+                newSpanData.laps.map((l) => [l.name, l.deltaMs]),
+              )
             : undefined
         const spanEvent: SpanEvent = {
           kind: "span",
@@ -1135,9 +1137,7 @@ export function addWriter(
   }
   const config = arg1
   const matches = config.ns ? parseNsFilter(config.ns) : null
-  const minPriority = config.level
-    ? LOG_LEVEL_PRIORITY[config.level]
-    : null
+  const minPriority = config.level ? LOG_LEVEL_PRIORITY[config.level] : null
   return _addRawWriter((formatted, level, namespace, event) => {
     if (matches && !matches(namespace)) return
     if (minPriority !== null) {

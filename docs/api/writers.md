@@ -148,10 +148,7 @@ const unsub = addWriter((formatted, level, namespace, event) => {
 //    The config object accepts the same `{ ns, level }` shape used in
 //    createLogger config arrays, so the mental model is uniform.
 const file = createFileWriter("/tmp/bg-recall.log")
-addWriter(
-  { ns: "bg-recall:*" },
-  (formatted) => file.write(formatted),
-)
+addWriter({ ns: "bg-recall:*" }, (formatted) => file.write(formatted))
 
 // 3. Multi-dimensional filter
 addWriter(
@@ -166,10 +163,10 @@ unsub() // call the returned handle to remove the writer
 
 ### Config keys
 
-| Key     | Type                   | Description                                            |
-| ------- | ---------------------- | ------------------------------------------------------ |
-| `ns`    | `string \| string[]`   | DEBUG-style namespace pattern (supports `*` and `-ns`) |
-| `level` | `LogLevel`             | Records below the level skip the writer                |
+| Key     | Type                 | Description                                            |
+| ------- | -------------------- | ------------------------------------------------------ |
+| `ns`    | `string \| string[]` | DEBUG-style namespace pattern (supports `*` and `-ns`) |
+| `level` | `LogLevel`           | Records below the level skip the writer                |
 
 ### When to use addWriter vs config array
 

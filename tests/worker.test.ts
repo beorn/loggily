@@ -60,9 +60,11 @@ beforeEach(() => {
 
   // Mock console methods for main thread — join all args so tests that
   // look for message/data keywords match regardless of sink spreading.
-  const capture = (level: string) => (...args: unknown[]) => {
-    consoleOutput.push({ level, message: args.map(formatArg).join(" ") })
-  }
+  const capture =
+    (level: string) =>
+    (...args: unknown[]) => {
+      consoleOutput.push({ level, message: args.map(formatArg).join(" ") })
+    }
   vi.spyOn(console, "log").mockImplementation(capture("log"))
   vi.spyOn(console, "debug").mockImplementation(capture("debug"))
   vi.spyOn(console, "info").mockImplementation(capture("info"))
