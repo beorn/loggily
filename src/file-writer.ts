@@ -13,6 +13,12 @@ export interface FileWriterOptions {
   bufferSize?: number
   /** Flush interval in milliseconds (default: 100) */
   flushInterval?: number
+  /** Test-only filesystem injection. Production callers should omit this. */
+  __fs?: {
+    openSync(path: string, flags: string): number
+    writeSync(fd: number, data: string): unknown
+    closeSync(fd: number): void
+  }
 }
 
 /** An async buffered file writer with automatic flushing */
@@ -50,6 +56,7 @@ export function createFileWriter(
 ): FileWriter {
   const bufferSize = options.bufferSize ?? 4096
   const flushInterval = options.flushInterval ?? 100
+  const fs = options.__fs ?? { openSync, writeSync, closeSync }
 
   let buffer = ""
   let fd: number | null = null
@@ -57,13 +64,13 @@ export function createFileWriter(
   let closed = false
 
   // Open file in append mode
-  fd = openSync(filePath, "a")
+  fd = fs.openSync(filePath, "a")
 
   /** Flush buffer contents to disk synchronously */
   function flush(): void {
     if (buffer.length === 0 || fd === null) return
     const data = buffer
-    writeSync(fd, data)
+    fs.writeSync(fd, data)
     buffer = ""
   }
 
@@ -103,7 +110,7 @@ export function createFileWriter(
         // at this point, but we must still release the fd and exit handler.
       } finally {
         if (fd !== null) {
-          closeSync(fd)
+          fs.closeSync(fd)
           fd = null
         }
         process.removeListener("exit", exitHandler)

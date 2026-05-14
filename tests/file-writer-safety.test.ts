@@ -7,9 +7,11 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
 
 // Mock node:fs to control writeSync behavior
-const mockOpenSync = vi.fn((_path?: string, _flags?: string) => 42) // fake fd
-const mockWriteSync = vi.fn()
-const mockCloseSync = vi.fn()
+const { mockOpenSync, mockWriteSync, mockCloseSync } = vi.hoisted(() => ({
+  mockOpenSync: vi.fn((_path?: string, _flags?: string) => 42), // fake fd
+  mockWriteSync: vi.fn(),
+  mockCloseSync: vi.fn(),
+}))
 
 vi.mock("node:fs", () => ({
   openSync: (path: string, flags: string) => mockOpenSync(path, flags),
@@ -36,6 +38,11 @@ describe("file-writer safety", () => {
     const writer = createFileWriter("/fake/path.log", {
       bufferSize: 999999,
       flushInterval: 60000,
+      __fs: {
+        openSync: mockOpenSync,
+        writeSync: mockWriteSync,
+        closeSync: mockCloseSync,
+      },
     })
 
     // Write some data
@@ -68,6 +75,11 @@ describe("file-writer safety", () => {
     const writer = createFileWriter("/fake/path.log", {
       bufferSize: 999999,
       flushInterval: 60000,
+      __fs: {
+        openSync: mockOpenSync,
+        writeSync: mockWriteSync,
+        closeSync: mockCloseSync,
+      },
     })
     writer.write("some data")
 
