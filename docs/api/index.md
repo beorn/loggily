@@ -11,7 +11,7 @@
 | `createTestLogger(name)`          | Test helper — all levels enabled, console output                                           |
 | `pipe(base, ...plugins)`          | Pipe a logger factory through plugins (left-to-right)                                      |
 | `withEnvDefaults()`               | Plugin: read defaults from env vars (included by default)                                  |
-| `withSpans()`                     | Plugin: enable `.span()` capability (included by default)                                  |
+| `withSpans()`                     | Plugin: enable optional `.span?.()` capability (included by default)                       |
 | `withConfigMetrics()`             | Plugin: enable `{ metrics: true }` in config (included by default)                         |
 
 `baseCreateLogger` does NOT include `withSpans()` or `withEnvDefaults()`. Use it when you want full manual control over plugin composition:
@@ -71,7 +71,7 @@ The second argument to `createLogger` is an optional config array:
 | `SpanEvent`          | `{ kind: "span", time, namespace, duration, spanId, traceId, ... }` |
 | `Event`              | `LogEvent \| SpanEvent`                                             |
 | `Stage`              | `(event: Event) => Event \| null \| void`                           |
-| `Pipeline`           | `{ dispatch, level, dispose }`                                      |
+| `Pipeline`           | `{ dispatch, spanEnabled, level, dispose }`                         |
 | `LogLevel`           | `"trace" \| "debug" \| ... \| "silent"`                             |
 | `LogFormat`          | `"console" \| "json"`                                               |
 | `LazyMessage`        | `string \| (() => string)`                                          |

@@ -105,9 +105,9 @@ const dbLog = log.child("db", { pool: "main" }) // namespace: "myapp:db"
 // Spans — time any operation, auto-track parent/child + trace IDs
 // AsyncLocalStorage propagation: logs in async chains inherit span context
 {
-  using span = dbLog.span("query", { table: "users" })
+  using span = dbLog.span?.("query", { table: "users" })
   const users = await queryUsers() // logs inside queryUsers() get trace IDs
-  span.spanData.count = users.length
+  if (span) span.spanData.count = users.length
 }
 // → SPAN myapp:db:query (45ms) {count: 100, table: "users"}
 

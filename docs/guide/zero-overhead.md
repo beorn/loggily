@@ -24,6 +24,18 @@ log.debug?.(`tree: ${JSON.stringify(buildTree())}`)
 // buildTree() and JSON.stringify() NEVER run when debug is off
 ```
 
+Spans use the same shape. When `TRACE` does not enable the logger namespace,
+`log.span` is `undefined`:
+
+```typescript
+using span = log.span?.("sync", buildSpanProps())
+// buildSpanProps() NEVER runs when spans are off
+```
+
+Span availability is resolved when each logger or child logger is created. Set
+`TRACE` before creating module-level loggers, and use `log.child("db")` before
+`span?.()` when the filter targets a child namespace such as `TRACE=myapp:db`.
+
 ## Lazy Messages
 
 For even more control, pass a function:
@@ -42,6 +54,7 @@ Both patterns work with all log levels and with structured data:
 
 ```typescript
 log.trace?.(() => `verbose: ${expensiveComputation()}`, { extra: "data" })
+log.span?.("sync", () => ({ tree: buildTree() }))
 ```
 
 ## Dynamic Levels

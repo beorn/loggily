@@ -8,7 +8,7 @@ Loggily is a structured logging library with built-in spans and near-zero cost d
 
 1. **Structured logging** -- levels, JSON output, child loggers
 2. **Debug-style namespace filtering** -- `DEBUG=myapp:db,-myapp:sql`
-3. **Lightweight spans** -- `using span = log.span("op")` with automatic timing
+3. **Lightweight spans** -- `using span = log.span?.("op")` with automatic timing
 
 The config array provides a composable pipeline model:
 
@@ -111,9 +111,9 @@ log.debug(`state: ${computeState()}`)
 ```typescript
 // Loggily -- built-in
 {
-  using span = log.span("db:query", { table: "users" })
+  using span = log.span?.("db:query", { table: "users" })
   const users = await queryUsers() // your DB call
-  span.spanData.count = users.length
+  if (span) span.spanData.count = users.length
 }
 // SPAN myapp:db:query (45ms) {count: 100, table: "users"}
 ```

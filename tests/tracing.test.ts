@@ -55,6 +55,7 @@ beforeEach(() => {
   delete process.env.TRACE_ID_FORMAT
   delete process.env.TRACE_SAMPLE_RATE
   delete process.env.NODE_ENV
+  process.env.TRACE = "1"
   process.env.LOG_LEVEL = "trace"
   setIdFormat("simple")
   setSampleRate(1.0)

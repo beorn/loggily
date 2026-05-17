@@ -89,9 +89,9 @@ A span is a logger with a timer. It measures how long a block takes, and every l
 
 ```typescript
 {
-  using span = log.span("import", { file: "data.csv" })
-  span.info?.("parsing rows")
-  span.spanData.count = 42
+  using span = log.span?.("import", { file: "data.csv" })
+  span?.info?.("parsing rows")
+  if (span) span.spanData.count = 42
 }
 // -> SPAN myapp:import (1234ms) {count: 42, file: "data.csv"}
 ```
@@ -102,11 +102,11 @@ Spans nest. Each span gets a unique ID and shares its parent's trace ID, so you 
 
 ```typescript
 {
-  using req = log.span("request", { path: "/api/users" })
+  using req = log.span?.("request", { path: "/api/users" })
   {
-    using db = req.span("db-query")
-    // db.spanData.traceId === req.spanData.traceId
-    // db.spanData.parentId === req.spanData.id
+    using db = req?.span("db-query")
+    // db?.spanData.traceId === req.spanData.traceId
+    // db?.spanData.parentId === req.spanData.id
   }
 }
 ```
@@ -181,7 +181,7 @@ const log = createWorkerLogger(postMessage, "myapp:worker")
 log.info?.("processing chunk", { size: 1000 })
 
 {
-  using span = log.span("process")
+  using span = log.span?.("process")
   // ...
 }
 ```
@@ -226,7 +226,7 @@ import { enableContextPropagation, getCurrentSpan } from "loggily/context"
 enableContextPropagation()
 
 {
-  using span = log.span("request", { path: "/api/users" })
+  using span = log.span?.("request", { path: "/api/users" })
 
   // ANY logger, ANYWHERE in this async context,
   // auto-inherits trace_id and span_id
@@ -236,8 +236,8 @@ enableContextPropagation()
   // Child spans from other loggers auto-parent to the current span
   const dbLog = createLogger("db")
   {
-    using query = dbLog.span("query")
-    // query.spanData.parentId === span.spanData.id — automatic!
+    using query = dbLog.span?.("query")
+    // query?.spanData.parentId === span.spanData.id — automatic!
   }
 }
 ```

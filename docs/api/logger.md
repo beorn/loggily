@@ -90,8 +90,8 @@ const db = log.child("db", { pool: "primary" })
 
 // Create timed span
 {
-  using span = log.span("import")
-  span.spanData.count = 42
+  using span = log.span?.("import")
+  if (span) span.spanData.count = 42
 }
 ```
 
@@ -104,11 +104,11 @@ const db = log.child("db", { pool: "primary" })
 ### Manual Span End
 
 ```typescript
-const span = log.span("op")
+const span = log.span?.("op")
 try {
   /* ... */
 } finally {
-  span.end()
+  span?.end()
 }
 ```
 
@@ -131,7 +131,7 @@ interface ConditionalLogger {
   }
   /** @deprecated Use .child() */
   logger(ns?: string, props?: Record<string, unknown>): ConditionalLogger
-  span(ns?: string, props?: LazyProps): SpanLogger
+  span?: (ns?: string, props?: LazyProps) => SpanLogger
   child(namespace: string, props?: Record<string, unknown>): ConditionalLogger
   child(context: Record<string, unknown>): ConditionalLogger
   end(): void

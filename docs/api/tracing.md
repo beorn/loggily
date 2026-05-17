@@ -22,9 +22,9 @@ const log = createLogger("myapp", [
   { level: "debug", idFormat: "w3c" },
   console,
 ])
-const span = log.span("request")
-// span.spanData.id    → "a1b2c3d4e5f6a7b8"
-// span.spanData.traceId → "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
+const span = log.span?.("request")
+// span?.spanData.id      → "a1b2c3d4e5f6a7b8"
+// span?.spanData.traceId → "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
 ```
 
 ### Via setters (deprecated)
@@ -51,7 +51,8 @@ interface TraceparentOptions {
 Format a [W3C traceparent](https://www.w3.org/TR/trace-context/#traceparent-header) header.
 
 ```typescript
-const span = log.span("http-request")
+const span = log.span?.("http-request")
+if (!span) return
 const header = traceparent(span.spanData)
 // → "00-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6-1a2b3c4d5e6f7a8b-01"
 

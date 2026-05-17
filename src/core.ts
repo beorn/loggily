@@ -129,29 +129,23 @@ export interface SpanLogger extends ConditionalLogger, Disposable {
    * one summary line with phase deltas in props.
    *
    * @example
-   *   using span = log.span("materialize")
+   *   using span = log.span?.("materialize")
    *   loadInputs()
-   *   span.lap("inputs")
+   *   span?.lap("inputs")
    *   computeMatches()
-   *   span.lap("matches")
+   *   span?.lap("matches")
    *   writeOutputs()
-   *   span.lap("outputs")
+   *   span?.lap("outputs")
    *   // Span end → SPAN ... laps: { inputs: 12, matches: 340, outputs: 8 }
    */
   lap(name: string): void
 }
 
 /**
- * ConditionalLogger + guaranteed `.span()` method.
- *
- * The default exported `createLogger` applies `withSpans()`, which attaches a
- * working `.span()` at runtime. `ConditionalLogger.span` is optional (undefined
- * on loggers built without `withSpans()`), so consumers of the default factory
- * need a type that reflects the attached span method to avoid TS2722/TS18048.
+ * @deprecated `createLogger()` now returns `ConditionalLogger`; use
+ * `log.span?.("op")` because spans are only present when enabled.
  */
-export type SpannedLogger = ConditionalLogger & {
-  span: (namespace?: string, props?: LazyProps) => SpanLogger
-}
+export type SpannedLogger = ConditionalLogger
 
 // ============ ConditionalLogger ============
 
@@ -181,6 +175,20 @@ export interface ConditionalLogger extends Disposable {
   child(namespace: string, props?: Record<string, unknown>): ConditionalLogger
   child(context: Record<string, unknown>): ConditionalLogger
   end(): void
+}
+
+const SPAN_ENABLED = Symbol("loggily.spanEnabled")
+
+type SpanEnabledChecker = (namespace: string) => boolean
+
+interface SpanEnabledCarrier {
+  [SPAN_ENABLED]?: SpanEnabledChecker
+}
+
+function spanIsEnabled(logger: ConditionalLogger, namespace: string): boolean {
+  if (collectSpans) return true
+  const checker = (logger as unknown as SpanEnabledCarrier)[SPAN_ENABLED]
+  return checker ? checker(namespace) : true
 }
 
 // ============ ID Generation ============
@@ -407,12 +415,16 @@ function createLoggerImpl(
     pipeline.dispatch(event)
   }
 
-  const logger: Logger = {
+  const logger: Logger & SpanEnabledCarrier = {
     name,
     props: Object.freeze({ ...props }),
 
     get level(): LogLevel {
       return pipeline.level
+    },
+
+    [SPAN_ENABLED](namespace: string): boolean {
+      return pipeline.spanEnabled(namespace)
     },
 
     dispatch(event: Event): void {
@@ -549,11 +561,14 @@ function augmentWithSpans(
   traceSampled: boolean,
 ): ConditionalLogger {
   const spanState: SpanState = { parentSpanId, traceId, traceSampled }
+  const spanMethod = spanIsEnabled(logger, logger.name)
+    ? createSpanMethod(logger, spanState)
+    : undefined
 
   return new Proxy(logger, {
     get(target, prop: string | symbol) {
       if (prop === "span") {
-        return createSpanMethod(target, spanState)
+        return spanMethod
       }
       if (prop === "child") {
         return function child(
@@ -919,6 +934,17 @@ export function withEnvDefaults(): LoggerPlugin {
 function applyNamespaceGating(logger: ConditionalLogger): ConditionalLogger {
   return new Proxy(logger, {
     get(target, prop: string | symbol) {
+      if (prop === SPAN_ENABLED) {
+        return (namespace: string): boolean => {
+          if (collectSpans) return true
+          const trace = currentTrace()
+          if (!trace.enabled) return false
+          if (trace.filter && !trace.filter(namespace)) return false
+          const ns = currentNs()
+          if (ns && !ns(namespace)) return false
+          return true
+        }
+      }
       if (
         typeof prop === "string" &&
         prop in LOG_LEVEL_PRIORITY &&
@@ -983,6 +1009,14 @@ function createEnvPipeline(): Pipeline {
 
   return {
     dispatch,
+    spanEnabled(namespace: string): boolean {
+      const trace = currentTrace()
+      if (!trace.enabled) return false
+      if (trace.filter && !trace.filter(namespace)) return false
+      const ns = currentNs()
+      if (ns && !ns(namespace)) return false
+      return true
+    },
     get level() {
       return currentLevel()
     },
@@ -1029,7 +1063,7 @@ export function withConfigMetrics(): LoggerPlugin {
 export const createLogger: (
   name: string,
   configOrProps?: ConfigElement[] | Record<string, unknown>,
-) => SpannedLogger = pipe(
+) => ConditionalLogger = pipe(
   baseCreateLogger,
   withEnvDefaults(),
   withSpans(),
@@ -1037,7 +1071,7 @@ export const createLogger: (
 ) as (
   name: string,
   configOrProps?: ConfigElement[] | Record<string, unknown>,
-) => SpannedLogger
+) => ConditionalLogger
 
 /** Test helper — all levels, console output. */
 export function createTestLogger(name: string): ConditionalLogger {

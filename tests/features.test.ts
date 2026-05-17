@@ -724,6 +724,83 @@ describe("baseCreateLogger", () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 7a. Zero-overhead span gating
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("zero-overhead span gating", () => {
+  test("default logger has no span method when TRACE is disabled", () => {
+    const log = createLogger("test:span-off")
+    let propsEvaluated = false
+
+    expect(log.span).toBeUndefined()
+
+    using span = log.span?.("op", () => {
+      propsEvaluated = true
+      return { expensive: true }
+    })
+
+    expect(span).toBeUndefined()
+    expect(propsEvaluated).toBe(false)
+  })
+
+  test("TRACE filter enables span only for matching logger namespaces", () => {
+    const prev = process.env.TRACE
+    process.env.TRACE = "test:enabled"
+    try {
+      const enabled = createLogger("test:enabled")
+      const disabled = createLogger("test:disabled")
+
+      expect(enabled.span).toBeDefined()
+      expect(disabled.span).toBeUndefined()
+    } finally {
+      if (prev === undefined) delete process.env.TRACE
+      else process.env.TRACE = prev
+    }
+  })
+
+  test("TRACE filter is evaluated for child logger namespaces", () => {
+    const prev = process.env.TRACE
+    process.env.TRACE = "test:parent:child"
+    try {
+      const parent = createLogger("test:parent")
+      const child = parent.child("child")
+
+      expect(parent.span).toBeUndefined()
+      expect(child.span).toBeDefined()
+    } finally {
+      if (prev === undefined) delete process.env.TRACE
+      else process.env.TRACE = prev
+    }
+  })
+
+  test("explicit config keeps span creation available without TRACE", () => {
+    const log = createLogger("test:explicit", [{ level: "trace" }, console])
+
+    expect(log.span).toBeDefined()
+    using span = log.span?.("op")
+
+    expect(span?.spanData).toBeDefined()
+  })
+
+  test("{ spans: false } config removes span creation", () => {
+    const log = createLogger("test:spans-false", [
+      { level: "trace", spans: false },
+      console,
+    ])
+    let propsEvaluated = false
+
+    expect(log.span).toBeUndefined()
+    using span = log.span?.("op", () => {
+      propsEvaluated = true
+      return { expensive: true }
+    })
+
+    expect(span).toBeUndefined()
+    expect(propsEvaluated).toBe(false)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 7b. Span Laps (stopwatch checkpoints within a span)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -740,11 +817,12 @@ describe("span laps (stopwatch checkpoints)", () => {
         },
       ])
       {
-        using span = log.span("op")
+        using span = log.span?.("op")
+        expect(span).toBeDefined()
         await new Promise((r) => setTimeout(r, 5))
-        span.lap("phase-a")
+        span?.lap("phase-a")
         await new Promise((r) => setTimeout(r, 5))
-        span.lap("phase-b")
+        span?.lap("phase-b")
       }
 
       const spanLine = writer.lines.find((l) => l.includes('"kind":"span"'))
@@ -775,7 +853,8 @@ describe("span laps (stopwatch checkpoints)", () => {
         },
       ])
       {
-        using _span = log.span("nolaps")
+        using _span = log.span?.("nolaps")
+        expect(_span).toBeDefined()
       }
 
       const spanLine = writer.lines.find((l) => l.includes('"kind":"span"'))

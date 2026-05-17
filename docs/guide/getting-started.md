@@ -143,10 +143,10 @@ Time any operation with `using`:
 
 ```typescript
 {
-  using span = log.span("import", { file: "data.csv" })
-  span.info?.("parsing")
+  using span = log.span?.("import", { file: "data.csv" })
+  span?.info?.("parsing")
   const rows = await importFile()
-  span.spanData.rowCount = rows.length
+  if (span) span.spanData.rowCount = rows.length
 }
 // SPAN myapp:import (1234ms) {rowCount: 500, file: "data.csv"}
 ```

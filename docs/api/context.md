@@ -14,12 +14,12 @@ enableContextPropagation()
 
 const log = createLogger("myapp")
 {
-  using span = log.span("request")
+  using span = log.span?.("request")
   log.info?.("handling") // auto-tagged with trace_id, span_id
 
   // Child spans from ANY logger auto-parent via AsyncLocalStorage
   const db = createLogger("db")
-  using dbSpan = db.span("query") // parentId = span.id
+  using dbSpan = db.span?.("query") // parentId = span.id
 }
 ```
 

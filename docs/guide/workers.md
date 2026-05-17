@@ -14,9 +14,9 @@ const log = createWorkerLogger(postMessage, "myapp:worker")
 log.info?.("processing", { file: "data.csv" })
 
 {
-  using span = log.span("parse")
-  span.info?.("parsing rows")
-  span.spanData.lines = 100
+  using span = log.span?.("parse")
+  span?.info?.("parsing rows")
+  if (span) span.spanData.lines = 100
 }
 // Span events forwarded to main thread automatically
 ```

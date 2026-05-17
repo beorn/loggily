@@ -13,10 +13,10 @@
  *
  * const log = createLogger("myapp")
  * {
- *   using span = log.span("request")
+ *   using span = log.span?.("request")
  *   // All logs and child spans within this async context
  *   // automatically inherit trace_id and span_id
- *   log.info("inside span") // auto-tagged with trace_id, span_id
+ *   log.info?.("inside span") // auto-tagged with trace_id, span_id
  *
  *   const current = getCurrentSpan()
  *   // current === { spanId: "sp_1", traceId: "tr_1", parentId: null }

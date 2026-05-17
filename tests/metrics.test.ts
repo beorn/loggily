@@ -13,9 +13,9 @@ import {
 } from "../src/metrics.ts"
 
 beforeEach(() => {
+  setTraceFilter(null)
   enableSpans()
   setLogLevel("trace")
-  setTraceFilter(null)
 })
 
 afterEach(() => {
@@ -150,11 +150,11 @@ describe("withMetrics (explicit collector)", () => {
     disableSpans()
     const collector = createMetricsCollector()
     const log = withMetrics(collector)(createLogger("test:off"))
-    // span is still created (loggily always creates spans) but output is suppressed
     {
       using _span = log.span?.("op")
     }
-    // The key property: no span OUTPUT is produced
+    expect(log.span).toBeUndefined()
+    expect(collector.stats("test:off:op")).toBeUndefined()
   })
 })
 
@@ -253,18 +253,15 @@ describe("LazyProps", () => {
     expect(called).toBe(true)
   })
 
-  test("lazy props function called even when spans output disabled (span still created)", () => {
+  test("lazy props function is skipped when spans are disabled", () => {
     disableSpans()
     let called = false
     const log = createLogger("test:lazy-off")
-    // Note: log.span is always defined — ?.  doesn't short-circuit for spans.
-    // The zero-overhead pattern for spans relies on callers not calling span at all
-    // in production paths (e.g., behind a TRACE check or inside ?.  argument evaluation).
     const span = log.span?.("op", () => {
       called = true
       return { key: "value" }
     })
-    expect(span).toBeDefined()
-    expect(called).toBe(true)
+    expect(span).toBeUndefined()
+    expect(called).toBe(false)
   })
 })

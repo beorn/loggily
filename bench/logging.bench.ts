@@ -34,6 +34,8 @@ function expensiveArgs(): string {
 
 group("disabled log (should be ~0ns)", () => {
   summary(() => {
+    bench("noop baseline", () => {})
+
     bench("debug?.() on info logger (cheap args)", () => {
       defaultLog.debug?.("cheap string")
     })
@@ -48,6 +50,24 @@ group("disabled log (should be ~0ns)", () => {
 
     bench("debug?.() on silent logger", () => {
       silentLog.debug?.("should not run")
+    })
+  })
+})
+
+group("disabled span (should match conditional logger baseline)", () => {
+  summary(() => {
+    bench("noop baseline", () => {})
+
+    bench("debug?.() on info logger baseline", () => {
+      defaultLog.debug?.("disabled")
+    })
+
+    bench("span?.() with TRACE off", () => {
+      void defaultLog.span?.("op")
+    })
+
+    bench("span?.() with lazy props and TRACE off", () => {
+      void defaultLog.span?.("op", () => ({ state: expensiveArgs() }))
     })
   })
 })

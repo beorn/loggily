@@ -40,9 +40,9 @@ log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 
 // Spans for timing (implements Disposable)
 {
-  using span = log.span("import", { file: "data.csv" })
-  span.info?.("working...")
-  span.spanData.count = 42
+  using span = log.span?.("import", { file: "data.csv" })
+  span?.info?.("working...")
+  if (span) span.spanData.count = 42
 }
 // -> SPAN myapp:import (15ms) {count: 42, file: "data.csv"}
 ```
@@ -225,9 +225,9 @@ Spans are loggers with timing. They implement `Disposable` for use with `using`:
 
 ```typescript
 {
-  using span = log.span("operation", { context: "value" })
-  span.debug?.("step 1")
-  span.spanData.processed = 100
+  using span = log.span?.("operation", { context: "value" })
+  span?.debug?.("step 1")
+  if (span) span.spanData.processed = 100
 }
 // On block exit: SPAN myapp:operation (15ms) {processed: 100, context: "value"}
 ```
@@ -235,12 +235,12 @@ Spans are loggers with timing. They implement `Disposable` for use with `using`:
 For environments without `using` support, call `.end()` manually:
 
 ```typescript
-const span = log.span("operation")
+const span = log.span?.("operation")
 try {
-  span.info?.("working...")
-  span.spanData.count = 42
+  span?.info?.("working...")
+  if (span) span.spanData.count = 42
 } finally {
-  span.end()
+  span?.end()
 }
 ```
 
@@ -314,7 +314,7 @@ import { enableContextPropagation, getCurrentSpan } from "loggily/context"
 enableContextPropagation()
 
 {
-  using span = log.span("request")
+  using span = log.span?.("request")
   log.info?.("handling") // auto-tagged with trace_id/span_id
   getCurrentSpan() // { spanId, traceId, parentId }
 }
@@ -449,7 +449,8 @@ setIdFormat("w3c")
 ```typescript
 import { traceparent } from "loggily"
 
-const span = log.span("http-request")
+const span = log.span?.("http-request")
+if (!span) return
 const header = traceparent(span.spanData)
 // -> "00-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6-1a2b3c4d5e6f7a8b-01"
 fetch(url, { headers: { traceparent: header } })
@@ -525,11 +526,11 @@ enableContextPropagation()
 const log = createLogger("api")
 
 async function handleRequest(req: Request) {
-  using span = log.span("request", { method: req.method, url: req.url })
+  using span = log.span?.("request", { method: req.method, url: req.url })
 
   // All logs in this async context auto-inherit trace_id/span_id
   const result = await processRequest(req) // child spans auto-parent
-  span.spanData.status = result.status
+  if (span) span.spanData.status = result.status
   return result
 }
 ```
@@ -550,7 +551,7 @@ const log = createLogger("myapp", [
 const log = createLogger("myapp", [{ level: "debug", metrics: true }, console])
 
 {
-  using span = log.span("db:query")
+  using span = log.span?.("db:query")
   // ...
 }
 
@@ -573,8 +574,8 @@ import { createWorkerLogger } from "loggily/worker"
 const log = createWorkerLogger(postMessage, "myapp:worker")
 log.info?.("processing", { file: "data.csv" })
 {
-  using span = log.span("parse")
-  span.spanData.lines = 100
+  using span = log.span?.("parse")
+  if (span) span.spanData.lines = 100
 }
 
 // main.ts
@@ -617,7 +618,8 @@ import { traceparent } from "loggily"
 // Use W3C-format IDs via config (or TRACE_ID_FORMAT=w3c env var)
 const log = createLogger("myapp", [{ idFormat: "w3c" }, console])
 
-const span = log.span("outbound-request")
+const span = log.span?.("outbound-request")
+if (!span) return
 fetch(url, {
   headers: { traceparent: traceparent(span.spanData) },
 })

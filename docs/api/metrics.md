@@ -12,7 +12,7 @@ import { createLogger } from "loggily"
 const log = createLogger("myapp", [{ level: "debug", metrics: true }, console])
 
 {
-  using span = log.span("query")
+  using span = log.span?.("query")
   // ...
 }
 
@@ -26,7 +26,7 @@ Child loggers inherit the same collector:
 ```typescript
 const db = log.child("db")
 {
-  using span = db.span("query")
+  using span = db.span?.("query")
   // ...
 }
 log.metrics.stats("myapp:db:query") // same collector
@@ -46,7 +46,7 @@ const log = withMetrics(collector)(createLogger("myapp"))
 // log.metrics === collector
 
 {
-  using span = log.span("query")
+  using span = log.span?.("query")
   // ...
 }
 

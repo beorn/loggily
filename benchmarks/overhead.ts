@@ -91,11 +91,11 @@ const noopStream = () =>
 
 // ── loggily setup ──────────────────────────────────────────────────────
 
-const loggilyLog = createLogger("bench")
 // Route all output to noop writer, suppress console
 setSuppressConsole(true)
 addWriter(() => {}) // noop writer — receives formatted output, discards it
 disableSpans()
+const loggilyLog = createLogger("bench")
 
 // ── Pino setup ───────────────────────────────────────────────────────────────
 
@@ -311,22 +311,70 @@ console.log(`Platform: ${process.platform} ${process.arch}`)
 
 // ─── PART 3: SPANS ──────────────────────────────────────────────────────────
 
-// 6. Span creation + disposal
+// 6. Disabled span optional chaining — should match the existing
+// ConditionalLogger optional-method baseline and skip lazy prop evaluation.
 {
   setLogLevel("warn")
   disableSpans()
+  let propsEvaluated = 0
+
+  const noopBaseline = measure("noop()", () => noop(), N)
+  const conditionalBaseline = measure(
+    "loggily: log.debug?.(disabled baseline)",
+    () => {
+      void loggilyLog.debug?.("disabled")
+    },
+    N,
+  )
+  const disabledSpan = measure(
+    "loggily: log.span?.(disabled)",
+    () => {
+      void loggilyLog.span?.("op")
+    },
+    N,
+  )
+  const disabledSpanLazyProps = measure(
+    "loggily: log.span?.(disabled, lazy props)",
+    () => {
+      void loggilyLog.span?.("op", () => {
+        propsEvaluated++
+        return { state: expensiveArg() }
+      })
+    },
+    N,
+  )
+  const results = [
+    noopBaseline,
+    conditionalBaseline,
+    disabledSpan,
+    disabledSpanLazyProps,
+  ]
+
+  printResults("DISABLED SPAN — optional method short-circuit", results)
+
+  const ratio = disabledSpan.nsPerOp / conditionalBaseline.nsPerOp
+  console.log(
+    `  disabled span / disabled debug ratio: ${ratio.toFixed(3)}x (${((ratio - 1) * 100).toFixed(1)}%)`,
+  )
+  console.log(`  disabled lazy span props evaluated: ${propsEvaluated}`)
+}
+
+// 7. Enabled span creation + disposal to noop writer.
+{
+  process.env.TRACE = "1"
+  const spanLog = createLogger("bench:span-enabled")
 
   const results = [
     measure(
       "loggily: span create+dispose",
       () => {
-        using _s = loggilyLog.span!("op")
+        using _s = spanLog.span!("op")
       },
       N / 10,
     ),
   ]
 
-  printResults("SPAN — create + dispose (no output)", results)
+  printResults("ENABLED SPAN — create + dispose (noop output)", results)
 }
 
 console.log("\n" + "─".repeat(70))

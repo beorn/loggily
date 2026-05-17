@@ -314,8 +314,9 @@ describe("span output control", () => {
     const log = createLogger("app")
 
     {
-      using span = log.span!("import")
-      span.info!("working")
+      using span = log.span?.("import")
+      log.info!("working")
+      expect(span).toBeUndefined()
     }
 
     // Only the info log, no span
@@ -341,7 +342,8 @@ describe("span output control", () => {
     const log = createLogger("app")
 
     {
-      using span = log.span!("import")
+      using span = log.span?.("import")
+      expect(span).toBeUndefined()
     }
 
     expect(consoleMock.findSpan()).toBeUndefined()
@@ -673,7 +675,8 @@ describe("TRACE namespace filtering", () => {
     const log = createLogger("other")
 
     {
-      using span = log.span!("work")
+      using span = log.span?.("work")
+      expect(span).toBeUndefined()
     }
 
     expect(consoleMock.findSpan()).toBeUndefined()
@@ -694,7 +697,8 @@ describe("TRACE namespace filtering", () => {
       using span = log2.span!("work")
     }
     {
-      using span = log3.span!("work")
+      using span = log3.span?.("work")
+      expect(span).toBeUndefined()
     }
 
     const spanOutputs = consoleMock.findSpans()
@@ -880,7 +884,8 @@ describe("DEBUG namespace filtering", () => {
       using span = log1.span!("work")
     }
     {
-      using span = log2.span!("work")
+      using span = log2.span?.("work")
+      expect(span).toBeUndefined()
     }
 
     const spans = consoleMock.findSpans()

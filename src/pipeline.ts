@@ -316,6 +316,7 @@ function createWritableSink(
 
 export interface Pipeline {
   dispatch: (event: Event) => void
+  spanEnabled: (namespace: string) => boolean
   level: LogLevel
   dispose: () => void
 }
@@ -568,8 +569,21 @@ export function buildPipeline(
     }
   }
 
+  const spanEnabledForNamespace = (namespace: string): boolean => {
+    if (!spansEnabled) return false
+    if (
+      outputs.some((output) => !output.nsFilter || output.nsFilter(namespace))
+    )
+      return true
+    if (branches.some((branch) => branch.spanEnabled(namespace))) return true
+    // Stages may consume or forward spans themselves, so keep `.span` available
+    // for stage-only explicit pipelines.
+    return stages.length > 0
+  }
+
   return {
     dispatch,
+    spanEnabled: spanEnabledForNamespace,
     level: config.level,
     dispose: () => {
       for (const d of disposables) d()
