@@ -326,6 +326,29 @@ interface Output {
   nsFilter: NsFilter | null
   write: (event: Event) => void
   dispose?: () => void
+  /** Consecutive write failures (guarded dispatch); reset on success. */
+  failures?: number
+  /** Set after OUTPUT_MAX_STRIKES consecutive failures — sink is skipped. */
+  disabled?: boolean
+}
+
+/** Consecutive failures before a throwing output sink is disabled. */
+const OUTPUT_MAX_STRIKES = 3
+
+/**
+ * Report a dispatch-guard failure WITHOUT going through any pipeline —
+ * the error channel for the logger itself must not recurse into the logger.
+ * Routes through writeStderr (the `_process` guard) for browser safety.
+ */
+function reportGuard(what: string, err: unknown): void {
+  const detail = err instanceof Error ? (err.stack ?? err.message) : String(err)
+  try {
+    writeStderr(`loggily: ${what}: ${detail}`)
+  } catch {
+    // The terminal fallback of the error channel itself: if stderr is gone
+    // there is nowhere left to report, and throwing here would defeat the
+    // guard's entire purpose (logger must never throw into the host).
+  }
 }
 
 // ============ Discrimination ============
@@ -545,27 +568,71 @@ export function buildPipeline(
     )
   }
 
+  // Guarded dispatch: a logger must never throw into its host app. Stage
+  // throws drop the event (fail-closed — a broken redaction stage must not
+  // leak unprocessed events); output throws are isolated per-sink with a
+  // strike counter; branch throws are isolated. All failures are reported
+  // once via reportGuard (direct stderr — never through the pipeline).
+  const stageReported: boolean[] = []
+  const branchReported: boolean[] = []
   const dispatch = (event: Event): void => {
     // Span gate: { spans: false } disables span output for this pipeline
     if (event.kind === "span" && !spansEnabled) return
 
     let e: Event = event
-    for (const stage of stages) {
-      const result = stage(e)
+    for (let i = 0; i < stages.length; i++) {
+      let result: Event | null | void
+      try {
+        result = stages[i]!(e)
+      } catch (err) {
+        if (!stageReported[i]) {
+          stageReported[i] = true
+          reportGuard(
+            `stage #${i} threw — dropping event, fail-closed (reported once)`,
+            err,
+          )
+        }
+        return
+      }
       if (result === null) return
       if (result !== undefined) e = result
     }
     for (const output of outputs) {
+      if (output.disabled) continue
       if (
         e.kind === "log" &&
         LOG_LEVEL_PRIORITY[e.level] < output.levelPriority
       )
         continue
       if (output.nsFilter && !output.nsFilter(e.namespace)) continue
-      output.write(e)
+      try {
+        output.write(e)
+        if (output.failures) output.failures = 0
+      } catch (err) {
+        output.failures = (output.failures ?? 0) + 1
+        if (output.failures === 1) {
+          reportGuard("output write threw — event lost for this sink", err)
+        }
+        if (output.failures >= OUTPUT_MAX_STRIKES) {
+          output.disabled = true
+          reportGuard(
+            `output disabled after ${output.failures} consecutive failures`,
+            err,
+          )
+        }
+      }
     }
-    for (const branch of branches) {
-      branch.dispatch(e)
+    for (let i = 0; i < branches.length; i++) {
+      try {
+        branches[i]!.dispatch(e)
+      } catch (err) {
+        // Branch pipelines guard themselves; this catch is the backstop for
+        // anything that escapes (e.g. a foreign Pipeline implementation).
+        if (!branchReported[i]) {
+          branchReported[i] = true
+          reportGuard(`branch #${i} dispatch threw (reported once)`, err)
+        }
+      }
     }
   }
 
