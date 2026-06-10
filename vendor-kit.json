@@ -1,0 +1,10 @@
+{
+  "modules": ["release", "format-check", "oxfmt"],
+  "vars": {
+    "testCommand": "bun run test",
+    "bunVersion": "1.3.13"
+  },
+  "overrides": {
+    "oxfmt": "printWidth 80 + repo-local schema path — reflowing the repo to 120 not worth it"
+  }
+}
