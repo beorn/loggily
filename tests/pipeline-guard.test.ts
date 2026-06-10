@@ -37,7 +37,8 @@ afterEach(() => {
   stderrSpy.mockRestore()
 })
 
-const stderrText = () => stderrSpy.mock.calls.map((c) => String(c[0])).join("")
+const stderrText = () =>
+  stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("")
 
 describe("dispatch guard — stages", () => {
   test("throwing stage does not throw into the host and drops the event", () => {
