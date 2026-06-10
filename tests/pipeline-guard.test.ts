@@ -18,23 +18,26 @@ import { buildPipeline } from "../src/pipeline.ts"
 import type { Event, LogEvent } from "../src/pipeline.ts"
 
 function logEvent(message: string): LogEvent {
-  return { kind: "log", time: Date.now(), namespace: "t", level: "info", message }
+  return {
+    kind: "log",
+    time: Date.now(),
+    namespace: "t",
+    level: "info",
+    message,
+  }
 }
 
 let stderrSpy: ReturnType<typeof vi.spyOn>
 
 beforeEach(() => {
-  stderrSpy = vi
-    .spyOn(process.stderr, "write")
-    .mockImplementation(() => true)
+  stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 })
 
 afterEach(() => {
   stderrSpy.mockRestore()
 })
 
-const stderrText = () =>
-  stderrSpy.mock.calls.map((c) => String(c[0])).join("")
+const stderrText = () => stderrSpy.mock.calls.map((c) => String(c[0])).join("")
 
 describe("dispatch guard — stages", () => {
   test("throwing stage does not throw into the host and drops the event", () => {
@@ -42,7 +45,8 @@ describe("dispatch guard — stages", () => {
     const pipeline = buildPipeline([
       { level: "trace" },
       (e) => {
-        if (e.kind === "log" && e.message === "boom") throw new Error("stage broke")
+        if (e.kind === "log" && e.message === "boom")
+          throw new Error("stage broke")
         return e
       },
       { write: (e: Event) => void seen.push(e) },
