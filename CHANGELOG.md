@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.2
+
+- **`createFileWriter` std-stream paths** — `/dev/stdout`, `/dev/stderr`,
+  `/dev/fd/N`, `/proc/self/fd/N` now bind the already-open descriptor
+  instead of `openSync(path, "a")`, which works on macOS but throws ENXIO
+  on Linux whenever the stream is a pipe (CI runners). Fixes the
+  `DEBUG_LOG=/dev/stderr` diagnostic recipe under CI; borrowed std fds are
+  never closed by `close()`.
+
 ## 0.10.0
 
 - **Removed `addWriterFor`** — use `addWriter({ ns: pattern }, writer)`.

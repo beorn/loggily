@@ -63,8 +63,14 @@ export function createFileWriter(
   let timer: ReturnType<typeof setInterval> | null = null
   let closed = false
 
-  // Open file in append mode
-  fd = fs.openSync(filePath, "a")
+  // Std-stream paths (DEBUG_LOG=/dev/stderr et al.) bind the already-open
+  // descriptor instead of re-opening the device node: openSync("/dev/stderr",
+  // "a") works on macOS but throws ENXIO on Linux whenever stderr is a pipe
+  // (CI runners). The borrowed fd is never closed — it belongs to the process.
+  const stdFd = stdStreamFd(filePath)
+
+  // Open file in append mode (regular paths only)
+  fd = stdFd ?? fs.openSync(filePath, "a")
 
   /** Flush buffer contents to disk synchronously */
   function flush(): void {
@@ -110,11 +116,25 @@ export function createFileWriter(
         // at this point, but we must still release the fd and exit handler.
       } finally {
         if (fd !== null) {
-          fs.closeSync(fd)
+          // Borrowed std-stream descriptors stay open — closing fd 1/2 would
+          // sever the whole process's stdout/stderr.
+          if (stdFd === null) fs.closeSync(fd)
           fd = null
         }
         process.removeListener("exit", exitHandler)
       }
     },
   }
+}
+
+/**
+ * Map a std-stream pseudo-path to its file descriptor, or null for regular
+ * paths. Covers the portable spellings: /dev/stdout, /dev/stderr, /dev/fd/N
+ * (macOS + Linux), /proc/self/fd/N (Linux).
+ */
+function stdStreamFd(filePath: string): number | null {
+  if (filePath === "/dev/stdout") return 1
+  if (filePath === "/dev/stderr") return 2
+  const m = /^(?:\/dev\/fd|\/proc\/self\/fd)\/(\d+)$/.exec(filePath)
+  return m ? Number(m[1]) : null
 }
