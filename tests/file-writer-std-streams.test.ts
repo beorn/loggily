@@ -9,22 +9,20 @@
  * re-opening the device node — and must never close that fd.
  */
 
-import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
+import { describe, test, expect, beforeEach, vi } from "vitest"
+import { createFileWriter } from "../src/file-writer.ts"
 
-const { mockOpenSync, mockWriteSync, mockCloseSync } = vi.hoisted(() => ({
-  mockOpenSync: vi.fn((_path?: string, _flags?: string) => 42),
-  mockWriteSync: vi.fn(),
-  mockCloseSync: vi.fn(),
-}))
+const mockOpenSync = vi.fn((_path: string, _flags: string) => 42)
+const mockWriteSync = vi.fn()
+const mockCloseSync = vi.fn()
 
-vi.mock("node:fs", () => ({
-  openSync: (path: string, flags: string) => mockOpenSync(path, flags),
-  writeSync: (fd: number, data: string) => mockWriteSync(fd, data),
-  closeSync: (fd: number) => mockCloseSync(fd),
-}))
-
-// Import AFTER mock setup
-const { createFileWriter } = await import("../src/file-writer.ts")
+function mockFs() {
+  return {
+    openSync: mockOpenSync,
+    writeSync: mockWriteSync,
+    closeSync: mockCloseSync,
+  }
+}
 
 describe("file-writer std-stream paths", () => {
   beforeEach(() => {
@@ -32,10 +30,6 @@ describe("file-writer std-stream paths", () => {
     mockOpenSync.mockReturnValue(42)
     mockWriteSync.mockReturnValue(0)
     mockCloseSync.mockReturnValue(undefined)
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
   })
 
   test.each([
@@ -59,6 +53,7 @@ describe("file-writer std-stream paths", () => {
       const writer = createFileWriter(path, {
         bufferSize: 999999,
         flushInterval: 60000,
+        __fs: mockFs(),
       })
       writer.write("hello")
       writer.flush()
@@ -76,6 +71,7 @@ describe("file-writer std-stream paths", () => {
     const writer = createFileWriter("/tmp/regular.log", {
       bufferSize: 999999,
       flushInterval: 60000,
+      __fs: mockFs(),
     })
     writer.write("line")
     writer.flush()
@@ -90,6 +86,7 @@ describe("file-writer std-stream paths", () => {
     const writer = createFileWriter("dev/stderr", {
       bufferSize: 999999,
       flushInterval: 60000,
+      __fs: mockFs(),
     })
     writer.write("x")
     writer.close()
