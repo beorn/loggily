@@ -19,6 +19,17 @@ import {
   withSpans,
   resetIds,
   createFileWriter,
+  setLogLevel,
+  getLogLevel,
+  enableSpans,
+  disableSpans,
+  spansAreEnabled,
+  setDebugFilter,
+  getDebugFilter,
+  setLogFormat,
+  getLogFormat,
+  addWriter,
+  setSuppressConsole,
   type FileWriter,
   type LoggerPlugin,
 } from "../src/index.ts"
@@ -1010,16 +1021,12 @@ describe("namespace-aware conditional gating", () => {
 
 describe("deprecated v1 global setters still work", () => {
   test("setLogLevel sets LOG_LEVEL env var", () => {
-    const { setLogLevel, getLogLevel } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     setLogLevel("debug")
     expect(getLogLevel()).toBe("debug")
     setLogLevel("info")
   })
 
   test("enableSpans/disableSpans toggle TRACE env var", () => {
-    const { enableSpans, disableSpans, spansAreEnabled } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     enableSpans()
     expect(spansAreEnabled()).toBe(true)
     disableSpans()
@@ -1027,8 +1034,6 @@ describe("deprecated v1 global setters still work", () => {
   })
 
   test("setDebugFilter sets DEBUG env var", () => {
-    const { setDebugFilter, getDebugFilter } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     setDebugFilter(["myapp", "-myapp:sql"])
     expect(getDebugFilter()).toEqual(["myapp", "-myapp:sql"])
     setDebugFilter(null)
@@ -1036,16 +1041,12 @@ describe("deprecated v1 global setters still work", () => {
   })
 
   test("setLogFormat sets LOG_FORMAT env var", () => {
-    const { setLogFormat, getLogFormat } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     setLogFormat("json")
     expect(getLogFormat()).toBe("json")
     setLogFormat("console")
   })
 
   test("addWriter registers and unregisters", () => {
-    const { addWriter } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     const calls: string[] = []
     const unsub = addWriter((formatted) => calls.push(formatted))
     expect(typeof unsub).toBe("function")
@@ -1053,8 +1054,6 @@ describe("deprecated v1 global setters still work", () => {
   })
 
   test("setSuppressConsole toggles runtime state", () => {
-    const { setSuppressConsole } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     setSuppressConsole(true)
     setSuppressConsole(false)
   })

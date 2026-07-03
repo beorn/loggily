@@ -7,19 +7,16 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
+import { addWriter, createLogger, setLogLevel, setSuppressConsole } from "../src/index.ts"
 
 const unsubs: Array<() => void> = []
 
 beforeEach(() => {
-  const { setSuppressConsole } =
-    require("../src/index.ts") as typeof import("../src/index.ts")
   setSuppressConsole(true)
 })
 
 afterEach(() => {
   while (unsubs.length) unsubs.pop()?.()
-  const { setSuppressConsole } =
-    require("../src/index.ts") as typeof import("../src/index.ts")
   setSuppressConsole(false)
 })
 
@@ -30,8 +27,6 @@ function track(unsub: () => void): () => void {
 
 describe("addWriter — overloaded form (writer | config + writer)", () => {
   test("addWriter(writer) — catch-all, every namespace routes", () => {
-    const { addWriter, createLogger } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     const captured: string[] = []
     track(addWriter((_fmt, _lvl, ns) => captured.push(ns)))
 
@@ -43,8 +38,6 @@ describe("addWriter — overloaded form (writer | config + writer)", () => {
   })
 
   test("addWriter({ ns }, writer) — namespace scope only", () => {
-    const { addWriter, createLogger } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     const captured: string[] = []
     track(
       addWriter({ ns: "bg-recall:*" }, (_fmt, _lvl, ns) => captured.push(ns)),
@@ -58,8 +51,6 @@ describe("addWriter — overloaded form (writer | config + writer)", () => {
   })
 
   test("addWriter({ level }, writer) — level filter only", () => {
-    const { addWriter, createLogger, setLogLevel } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     setLogLevel("trace") // ensure all levels emit through the pipeline
     track(() => setLogLevel("info"))
 
@@ -77,8 +68,6 @@ describe("addWriter — overloaded form (writer | config + writer)", () => {
   })
 
   test("addWriter({ ns, level }, writer) — both filters apply", () => {
-    const { addWriter, createLogger, setLogLevel } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     setLogLevel("trace")
     track(() => setLogLevel("info"))
 
@@ -101,8 +90,6 @@ describe("addWriter — overloaded form (writer | config + writer)", () => {
   })
 
   test("addWriter({}, writer) — empty config behaves like catch-all", () => {
-    const { addWriter, createLogger } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     const captured: string[] = []
     track(addWriter({}, (_fmt, _lvl, ns) => captured.push(ns)))
 
@@ -113,8 +100,6 @@ describe("addWriter — overloaded form (writer | config + writer)", () => {
   })
 
   test("addWriter({ ns: array }, writer) — array of patterns with excludes", () => {
-    const { addWriter, createLogger } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     const captured: string[] = []
     track(
       addWriter({ ns: ["bg-recall:*", "-bg-recall:noisy"] }, (_fmt, _lvl, ns) =>
@@ -130,16 +115,12 @@ describe("addWriter — overloaded form (writer | config + writer)", () => {
   })
 
   test("addWriter throws when config given without writer", () => {
-    const { addWriter } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     expect(() => (addWriter as any)({ ns: "x:*" })).toThrow(
       /writer fn required/,
     )
   })
 
   test("unsubscribe stops further writes (scoped form)", () => {
-    const { addWriter, createLogger } =
-      require("../src/index.ts") as typeof import("../src/index.ts")
     const captured: string[] = []
     const unsub = addWriter({ ns: "x:*" }, (_fmt, _lvl, ns) =>
       captured.push(ns),
