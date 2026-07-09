@@ -75,7 +75,7 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
-    "test": "bunx --bun vitest run",
+    "test": "bun node_modules/.bin/vitest run",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
@@ -88,11 +88,11 @@
     "mitata": "^1.0.34",
     "oxfmt": "0.38.0",
     "tsdown": "^0.21.7",
-    "typescript": "^5.9.0",
+    "typescript": "^5.9.3",
     "vitepress": "^1.6.4",
     "vitepress-enrich": "^0.4.0",
     "vitepress-plugin-llms": "^1.12.0",
-    "vitest": "^4.1.1"
+    "vitest": "^4.1.10"
   },
   "peerDependencies": {
     "@opentelemetry/api": ">=1.0.0"
