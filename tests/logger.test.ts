@@ -597,6 +597,54 @@ describe("console format output", () => {
     expect(consoleMock.output[0]!.message).toMatch(/\d{2}:\d{2}:\d{2}/)
   })
 
+  test("renders human timestamps in local time while JSON stays UTC", () => {
+    const previousTimezone = process.env.TZ
+    try {
+      process.env.TZ = "America/Los_Angeles"
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date("2026-07-18T06:10:59.000Z"))
+
+      const terminalLog = createLogger("terminal", [
+        { level: "trace" },
+        console,
+      ])
+      terminalLog.info!("message")
+      expect(consoleMock.output[0]!.message).toContain("23:10:59")
+
+      const consoleLines: string[] = []
+      const consoleLog = createLogger("stream", [
+        { level: "trace", format: "console" },
+        {
+          objectMode: false,
+          write: (value: unknown) => consoleLines.push(String(value)),
+        },
+      ])
+      consoleLog.info!("message")
+      expect(consoleLines[0]).toContain("23:10:59")
+
+      const jsonLines: string[] = []
+      const jsonLog = createLogger("json", [
+        { level: "trace", format: "json" },
+        {
+          objectMode: false,
+          write: (value: unknown) => jsonLines.push(String(value)),
+        },
+      ])
+      jsonLog.info!("message")
+      expect(JSON.parse(jsonLines[0]!) as { time: string }).toMatchObject({
+        time: "2026-07-18T06:10:59.000Z",
+      })
+
+      terminalLog.end()
+      consoleLog.end()
+      jsonLog.end()
+    } finally {
+      vi.useRealTimers()
+      if (previousTimezone === undefined) delete process.env.TZ
+      else process.env.TZ = previousTimezone
+    }
+  })
+
   // Test level labels in console output
   test.each([
     ["trace", "TRACE"],
