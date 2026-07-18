@@ -31,6 +31,7 @@ import { colors as pc } from "./colors.js"
 import type { Event, LogFormat, OutputLogLevel } from "./pipeline.js"
 import {
   formatConsoleEvent,
+  formatConsoleTime,
   formatJSONEvent,
   safeStringify,
 } from "./pipeline.js"
@@ -56,10 +57,6 @@ export function isBrowserRuntime(): boolean {
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
-
-function timeStr(time: number): string {
-  return new Date(time).toISOString().split("T")[1]?.split(".")[0] ?? ""
-}
 
 function levelLabel(level: OutputLogLevel): string {
   switch (level) {
@@ -125,7 +122,7 @@ export function createTerminalConsoleSink(
       return
     }
 
-    const prefix = `${pc.dim(timeStr(event.time))} ${levelAnsi(event.level)} ${pc.cyan(event.namespace)}`
+    const prefix = `${pc.dim(formatConsoleTime(event.time))} ${levelAnsi(event.level)} ${pc.cyan(event.namespace)}`
     const args = userArgsOf(event)
     // Arrow → console.<level>: preserves caller frame + stays mockable.
     invokeForLevel(event.level, prefix, event.message, ...args)
@@ -192,7 +189,7 @@ export function createBrowserConsoleSink(
         "info",
         spanTemplate + (spanPropsString ? "%s" : ""),
         cssDim(),
-        timeStr(event.time),
+        formatConsoleTime(event.time),
         cssSpan(),
         cssNamespace(),
         event.namespace,
@@ -210,7 +207,7 @@ export function createBrowserConsoleSink(
       event.level,
       template,
       cssDim(),
-      timeStr(event.time),
+      formatConsoleTime(event.time),
       cssLevel(event.level),
       levelLabel(event.level),
       cssNamespace(),

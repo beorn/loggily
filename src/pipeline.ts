@@ -118,10 +118,16 @@ export function safeStringify(value: unknown): string {
   })
 }
 
+/** Human-facing console timestamps follow the host's local wall clock. */
+export function formatConsoleTime(time: number): string {
+  const date = new Date(time)
+  return [date.getHours(), date.getMinutes(), date.getSeconds()]
+    .map((part) => String(part).padStart(2, "0"))
+    .join(":")
+}
+
 export function formatConsoleEvent(event: Event): string {
-  const time = pc.dim(
-    new Date(event.time).toISOString().split("T")[1]?.split(".")[0] || "",
-  )
+  const time = pc.dim(formatConsoleTime(event.time))
   const ns = pc.cyan(event.namespace)
 
   if (event.kind === "span") {

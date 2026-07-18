@@ -475,6 +475,9 @@ setSampleRate(0.1)
 
 ### Console (development)
 
+Console timestamps use the host's local wall clock. Machine-readable JSON
+timestamps remain ISO 8601 UTC.
+
 ```
 14:32:15 INFO myapp starting
 14:32:15 DEBUG myapp:import loading {file: "data.csv"}
