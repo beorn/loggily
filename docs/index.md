@@ -26,7 +26,7 @@ features:
     linkText: "Get started"
   - icon: 🌐
     title: "Works Everywhere"
-    details: "Same API in browser and server (Node.js, Bun). Beautiful colorized logs in development, performant structured JSON in production — no compromise."
+    details: "Same API in browser and server (Node.js, Bun). Human console output by default, performant structured JSON when selected — no compromise."
     link: /guide/comparison
     linkText: "See comparison"
   - icon: 🔌
@@ -76,7 +76,7 @@ $ yarn add loggily
 $ DEBUG='*' node app                        # show all debug output
 $ DEBUG='myapp:db' node app                 # only database logs
 $ LOG_FILE=/tmp/app.log node app            # write to file
-$ NODE_ENV=production node app              # structured JSON output
+$ LOG_FORMAT=json node app                  # structured JSON output
 $ TRACE=1 node app                          # enable span timing
 ```
 
@@ -91,7 +91,7 @@ const log = createLogger("myapp", [
   pinoTransport, // writable — { write } receives events
   { file: "...", format: "json" }, // file sink — formatted strings
   [{ level: "warn" }, { file: "..." }], // branch — sub-pipeline with own scope
-  console, // colorized dev output, JSON in production
+  console, // human output; select JSON explicitly when needed
 ])
 
 // Structured logging

@@ -730,7 +730,6 @@ export function readEnvFormat(): LogFormat {
   if (envFormat === "json") return "json"
   if (envFormat === "console") return "console"
   if (getEnv("TRACE_FORMAT") === "json") return "json"
-  if (getEnv("NODE_ENV") === "production") return "json"
   return "console"
 }
 

@@ -29,7 +29,7 @@ $ npm install loggily
 $ DEBUG='*' node app                        # show all debug output
 $ DEBUG='myapp:db' node app                 # only database logs
 $ LOG_FILE=/tmp/app.log node app            # write to file
-$ NODE_ENV=production node app              # structured JSON output
+$ LOG_FORMAT=json node app                  # structured JSON output
 $ TRACE=1 node app                          # enable span timing
 ```
 
@@ -44,7 +44,7 @@ const log = createLogger("myapp", [
   pinoTransport, // writable — { write } receives events
   { file: "...", format: "json" }, // file sink — formatted strings
   [{ level: "warn" }, { file: "..." }], // branch — sub-pipeline with own scope
-  console, // colorized dev output, JSON in production
+  console, // human output; select JSON explicitly when needed
 ])
 
 // Structured logging

@@ -32,7 +32,7 @@ Colorized in your terminal:
     at server.ts:42
 ```
 
-Set `LOG_FORMAT=json` or `NODE_ENV=production` and the same calls produce structured JSON -- same data, machine-parseable, ready for Datadog or Elastic or whatever your ops team uses:
+Set `LOG_FORMAT=json` and the same calls produce structured JSON -- same data, machine-parseable, ready for Datadog or Elastic or whatever your ops team uses:
 
 ```json
 {
@@ -250,7 +250,7 @@ Normally, you'd pull in one library for logs, another for debug prints, a tracin
 
 At this point you've replaced that patchwork with a single library:
 
-- **Structured logging** with levels, namespaces, colorized dev output, JSON production output
+- **Structured logging** with levels, namespaces, human console output, and explicit JSON output
 - **Debug output** with `DEBUG=namespace:*` filtering -- compatible with the debug package's patterns, integrated
 - **Span timing** with `using` keyword, nested traces, and independent `TRACE=` control
 - **Composable output** via the config array -- console, file, custom stages, branches

@@ -35,8 +35,8 @@ Objects configure (`{ level, ns, format }`), arrays branch, values write. Custom
 | Namespace Filtering    | `DEBUG=` compatible patterns                        |
 | Child / Context Logger | `.child()` — extend namespace, add context, or both |
 | Output Pipeline        | Config array: objects, arrays, values               |
-| Pretty Print           | Built-in (auto in dev)                              |
-| JSON Output            | Built-in (auto in production)                       |
+| Pretty Print           | Built-in (default)                                  |
+| JSON Output            | Built-in (`LOG_FORMAT=json`)                        |
 | File Output            | `{ file: "/path" }` in config array                 |
 | Custom Stages          | `(event) => event \| null \| void`                  |
 | Worker Threads         | `loggily/worker` with typed protocol                |
@@ -50,7 +50,7 @@ Loggily is designed to coexist with and interoperate with the broader Node.js ec
 
 - **`DEBUG=` compatible** -- uses the same namespace filter patterns as the `debug` package. Existing `DEBUG=myapp:db,-myapp:noisy` environment variables work as-is.
 - **Works with Pino transports** -- custom stage functions in the config array can forward `Event` objects to Pino transport destinations or any other sink.
-- **Standard env vars** -- `LOG_LEVEL`, `LOG_FORMAT`, `NODE_ENV=production` all work as expected from any Node.js logger.
+- **Standard env vars** -- `LOG_LEVEL`, `LOG_FORMAT`, and `DEBUG` select logging behavior directly.
 - **W3C Trace Context** -- `traceparent()` generates W3C-format headers for distributed tracing interop.
 - **OpenTelemetry compatible** -- span events include `spanId`, `traceId`, and `parentId` fields that map directly to OTel concepts.
 

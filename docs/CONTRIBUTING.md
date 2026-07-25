@@ -51,7 +51,7 @@ Tests must be silent on success. Use `vi.spyOn(console, 'log').mockImplementatio
 2. **Minimal surface** -- Few, well-designed functions
 3. **Type safe** -- TypeScript enforces correct usage (e.g., `?.` for disabled levels)
 4. **Zero-cost** -- Optional chaining skips argument evaluation when disabled
-5. **Structured** -- JSON in production, readable console in development
+5. **Structured** -- readable console by default, JSON when explicitly selected
 
 ## Questions?
 

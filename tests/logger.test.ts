@@ -499,16 +499,17 @@ describe("JSON format output", () => {
     expect(parsed.time).toBeDefined()
   })
 
-  test("NODE_ENV=production produces JSON output", () => {
+  test("NODE_ENV does not choose a log format", () => {
     process.env.NODE_ENV = "production"
     const log = createLogger("test", [{ level: "trace" }, console])
 
     log.info!("prod message")
 
     const output = consoleMock.output[0]!.message
-    const parsed = JSON.parse(output) as Record<string, unknown>
-    expect(parsed.level).toBe("info")
-    expect(parsed.msg).toBe("prod message")
+    expect(output).toContain("INFO")
+    expect(output).toContain("test")
+    expect(output).toContain("prod message")
+    expect(() => JSON.parse(output)).toThrow()
   })
 
   test("JSON output includes all props", () => {

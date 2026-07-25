@@ -181,20 +181,18 @@ const log = createLogger("myapp", [
 
 ## Output Format
 
-Pretty console in development, JSON in production:
+Human console output is the default. Select JSON explicitly when a machine
+consumer needs it:
 
 ```bash
-# Development (default)
+# Default
 bun run app
 # 14:32:15 INFO myapp server started {port: 3000}
 
-# Production (automatic)
-NODE_ENV=production bun run app
+# Structured JSON
+LOG_FORMAT=json bun run app
 # {"time":"2026-01-15T14:32:15.123Z","level":"info",
 #  "name":"myapp","msg":"server started","port":3000}
-
-# Explicit
-LOG_FORMAT=json bun run app
 ```
 
 Or set the format in the config array:

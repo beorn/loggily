@@ -95,7 +95,7 @@ This replaces the deprecated global setters (`setLogLevel`, `enableSpans`, `setD
 2. **Near-zero cost**: Disabled levels skip argument evaluation entirely via optional chaining.
 3. **Minimal surface**: Few functions, each does one thing well.
 4. **Type enforced**: TypeScript makes `?.` mandatory -- you can't accidentally call a disabled level.
-5. **Structured**: JSON in production, readable console in development.
+5. **Structured**: readable console by default, JSON when explicitly selected.
 6. **Progressive disclosure**: Start with one import and one function call. Discover namespaces, spans, context, workers, and the pipeline model as you need them -- each capability is additive, not a migration.
 
 ### Key types

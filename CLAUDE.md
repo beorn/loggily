@@ -118,7 +118,6 @@ Writables receive raw `Event` objects by default. Node.js streams (`process.stde
 | `TRACE_SAMPLE_RATE` | 0.0 -- 1.0                              | `1.0`     | Head-based trace sampling rate      |
 | `LOG_FORMAT`        | console, json                           | `console` | Override output format              |
 | `LOG_FILE`          | /path/to/file                           | (none)    | File output (default pipeline only) |
-| `NODE_ENV`          | production                              | (none)    | Auto-enable JSON format             |
 
 ### Examples
 
@@ -484,7 +483,7 @@ timestamps remain ISO 8601 UTC.
 14:32:16 SPAN myapp:import (1234ms) {count: 42}
 ```
 
-### JSON (production / LOG_FORMAT=json)
+### JSON (`LOG_FORMAT=json`)
 
 ```json
 {
