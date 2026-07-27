@@ -7,7 +7,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
-import { addWriter, createLogger, setLogLevel, setSuppressConsole } from "../src/index.ts"
+import {
+  addWriter,
+  createLogger,
+  setLogLevel,
+  setSuppressConsole,
+} from "../src/index.ts"
 
 const unsubs: Array<() => void> = []
 
