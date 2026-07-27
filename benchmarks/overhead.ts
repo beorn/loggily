@@ -122,9 +122,14 @@ try {
   // specifier fails typecheck (TS2307) wherever pino isn't installed; the
   // opaque form types as `any` in every environment while the runtime import
   // and the catch-fallback below behave identically.
-  const pino = ((await import("pino" as string)) as {
-    default: (options?: { level?: string }, destination?: unknown) => BenchLogger
-  }).default
+  const pino = (
+    (await import("pino" as string)) as {
+      default: (
+        options?: { level?: string },
+        destination?: unknown,
+      ) => BenchLogger
+    }
+  ).default
   pinoDisabled = pino({ level: "warn" }, noopStream())
   pinoEnabled = pino({ level: "debug" }, noopStream())
 } catch {
@@ -143,7 +148,10 @@ let winstonEnabled: BenchLogger
 try {
   // Opaque specifier — same optional-comparison-dep rationale as pino above.
   const winston = (await import("winston" as string)) as {
-    createLogger: (options?: { level?: string; transports?: unknown[] }) => BenchLogger
+    createLogger: (options?: {
+      level?: string
+      transports?: unknown[]
+    }) => BenchLogger
     transports: {
       Console: new (options?: { silent?: boolean }) => unknown
       Stream: new (options?: { stream?: unknown }) => unknown
