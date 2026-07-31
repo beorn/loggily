@@ -162,7 +162,14 @@ const log = createLogger("myapp", [{ level: "debug" }, console])
 Base logger factory without `withEnvDefaults()` or `withSpans()`. Use for full manual control:
 
 ```typescript
-import { baseCreateLogger, pipe, withSpans, withEnvDefaults } from "loggily"
+import {
+  baseCreateLogger,
+  pipe,
+  withConfigMetrics,
+  withEnvDefaults,
+  withRedaction,
+  withSpans,
+} from "loggily"
 
 const myCreateLogger = pipe(baseCreateLogger, withEnvDefaults(), withSpans())
 ```
@@ -273,15 +280,18 @@ const myCreateLogger = pipe(createLogger, withSentry({ dsn: "..." }))
 // Or build from scratch:
 const customFactory = pipe(
   baseCreateLogger,
+  withRedaction(),
   withEnvDefaults(),
   withSpans(),
-  myPlugin(),
+  withConfigMetrics(),
 )
 ```
 
 `withEnvDefaults()` reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, `TRACE`, etc. from env vars.
 
 `withSpans()` enables `.span()` capability. Without it, `.span()` throws.
+
+`withRedaction()` returns new events with common credential keys and token-shaped values replaced. It is not included by default. Compose it before `withEnvDefaults()` so console, file, global-writer, forwarding-stage, and branch outputs receive only redacted events.
 
 ### Test Helper
 

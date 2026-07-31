@@ -15,7 +15,9 @@ import {
   createLogger,
   baseCreateLogger,
   pipe,
+  withConfigMetrics,
   withEnvDefaults,
+  withRedaction,
   withSpans,
   resetIds,
   createFileWriter,
@@ -32,6 +34,7 @@ import {
   setSuppressConsole,
   type FileWriter,
   type LoggerPlugin,
+  type Event,
 } from "../src/index.ts"
 import { createConsoleMock } from "./helpers.ts"
 
@@ -941,6 +944,320 @@ describe("full composition chain", () => {
     myCreateLogger("b")
 
     expect(factoryCallCount).toBe(2)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. Redaction Plugin
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("withRedaction", () => {
+  const replacement = "[REDACTED]"
+
+  test("prepends redaction before explicit stages, outputs, and branches without mutating inputs", () => {
+    const stageSeen: Event[] = []
+    const branchSeen: Event[] = []
+    const circular: Record<string, unknown> = { secret: "sk-circular-secret" }
+    circular.self = circular
+    const original = {
+      password: "plain-password",
+      nested: { authorization: "Bearer abc.def.ghi", circular },
+      trace_id: "0123456789abcdef0123456789abcdef",
+    }
+    const factory = pipe(baseCreateLogger, withRedaction(), withSpans())
+    const log = factory("redaction", [
+      { level: "trace" },
+      (event) => {
+        stageSeen.push(event)
+        return event
+      },
+      [
+        (event) => {
+          branchSeen.push(event)
+          return event
+        },
+      ],
+    ])
+
+    log.info?.("credential sk-message-secret", original)
+
+    expect(stageSeen).toHaveLength(1)
+    expect(branchSeen).toHaveLength(1)
+    const event = stageSeen[0]!
+    expect(event).toBe(branchSeen[0])
+    expect(event.props).not.toBe(original)
+    expect(event.props).toMatchObject({
+      password: replacement,
+      nested: { authorization: replacement },
+      trace_id: original.trace_id,
+    })
+    const redactedCircular = (
+      event.props?.nested as { circular: Record<string, unknown> }
+    ).circular
+    expect(redactedCircular.secret).toBe(replacement)
+    expect(redactedCircular.self).toBe(redactedCircular)
+    expect(event.kind === "log" ? event.message : "").toBe(
+      `credential ${replacement}`,
+    )
+    expect(original.password).toBe("plain-password")
+    expect(original.nested.authorization).toBe("Bearer abc.def.ghi")
+    expect(circular.secret).toBe("sk-circular-secret")
+  })
+
+  test("covers undefined and props configuration through the approved full composition order", () => {
+    const previousLogLevel = process.env.LOG_LEVEL
+    process.env.LOG_LEVEL = "info"
+    const factory = pipe(
+      baseCreateLogger,
+      withRedaction(),
+      withEnvDefaults(),
+      withSpans(),
+      withConfigMetrics(),
+    )
+    try {
+      const plain = factory("plain")
+      const contextual = factory("contextual", { apiKey: "sk-context-secret" })
+
+      plain.info?.("Bearer plain-secret")
+      contextual.info?.("safe")
+
+      expect(JSON.stringify(consoleMock.output)).not.toMatch(
+        /plain-secret|context-secret/u,
+      )
+      expect(JSON.stringify(consoleMock.output)).toContain(replacement)
+    } finally {
+      if (previousLogLevel === undefined) delete process.env.LOG_LEVEL
+      else process.env.LOG_LEVEL = previousLogLevel
+    }
+  })
+
+  test("covers the documented key and value policy without globally exempting hex secrets", () => {
+    const seen: Event[] = []
+    const correlation = "0123456789abcdef0123456789abcdef0123456789abcdef"
+    const hexSecret = "fedcba9876543210fedcba9876543210fedcba9876543210"
+    const longToken =
+      "abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789"
+    const log = pipe(
+      baseCreateLogger,
+      withRedaction({ replacement: "<hidden>" }),
+    )("policy", [
+      { level: "trace" },
+      (event) => {
+        seen.push(event)
+        return event
+      },
+    ])
+
+    log.info?.(`hex credential ${hexSecret}`, {
+      secret: "plain-secret",
+      signingKey: "plain-key",
+      refresh_token: "plain-token",
+      "Set-Cookie": "session=plain-cookie",
+      opaque: longToken,
+      trace_id: correlation,
+      spanId: correlation,
+      requestID: correlation,
+    })
+
+    expect(seen).toHaveLength(1)
+    expect(JSON.stringify(seen[0])).not.toMatch(
+      /plain-secret|plain-key|plain-token|plain-cookie|fedcba|abcdefghijklmnopqrstuvwxyz_/u,
+    )
+    expect(seen[0]?.props).toMatchObject({
+      secret: "<hidden>",
+      signingKey: "<hidden>",
+      refresh_token: "<hidden>",
+      "Set-Cookie": "<hidden>",
+      opaque: "<hidden>",
+      trace_id: correlation,
+      spanId: correlation,
+      requestID: correlation,
+    })
+    expect(seen[0]?.kind === "log" ? seen[0].message : "").toBe(
+      "hex credential <hidden>",
+    )
+  })
+
+  test("redacts enumerable function properties and preserves Error subclasses", () => {
+    class RequestError extends Error {}
+    const seen: Event[] = []
+    const callback = Object.assign(() => "safe", {
+      token: "sk-function-secret",
+    })
+    const error = Object.assign(new RequestError("Bearer subclass-secret"), {
+      apiKey: "sk-error-key",
+    })
+    const log = pipe(baseCreateLogger, withRedaction())("shapes", [
+      { level: "trace" },
+      (event) => {
+        seen.push(event)
+        return event
+      },
+    ])
+
+    log.error?.(error, { callback })
+
+    const event = seen[0]
+    const redactedError =
+      event?.kind === "log" ? event.userArgs?.[0] : undefined
+    const redactedProps =
+      event?.kind === "log" ? event.userArgs?.[1] : undefined
+    const redactedCallback = (
+      redactedProps as { callback?: { token?: unknown } }
+    ).callback
+    expect(redactedError).toBeInstanceOf(RequestError)
+    expect(JSON.stringify(redactedError)).not.toMatch(/error-key/u)
+    expect((redactedError as Error).message).toContain(replacement)
+    expect(redactedCallback?.token).toBe(replacement)
+    expect(callback.token).toBe("sk-function-secret")
+  })
+
+  test("redacts logs, spans, raw user arguments, and Error message/stack/cause", () => {
+    const seen: Event[] = []
+    const factory = pipe(baseCreateLogger, withRedaction(), withSpans())
+    const log = factory("errors", [
+      { level: "trace" },
+      (event) => {
+        seen.push(event)
+        return event
+      },
+    ])
+    const cause = new Error("cause sk-cause-secret")
+    const error = new Error("request Bearer error-secret", { cause })
+
+    log.error?.(error, "failed", { token: "sk-prop-secret" })
+    const span = log.span?.("work", { cookie: "session-secret" })
+    expect(span).toBeDefined()
+    span!.spanData.password = "span-secret"
+    span!.end()
+
+    expect(seen).toHaveLength(2)
+    const serialized = JSON.stringify(seen)
+    expect(serialized).not.toMatch(
+      /cause-secret|error-secret|prop-secret|session-secret|span-secret/u,
+    )
+    expect(serialized).toContain(replacement)
+    const logEvent = seen.find((event) => event.kind === "log")
+    const rawError =
+      logEvent?.kind === "log" ? logEvent.userArgs?.[0] : undefined
+    expect(rawError).toBeInstanceOf(Error)
+    expect((rawError as Error).message).toContain(replacement)
+    expect(String((rawError as Error).stack)).not.toContain("error-secret")
+    expect(String((rawError as Error).cause)).not.toContain("cause-secret")
+  })
+
+  test("redacts before both env console and LOG_FILE sinks", async () => {
+    const previous = {
+      LOG_FILE: process.env.LOG_FILE,
+      LOG_FORMAT: process.env.LOG_FORMAT,
+      LOG_LEVEL: process.env.LOG_LEVEL,
+    }
+    const file = join(
+      tmpdir(),
+      `loggily-redaction-${Date.now()}-${Math.random().toString(36).slice(2)}.log`,
+    )
+    process.env.LOG_FILE = file
+    process.env.LOG_FORMAT = "json"
+    process.env.LOG_LEVEL = "info"
+    const writerEvents: Event[] = []
+    const unsubscribe = addWriter((_formatted, _level, _namespace, event) => {
+      writerEvents.push(event)
+    })
+    try {
+      const factory = pipe(
+        baseCreateLogger,
+        withRedaction(),
+        withEnvDefaults(),
+        withSpans(),
+        withConfigMetrics(),
+      )
+      const log = factory("sinks")
+      log.info?.(`sk-sink-secret ${"x.".repeat(3_000)}`, {
+        password: "file-secret",
+      })
+
+      const fileText = readFileSync(file, "utf8")
+      expect(fileText).not.toMatch(/sink-secret|file-secret/u)
+      expect(fileText).toContain(replacement)
+      expect(JSON.stringify(consoleMock.output)).not.toMatch(
+        /sink-secret|file-secret/u,
+      )
+      expect(JSON.stringify(consoleMock.output)).toContain(replacement)
+      expect(JSON.stringify(writerEvents)).not.toMatch(
+        /sink-secret|file-secret/u,
+      )
+      expect(JSON.stringify(writerEvents)).toContain(replacement)
+    } finally {
+      unsubscribe()
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+      if (existsSync(file)) unlinkSync(file)
+    }
+  })
+
+  test("preserves bare-factory props while redacting them", () => {
+    const log = pipe(baseCreateLogger, withRedaction())("bare", {
+      password: "bare-password",
+    })
+
+    log.error?.("safe")
+
+    expect(JSON.stringify(consoleMock.output)).not.toContain("bare-password")
+    expect(JSON.stringify(consoleMock.output)).toContain(replacement)
+  })
+
+  test("treats a custom replacement as literal text", () => {
+    const seen: Event[] = []
+    const log = pipe(baseCreateLogger, withRedaction({ replacement: "$&" }))(
+      "literal",
+      [
+        { level: "trace" },
+        (event) => {
+          seen.push(event)
+          return event
+        },
+      ],
+    )
+
+    log.info?.("Bearer must-not-return")
+
+    expect(seen[0]?.kind === "log" ? seen[0].message : "").toBe("$&")
+  })
+
+  test("a throwing deep getter drops the event fail-closed", () => {
+    const seen: Event[] = []
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true)
+    const log = pipe(baseCreateLogger, withRedaction())("throwing", [
+      { level: "trace" },
+      (event) => {
+        seen.push(event)
+        return event
+      },
+    ])
+    const props: Record<string, unknown> = {}
+    Object.defineProperty(props, "value", {
+      enumerable: true,
+      get() {
+        throw new Error("redactor getter failed")
+      },
+    })
+
+    expect(() =>
+      log.dispatch({
+        kind: "log",
+        time: Date.now(),
+        namespace: "throwing",
+        level: "info",
+        message: "must drop",
+        props,
+      }),
+    ).not.toThrow()
+    expect(seen).toEqual([])
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining("fail-closed"))
   })
 })
 

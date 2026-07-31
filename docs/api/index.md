@@ -11,17 +11,33 @@
 | `createTestLogger(name)`          | Test helper — all levels enabled, console output                                           |
 | `pipe(base, ...plugins)`          | Pipe a logger factory through plugins (left-to-right)                                      |
 | `withEnvDefaults()`               | Plugin: read defaults from env vars (included by default)                                  |
+| `withRedaction(options?)`         | Plugin: redact credential keys and token-shaped values before dispatch                     |
 | `withSpans()`                     | Plugin: enable optional `.span?.()` capability (included by default)                       |
 | `withConfigMetrics()`             | Plugin: enable `{ metrics: true }` in config (included by default)                         |
 
 `baseCreateLogger` does NOT include `withSpans()` or `withEnvDefaults()`. Use it when you want full manual control over plugin composition:
 
 ```typescript
-import { baseCreateLogger, pipe, withSpans, withEnvDefaults } from "loggily"
+import {
+  baseCreateLogger,
+  pipe,
+  withConfigMetrics,
+  withEnvDefaults,
+  withRedaction,
+  withSpans,
+} from "loggily"
 
-// Manual composition — choose exactly which plugins to include
-const myCreateLogger = pipe(baseCreateLogger, withEnvDefaults(), withSpans())
+// Order is significant: redact before environment forwarding reaches any sink.
+const myCreateLogger = pipe(
+  baseCreateLogger,
+  withRedaction(),
+  withEnvDefaults(),
+  withSpans(),
+  withConfigMetrics(),
+)
 ```
+
+`withRedaction()` is opt-in and browser-safe. It returns new events, preserves correlation fields, tolerates circular structured data, and redacts messages, deep props, raw arguments, errors, and span props. Pass `{ replacement: "<hidden>" }` to change the default `[REDACTED]` marker.
 
 ### Config Array Elements
 
@@ -77,6 +93,7 @@ The second argument to `createLogger` is an optional config array:
 | `LazyMessage`        | `string \| (() => string)`                                          |
 | `LoggerFactory`      | `(name: string, config?) => ConditionalLogger`                      |
 | `LoggerPlugin`       | `(factory: LoggerFactory, ctx: PluginCtx) => LoggerFactory`         |
+| `RedactionOptions`   | `{ replacement?: string }`                                          |
 | `PluginCtx`          | Shared context for inter-plugin communication                       |
 | `ConfigElement`      | Union of all valid config array elements                            |
 | `ConfigObject`       | Scope config: `{ level?, ns?, format?, spans? }`                    |
