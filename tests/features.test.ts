@@ -1050,7 +1050,10 @@ describe("withRedaction", () => {
   test("covers the documented key and value policy without globally exempting hex secrets", () => {
     const seen: Event[] = []
     const correlation = "0123456789abcdef0123456789abcdef0123456789abcdef"
-    const hexSecret = "fedcba9876543210fedcba9876543210fedcba9876543210"
+    const gitSha = "5eb9000693b7c9e4b75d473bed5f8507cc1542f1"
+    const awsAccessKeyId = "AKIAIOSFODNN7EXAMPLE"
+    const stripeSecret = "sk_live_51H8exampleSecret"
+    const hexSecret = "fedcba9876543210fedcba9876543210"
     const longToken =
       "abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789"
     const log = pipe(
@@ -1064,33 +1067,48 @@ describe("withRedaction", () => {
       },
     ])
 
-    log.info?.(`hex credential ${hexSecret}`, {
-      secret: "plain-secret",
-      signingKey: "plain-key",
-      refresh_token: "plain-token",
-      "Set-Cookie": "session=plain-cookie",
-      opaque: longToken,
-      trace_id: correlation,
-      spanId: correlation,
-      requestID: correlation,
-    })
+    log.info?.(
+      `landing ${gitSha}; credentials ${awsAccessKeyId} ${stripeSecret} ${hexSecret} ${longToken}`,
+      {
+        secret: "plain-secret",
+        signingKey: "plain-key",
+        refresh_token: "plain-token",
+        "Set-Cookie": "session=plain-cookie",
+        passwd: "plain-passwd",
+        auth: "plain-auth",
+        credential: "plain-credential",
+        credentials: "plain-credentials",
+        signature: "plain-signature",
+        opaque: longToken,
+        sessionId: longToken,
+        trace_id: correlation,
+        spanId: correlation,
+        requestID: correlation,
+      },
+    )
 
     expect(seen).toHaveLength(1)
     expect(JSON.stringify(seen[0])).not.toMatch(
-      /plain-secret|plain-key|plain-token|plain-cookie|fedcba|abcdefghijklmnopqrstuvwxyz_/u,
+      /plain-secret|plain-key|plain-token|plain-cookie|plain-passwd|plain-auth|plain-credential|plain-credentials|plain-signature|AKIA|sk_live|fedcba|abcdefghijklmnopqrstuvwxyz_/u,
     )
     expect(seen[0]?.props).toMatchObject({
       secret: "<hidden>",
       signingKey: "<hidden>",
       refresh_token: "<hidden>",
       "Set-Cookie": "<hidden>",
+      passwd: "<hidden>",
+      auth: "<hidden>",
+      credential: "<hidden>",
+      credentials: "<hidden>",
+      signature: "<hidden>",
       opaque: "<hidden>",
+      sessionId: "<hidden>",
       trace_id: correlation,
       spanId: correlation,
       requestID: correlation,
     })
     expect(seen[0]?.kind === "log" ? seen[0].message : "").toBe(
-      "hex credential <hidden>",
+      `landing ${gitSha}; credentials <hidden> <hidden> <hidden> <hidden>`,
     )
   })
 

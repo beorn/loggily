@@ -6,24 +6,34 @@ export interface RedactionOptions {
   replacement?: string
 }
 
-const SECRET_KEY_NAMES = new Set([
-  "token",
-  "secret",
-  "password",
-  "api_key",
+const SECRET_KEY_TERMS = [
+  "auth",
   "authorization",
   "cookie",
-])
+  "credential",
+  "credentials",
+  "passwd",
+  "password",
+  "secret",
+  "signature",
+  "token",
+] as const
 const CORRELATION_KEY_NAMES = new Set([
   "correlationid",
   "generation",
   "launchid",
   "parentid",
   "requestid",
-  "sessionid",
   "spanid",
   "traceid",
 ])
+const SECRET_TEXT_PATTERNS = [
+  /\bBearer\s+[A-Za-z0-9._~+/-]+=*/giu,
+  /\bsk[-_][A-Za-z0-9_-]{8,}\b/gu,
+  /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/gu,
+  /\b[0-9a-fA-F]{32}\b/gu,
+  /\b(?=[A-Za-z0-9_-]{24,}\b)(?=[A-Za-z0-9_-]*[a-z])(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[_-])[A-Za-z0-9_-]+\b/gu,
+] as const
 
 /**
  * Redact structured events before they can reach outputs, forwarding stages,
@@ -214,11 +224,10 @@ function isSecretKey(key: string): boolean {
     .replaceAll(/[^a-z0-9]+/giu, "_")
     .toLowerCase()
   return (
-    SECRET_KEY_NAMES.has(normalized) ||
-    /(?:^|_)(?:token|secret|password|authorization|cookie)$/u.test(
-      normalized,
-    ) ||
-    /_key$/u.test(normalized)
+    normalized.endsWith("_key") ||
+    SECRET_KEY_TERMS.some(
+      (term) => normalized === term || normalized.endsWith(`_${term}`),
+    )
   )
 }
 
@@ -229,8 +238,8 @@ function isCorrelationKey(key: string): boolean {
 }
 
 function redactText(text: string, replacement: string): string {
-  return text
-    .replaceAll(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/giu, () => replacement)
-    .replaceAll(/\bsk-[A-Za-z0-9_-]{8,}\b/gu, () => replacement)
-    .replaceAll(/\b[A-Za-z0-9_-]{40,}\b/gu, () => replacement)
+  return SECRET_TEXT_PATTERNS.reduce(
+    (redacted, pattern) => redacted.replaceAll(pattern, () => replacement),
+    text,
+  )
 }
