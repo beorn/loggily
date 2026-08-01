@@ -70,6 +70,8 @@ export {
   writeSpan,
 } from "./core.js"
 
+export { withRedaction, type RedactionOptions } from "./redaction.js"
+
 export {
   createFileWriter,
   type FileWriter,

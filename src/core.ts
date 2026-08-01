@@ -43,6 +43,7 @@ import {
   parseNsFilter,
 } from "./pipeline.js"
 import { createConsoleSink as createStructuredConsoleSink } from "./console-sinks.js"
+import { withRedaction } from "./redaction.js"
 
 import {
   createMetricsCollector as _createMetricsCollector,
@@ -769,7 +770,7 @@ function createSpanMethod(
 
 /**
  * Base createLogger — requires a config array.
- * Use the default `createLogger` export (with `withEnvDefaults`) for zero-config.
+ * Use the default `createLogger` export (with redaction and env defaults) for zero-config.
  *
  * Note: loggers from baseCreateLogger do NOT have `.span()` capability.
  * Use `pipe(baseCreateLogger, withSpans())` or the default `createLogger` for spans.
@@ -1059,12 +1060,13 @@ export function withConfigMetrics(): LoggerPlugin {
   }
 }
 
-/** Default createLogger — includes withEnvDefaults + withSpans + withConfigMetrics. */
+/** Default createLogger — redacts before env/default sinks and optional plugins. */
 export const createLogger: (
   name: string,
   configOrProps?: ConfigElement[] | Record<string, unknown>,
 ) => ConditionalLogger = pipe(
   baseCreateLogger,
+  withRedaction(),
   withEnvDefaults(),
   withSpans(),
   withConfigMetrics(),

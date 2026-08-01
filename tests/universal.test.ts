@@ -38,6 +38,28 @@ describe("universal runtime compatibility", () => {
       // But it should re-export from core
       expect(browserSource).toContain("./core.js")
     })
+
+    test("withRedaction has no runtime imports and is exported by the browser entry", async () => {
+      const redactionSource = await Bun.file(
+        new URL("../src/redaction.ts", import.meta.url).pathname,
+      ).text()
+      const browserSource = await Bun.file(
+        new URL("../src/index.browser.ts", import.meta.url).pathname,
+      ).text()
+      const runtimeImports = redactionSource
+        .split("\n")
+        .filter(
+          (line) =>
+            /^import\s/u.test(line.trim()) &&
+            !/^import\s+type\b/u.test(line.trim()),
+        )
+
+      expect(runtimeImports).toEqual([])
+      expect(redactionSource).not.toMatch(/(?:node:|file-writer)/u)
+      expect(browserSource).toContain('from "./redaction.js"')
+      const browser = await import("../src/index.browser.ts")
+      expect(browser.withRedaction).toBeTypeOf("function")
+    })
   })
 
   describe("browser entry createFileWriter stub", () => {

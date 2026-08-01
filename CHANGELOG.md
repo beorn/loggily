@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Default redaction plugin** — `createLogger()` now composes
+  `withRedaction()` through the existing
+  logger-plugin pipeline and replaces common credential keys and token-shaped
+  values before stages, branches, console, file, or global-writer outputs. It
+  handles circular structured data, errors, raw arguments, and spans in both
+  Node and browser builds without mutating source events. Custom factories
+  built from `baseCreateLogger()` can opt in with the same plugin.
+
 ## 0.10.2
 
 - **`createFileWriter` std-stream paths** — `/dev/stdout`, `/dev/stderr`,

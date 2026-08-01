@@ -10,7 +10,15 @@
 Replace `debug` + your JSON logger + ad-hoc timers with one namespace tree and one output pipeline. Pure TypeScript, zero dependencies, ~3 KB.
 
 ```typescript
-import { createLogger } from "loggily"
+import {
+  baseCreateLogger,
+  createLogger,
+  pipe,
+  withConfigMetrics,
+  withEnvDefaults,
+  withRedaction,
+  withSpans,
+} from "loggily"
 
 const log = createLogger("myapp") // zero config — reads LOG_LEVEL, DEBUG from env
 
@@ -68,7 +76,13 @@ const dbLog = log.child("db", { pool: "main" }) // namespace: "myapp:db"
 log.metrics.summary() // myapp:db:query: 42 spans, mean=3.2ms, p95=8.4ms
 
 // Composable — build custom factories
-const myCreateLogger = pipe(baseCreateLogger, withSpans(), myPlugin())
+const myCreateLogger = pipe(
+  baseCreateLogger,
+  withRedaction(), // included by createLogger; explicit for custom factories
+  withEnvDefaults(),
+  withSpans(),
+  withConfigMetrics(),
+)
 ```
 
 Also supports [async context propagation](https://loggily.dev/api/context), [worker threads](https://loggily.dev/guide/workers), and [browser](https://loggily.dev/guide/getting-started#browser-support).

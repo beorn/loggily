@@ -224,16 +224,31 @@ For power users, `buildPipeline()` is exported for direct pipeline construction.
 
 ## Composition
 
-Extend `createLogger` with custom plugins using `pipe`:
+Extend logger factories with plugins using `pipe`:
 
 ```typescript
-import { createLogger, pipe } from "loggily"
+import {
+  baseCreateLogger,
+  pipe,
+  withConfigMetrics,
+  withEnvDefaults,
+  withRedaction,
+  withSpans,
+} from "loggily"
 
-const myCreateLogger = pipe(createLogger, withSentry({ dsn: "..." }))
+const myCreateLogger = pipe(
+  baseCreateLogger,
+  withRedaction(),
+  withEnvDefaults(),
+  withSpans(),
+  withConfigMetrics(),
+)
 const log = myCreateLogger("myapp")
 ```
 
-`createLogger` already includes `withEnvDefaults()`, which reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, and `TRACE` from environment variables.
+`createLogger` already includes `withRedaction()` followed by `withEnvDefaults()`, which reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, and `TRACE` from environment variables.
+
+Custom factories built from `baseCreateLogger()` opt in to `withRedaction()`. Keep it before `withEnvDefaults()` as shown: the environment plugin forwards events to console, file, and global writers, so redaction must run first. The plugin replaces common credential keys and bearer, `sk-…`, or long token-shaped values across messages, structured props, raw arguments, errors, and spans.
 
 ## Test Helper
 

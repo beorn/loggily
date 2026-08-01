@@ -71,6 +71,8 @@ export {
   writeSpan,
 } from "./core.js"
 
+export { withRedaction, type RedactionOptions } from "./redaction.js"
+
 // Tracing utilities (runtime-agnostic, work in browser)
 export {
   setIdFormat,
