@@ -56,6 +56,20 @@ export const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
   silent: 5,
 }
 
+/** Shift a base level along Loggily's canonical severity ladder. */
+export function resolveVerbosityLevel(
+  base: LogLevel,
+  verbose: number,
+  quiet: number,
+): LogLevel {
+  const levels = Object.keys(LOG_LEVEL_PRIORITY) as LogLevel[]
+  const index = Math.max(
+    0,
+    Math.min(levels.length - 1, LOG_LEVEL_PRIORITY[base] + quiet - verbose),
+  )
+  return levels[index] ?? base
+}
+
 // ============ Runtime Detection ============
 
 const _process = typeof process !== "undefined" ? process : undefined

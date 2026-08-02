@@ -101,7 +101,7 @@ export interface TraceparentOptions {
  * ```
  */
 export function traceparent(
-  spanData: SpanData,
+  spanData: Pick<SpanData, "id" | "traceId">,
   options?: TraceparentOptions,
 ): string {
   const traceId = padHex(spanData.traceId, 32)
