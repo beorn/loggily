@@ -85,11 +85,8 @@ export {
 } from "./tracing.js"
 
 // Pipeline builder for power users
-export {
-  buildPipeline,
-  type Pipeline,
-  resolveVerbosityLevel,
-} from "./pipeline.js"
+export { buildPipeline, type Pipeline } from "./pipeline.js"
+export { resolveVerbosityLevel } from "./pipeline.js"
 
 // Re-export config types for typed pipeline construction
 export type {
