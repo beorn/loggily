@@ -2,13 +2,18 @@
 
 ## Unreleased
 
+- **Identifier-safe redaction** — ordinary mixed-case paths, branch names,
+  session ids, and other opaque identifiers are no longer classified as
+  credentials by shape alone. Known Bearer, `sk-…`, AWS access-key, and
+  32-character hex forms remain redacted, as do values under credential-bearing
+  structured keys.
 - **Default redaction plugin** — `createLogger()` now composes
   `withRedaction()` through the existing
-  logger-plugin pipeline and replaces common credential keys and token-shaped
-  values before stages, branches, console, file, or global-writer outputs. It
-  handles circular structured data, errors, raw arguments, and spans in both
-  Node and browser builds without mutating source events. Custom factories
-  built from `baseCreateLogger()` can opt in with the same plugin.
+  logger-plugin pipeline and replaces common credential keys and recognized
+  credential forms before stages, branches, console, file, or global-writer
+  outputs. It handles circular structured data, errors, raw arguments, and
+  spans in both Node and browser builds without mutating source events. Custom
+  factories built from `baseCreateLogger()` can opt in with the same plugin.
 
 ## 0.10.2
 

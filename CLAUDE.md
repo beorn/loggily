@@ -296,7 +296,7 @@ const customFactory = pipe(
 
 `withSpans()` enables `.span()` capability. Without it, `.span()` throws.
 
-`withRedaction()` returns new events with common credential keys and token-shaped values replaced. It is included by default in `createLogger()`. Custom factories built from `baseCreateLogger()` must compose it before `withEnvDefaults()` so console, file, global-writer, forwarding-stage, and branch outputs receive only redacted events.
+`withRedaction()` returns new events with common credential keys and recognized credential forms replaced. It does not guess that anonymous mixed-case identifiers are secrets. It is included by default in `createLogger()`. Custom factories built from `baseCreateLogger()` must compose it before `withEnvDefaults()` so console, file, global-writer, forwarding-stage, and branch outputs receive only redacted events.
 
 ### Test Helper
 

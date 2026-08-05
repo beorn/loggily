@@ -32,8 +32,12 @@ const SECRET_TEXT_PATTERNS = [
   /\bsk[-_][A-Za-z0-9_-]{8,}\b/gu,
   /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/gu,
   /\b[0-9a-fA-F]{32}\b/gu,
-  /\b(?=[A-Za-z0-9_-]{24,}\b)(?=[A-Za-z0-9_-]*[a-z])(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[_-])[A-Za-z0-9_-]+\b/gu,
 ] as const
+
+// Deliberately do not guess that an anonymous mixed-character run is a
+// credential. Without a known prefix or a secret-bearing structured key, the
+// same shape describes branch names, temporary paths, session ids, and other
+// identifiers that logs need in order to diagnose a failure.
 
 /**
  * Redact structured events before they can reach outputs, forwarding stages,
@@ -43,8 +47,9 @@ const SECRET_TEXT_PATTERNS = [
 export function withRedaction(options: RedactionOptions = {}): LoggerPlugin {
   const stage = createRedactionStage(options)
   return (factory) => (name, configOrProps?) => {
-    if (Array.isArray(configOrProps))
+    if (Array.isArray(configOrProps)) {
       return factory(name, [stage, ...configOrProps])
+    }
 
     // A bare base factory needs an explicit pipeline to host the stage. Props
     // remain logger context through child(), exactly as baseCreateLogger's
@@ -93,13 +98,15 @@ function redactValue(
   seen: WeakMap<object, unknown>,
   redactStringValues: boolean,
 ): unknown {
-  if (typeof value === "string")
+  if (typeof value === "string") {
     return redactStringValues ? redactText(value, replacement) : value
+  }
   if (
     value === null ||
     (typeof value !== "object" && typeof value !== "function")
-  )
+  ) {
     return value
+  }
 
   const existing = seen.get(value)
   if (existing !== undefined) return existing
@@ -136,21 +143,22 @@ function redactValue(
   if (value instanceof Set) {
     const clone = new Set<unknown>()
     seen.set(value, clone)
-    for (const entry of value)
+    for (const entry of value) {
       clone.add(redactValue(entry, replacement, seen, true))
+    }
     return clone
   }
   if (Array.isArray(value)) {
     const clone: unknown[] = []
     seen.set(value, clone)
-    for (const entry of value)
+    for (const entry of value) {
       clone.push(redactValue(entry, replacement, seen, true))
+    }
     return clone
   }
 
-  const clone: Record<string, unknown> = Object.create(
-    Object.getPrototypeOf(value),
-  ) as Record<string, unknown>
+  const prototype = Object.getPrototypeOf(value) as object | null
+  const clone = Object.create(prototype) as Record<string, unknown>
   seen.set(value, clone)
   for (const key of Object.keys(value)) {
     if (isSecretKey(key)) {
@@ -175,7 +183,8 @@ function redactFunction(
   const clone = function (this: unknown, ...args: unknown[]): unknown {
     return Reflect.apply(value, this, args)
   }
-  Object.setPrototypeOf(clone, Object.getPrototypeOf(value))
+  const prototype = Object.getPrototypeOf(value) as object | null
+  Object.setPrototypeOf(clone, prototype)
   seen.set(value, clone)
   for (const key of Object.keys(value)) {
     ;(clone as unknown as Record<string, unknown>)[key] = isSecretKey(key)
@@ -195,14 +204,17 @@ function redactError(
   replacement: string,
   seen: WeakMap<object, unknown>,
 ): Error {
-  const clone = Object.create(Object.getPrototypeOf(error)) as Error
+  const prototype = Object.getPrototypeOf(error) as object | null
+  const clone = Object.create(prototype) as Error
   seen.set(error, clone)
   clone.name = error.name
   clone.message = redactText(error.message, replacement)
-  if (error.stack !== undefined)
+  if (error.stack !== undefined) {
     clone.stack = redactText(error.stack, replacement)
-  if (error.cause !== undefined)
+  }
+  if (error.cause !== undefined) {
     clone.cause = redactValue(error.cause, replacement, seen, true)
+  }
   for (const key of Object.keys(error)) {
     if (key === "cause") continue
     if (isSecretKey(key)) clone[key as keyof Error] = replacement as never

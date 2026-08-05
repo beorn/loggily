@@ -954,6 +954,35 @@ describe("full composition chain", () => {
 describe("withRedaction", () => {
   const replacement = "[REDACTED]"
 
+  test("preserves ordinary mixed-case identifiers and paths", () => {
+    const seen: Event[] = []
+    const tempPath = "/tmp/hab-pane-state-corrupt-FeA2ZM/.km/panes.json"
+    const branch = "task-agent-branch-ordinary-X7a9B2"
+    const sessionId = "session-worker-correlation-Ab3D4e"
+    const log = pipe(baseCreateLogger, withRedaction())(
+      "ordinary-identifiers",
+      [
+        { level: "trace" },
+        (event) => {
+          seen.push(event)
+          return event
+        },
+      ],
+    )
+
+    log.warn?.(`failed to load ${tempPath} on ${branch}`, {
+      path: tempPath,
+      branch,
+      sessionId,
+    })
+
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?.kind === "log" ? seen[0].message : "").toBe(
+      `failed to load ${tempPath} on ${branch}`,
+    )
+    expect(seen[0]?.props).toMatchObject({ path: tempPath, branch, sessionId })
+  })
+
   test("protects every sink used through the default createLogger factory", () => {
     const capture = createCapture()
     const log = createLogger("default-redaction", [
@@ -1047,7 +1076,7 @@ describe("withRedaction", () => {
     }
   })
 
-  test("covers the documented key and value policy without globally exempting hex secrets", () => {
+  test("covers known credential forms without misclassifying opaque identifiers", () => {
     const seen: Event[] = []
     const correlation = "0123456789abcdef0123456789abcdef0123456789abcdef"
     const gitSha = "5eb9000693b7c9e4b75d473bed5f8507cc1542f1"
@@ -1089,7 +1118,7 @@ describe("withRedaction", () => {
 
     expect(seen).toHaveLength(1)
     expect(JSON.stringify(seen[0])).not.toMatch(
-      /plain-secret|plain-key|plain-token|plain-cookie|plain-passwd|plain-auth|plain-credential|plain-credentials|plain-signature|AKIA|sk_live|fedcba|abcdefghijklmnopqrstuvwxyz_/u,
+      /plain-secret|plain-key|plain-token|plain-cookie|plain-passwd|plain-auth|plain-credential|plain-credentials|plain-signature|AKIA|sk_live|fedcba/u,
     )
     expect(seen[0]?.props).toMatchObject({
       secret: "<hidden>",
@@ -1101,14 +1130,14 @@ describe("withRedaction", () => {
       credential: "<hidden>",
       credentials: "<hidden>",
       signature: "<hidden>",
-      opaque: "<hidden>",
-      sessionId: "<hidden>",
+      opaque: longToken,
+      sessionId: longToken,
       trace_id: correlation,
       spanId: correlation,
       requestID: correlation,
     })
     expect(seen[0]?.kind === "log" ? seen[0].message : "").toBe(
-      `landing ${gitSha}; credentials <hidden> <hidden> <hidden> <hidden>`,
+      `landing ${gitSha}; credentials <hidden> <hidden> <hidden> ${longToken}`,
     )
   })
 

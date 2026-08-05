@@ -248,7 +248,7 @@ const log = myCreateLogger("myapp")
 
 `createLogger` already includes `withRedaction()` followed by `withEnvDefaults()`, which reads `LOG_LEVEL`, `DEBUG`, `LOG_FORMAT`, and `TRACE` from environment variables.
 
-Custom factories built from `baseCreateLogger()` opt in to `withRedaction()`. Keep it before `withEnvDefaults()` as shown: the environment plugin forwards events to console, file, and global writers, so redaction must run first. The plugin replaces common credential keys and bearer, `sk-…`, or long token-shaped values across messages, structured props, raw arguments, errors, and spans.
+Custom factories built from `baseCreateLogger()` opt in to `withRedaction()`. Keep it before `withEnvDefaults()` as shown: the environment plugin forwards events to console, file, and global writers, so redaction must run first. The plugin replaces common credential keys and recognized bearer, `sk-…`, AWS access-key, and 32-character hex forms across messages, structured props, raw arguments, errors, and spans. Anonymous mixed-case identifiers are preserved because their shape alone cannot distinguish a secret from a path, branch name, or session id.
 
 ## Test Helper
 

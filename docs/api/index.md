@@ -11,7 +11,7 @@
 | `createTestLogger(name)`          | Test helper — all levels enabled, console output                                          |
 | `pipe(base, ...plugins)`          | Pipe a logger factory through plugins (left-to-right)                                     |
 | `withEnvDefaults()`               | Plugin: read defaults from env vars (included by default)                                 |
-| `withRedaction(options?)`         | Plugin: redact credential keys and token-shaped values before dispatch                    |
+| `withRedaction(options?)`         | Plugin: redact credential keys and recognized credential forms before dispatch            |
 | `withSpans()`                     | Plugin: enable optional `.span?.()` capability (included by default)                      |
 | `withConfigMetrics()`             | Plugin: enable `{ metrics: true }` in config (included by default)                        |
 
