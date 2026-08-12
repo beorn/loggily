@@ -140,12 +140,6 @@ export interface SpanLogger extends ConditionalLogger, Disposable {
   lap(name: string): void
 }
 
-/**
- * @deprecated `createLogger()` now returns `ConditionalLogger`; use
- * `log.span?.("op")` because spans are only present when enabled.
- */
-export type SpannedLogger = ConditionalLogger
-
 // ============ ConditionalLogger ============
 
 export interface ConditionalLogger extends Disposable {
