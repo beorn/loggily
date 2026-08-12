@@ -109,7 +109,6 @@ These functions still work but are deprecated. They map to environment variables
 
 | Export (deprecated)                                      | Replacement                                      |
 | -------------------------------------------------------- | ------------------------------------------------ |
-| `.logger(ns?, props?)`                                   | `.child(ns?, props?)`                            |
 | `setLogLevel(level)` / `getLogLevel()`                   | `{ level }` in config array or `LOG_LEVEL` env   |
 | `setLogFormat(format)` / `getLogFormat()`                | `{ format }` in config array or `LOG_FORMAT` env |
 | `enableSpans()` / `disableSpans()` / `spansAreEnabled()` | `TRACE=1` env var                                |

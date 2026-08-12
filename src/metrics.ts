@@ -15,7 +15,6 @@ import {
   type SpanRecorder,
   type SpanRecord,
   type ConditionalLogger,
-  type Logger,
   type LazyProps,
   type SpanLogger,
 } from "./core.js"
@@ -170,19 +169,6 @@ export function withMetrics(
           ): ConditionalLogger => {
             const child = target.child(namespaceOrContext as string, childProps)
             return withMetrics(collector)(child)
-          }
-        }
-        if (prop === "logger") {
-          // Child loggers inherit the metrics wrapper
-          return (
-            namespace?: string,
-            childProps?: Record<string, unknown>,
-          ): Logger => {
-            const child = target.logger(namespace, childProps)
-            // Re-wrap the child — withMetrics(collector) applied recursively
-            return withMetrics(collector)(
-              child as unknown as ConditionalLogger,
-            ) as unknown as Logger
           }
         }
         return (target as unknown as Record<string | symbol, unknown>)[prop]

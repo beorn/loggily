@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Removed `.logger()`** — use `.child()`. Mechanically equivalent — the
+  alias was a one-line delegate to `.child()`. Removed so child-logger
+  creation has one canonical method, not two.
 - **Identifier-safe redaction** — ordinary mixed-case paths, branch names,
   session ids, and other opaque identifiers are no longer classified as
   credentials by shape alone. Known Bearer, `sk-…`, AWS access-key, and

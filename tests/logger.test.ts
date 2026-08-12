@@ -143,42 +143,44 @@ describe("logging methods", () => {
   })
 })
 
-describe("logger hierarchy", () => {
-  test(".logger() creates child with extended namespace", () => {
-    const parent = createLogger("app", [{ level: "trace" }, console])
-    const child = parent.logger("import")
-
-    expect(child.name).toBe("app:import")
-  })
-
-  test(".logger() inherits parent props", () => {
-    const parent = createLogger("app", [{ level: "trace" }, console])
-    const withProps = parent.child({ version: "1.0" })
-    const child = withProps.logger("import")
-
-    expect(child.props).toEqual({ version: "1.0" })
-  })
-
-  test(".logger() merges additional props", () => {
-    const parent = createLogger("app", [{ level: "trace" }, console])
-    const withProps = parent.child({ version: "1.0" })
-    const child = withProps.logger("import", { file: "data.csv" })
-
-    expect(child.props).toEqual({ version: "1.0", file: "data.csv" })
-  })
-
-  test(".logger() without namespace keeps same name", () => {
-    const parent = createLogger("app", [{ level: "trace" }, console])
-    const child = parent.logger(undefined, { extra: true })
-
-    expect(child.name).toBe("app")
-  })
-
-  test(".child() is deprecated alias for .logger()", () => {
+describe("child hierarchy", () => {
+  test(".child() creates child with extended namespace", () => {
     const parent = createLogger("app", [{ level: "trace" }, console])
     const child = parent.child("import")
 
     expect(child.name).toBe("app:import")
+  })
+
+  test(".child() inherits parent props", () => {
+    const parent = createLogger("app", [{ level: "trace" }, console])
+    const withProps = parent.child({ version: "1.0" })
+    const child = withProps.child("import")
+
+    expect(child.props).toEqual({ version: "1.0" })
+  })
+
+  test(".child() merges additional props", () => {
+    const parent = createLogger("app", [{ level: "trace" }, console])
+    const withProps = parent.child({ version: "1.0" })
+    const child = withProps.child("import", { file: "data.csv" })
+
+    expect(child.props).toEqual({ version: "1.0", file: "data.csv" })
+  })
+
+  test(".child() with only a context object keeps the same name", () => {
+    const parent = createLogger("app", [{ level: "trace" }, console])
+    const child = parent.child({ extra: true })
+
+    expect(child.name).toBe("app")
+    expect(child.props).toEqual({ extra: true })
+  })
+
+  test(".logger() no longer exists — .child() replaced it", () => {
+    const parent = createLogger("app", [{ level: "trace" }, console])
+
+    expect(
+      (parent as unknown as Record<string, unknown>).logger,
+    ).toBeUndefined()
   })
 })
 
@@ -422,7 +424,7 @@ describe("createLogger", () => {
   test("can create child loggers and spans", () => {
     const log = createLogger("test", [{ level: "info" }, console])
 
-    const child = log.logger("child")
+    const child = log.child("child")
     expect(child.name).toBe("test:child")
 
     const span = log.span!("work")
@@ -809,7 +811,7 @@ describe("DEBUG namespace filtering", () => {
   test("filter allows child namespace match", () => {
     process.env.DEBUG = "myapp"
     const log = createLogger("myapp")
-    const child = log.logger("db")
+    const child = log.child("db")
     child.info!("visible")
 
     expect(consoleMock.output).toHaveLength(1)
@@ -856,8 +858,8 @@ describe("DEBUG namespace filtering", () => {
     process.env.DEBUG = "myapp,-myapp:noisy"
 
     const log = createLogger("myapp")
-    const quiet = log.logger("db")
-    const noisy = log.logger("noisy")
+    const quiet = log.child("db")
+    const noisy = log.child("noisy")
 
     log.info!("root")
     quiet.info!("db msg")
@@ -872,9 +874,9 @@ describe("DEBUG namespace filtering", () => {
     process.env.DEBUG = "*,-km:storage:sql"
 
     const log = createLogger("km")
-    const storage = log.logger("storage")
-    const sql = storage.logger("sql")
-    const sqlChild = sql.logger("detail")
+    const storage = log.child("storage")
+    const sql = storage.child("sql")
+    const sqlChild = sql.child("detail")
 
     log.info!("visible")
     storage.info!("visible")
@@ -888,7 +890,7 @@ describe("DEBUG namespace filtering", () => {
     process.env.DEBUG = "-km:noisy"
 
     const log1 = createLogger("km")
-    const log2 = createLogger("km").logger("noisy")
+    const log2 = createLogger("km").child("noisy")
     const log3 = createLogger("other")
 
     log1.info!("visible")
@@ -966,7 +968,7 @@ describe("ns config in pipeline", () => {
       { level: "trace", ns: "myapp,-myapp:noisy" },
       console,
     ])
-    const noisy = log.logger("noisy")
+    const noisy = log.child("noisy")
 
     log.info!("visible")
     noisy.info!("hidden")

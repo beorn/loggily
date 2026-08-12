@@ -228,7 +228,7 @@ const child = log.child("auth", { sso: true })
 // namespace: "myapp:auth", all logs include sso
 ```
 
-`.child()` returns `ConditionalLogger`. The older `.logger()` still works but is deprecated.
+`.child()` returns `ConditionalLogger`. It is the single method for creating child loggers.
 
 ### Spans
 
@@ -438,7 +438,6 @@ setTraceFilter(["myapp"]) // -> set TRACE env var
 setLogFormat("json") // -> set LOG_FORMAT env var
 setIdFormat("w3c") // -> set TRACE_ID_FORMAT env var or { idFormat: "w3c" }
 setSampleRate(0.1) // -> set TRACE_SAMPLE_RATE env var or { sampleRate: 0.1 }
-  .logger("auth") // -> use .child("auth")
 ```
 
 ## Distributed Tracing (opt-in)

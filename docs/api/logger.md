@@ -97,10 +97,6 @@ const db = log.child("db", { pool: "primary" })
 
 `.child()` always returns `ConditionalLogger`.
 
-::: info Deprecated
-`.logger()` still works but is deprecated. Use `.child()` instead.
-:::
-
 ### Manual Span End
 
 ```typescript
@@ -129,8 +125,6 @@ interface ConditionalLogger {
     (error: Error, data?: Record<string, unknown>): void
     (error: Error, message: string, data?: Record<string, unknown>): void
   }
-  /** @deprecated Use .child() */
-  logger(ns?: string, props?: Record<string, unknown>): ConditionalLogger
   span?: (ns?: string, props?: LazyProps) => SpanLogger
   child(namespace: string, props?: Record<string, unknown>): ConditionalLogger
   child(context: Record<string, unknown>): ConditionalLogger

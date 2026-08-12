@@ -138,7 +138,7 @@ describe("withMetrics (explicit collector)", () => {
 
     const collector = createMetricsCollector()
     const parent = withMetrics(collector)(createLogger("test:parent"))
-    const child = parent.logger("child")
+    const child = parent.child("child")
     {
       using _span = (child as unknown as { span?: Function }).span?.("op")
     }

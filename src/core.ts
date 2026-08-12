@@ -105,8 +105,6 @@ export interface Logger extends Disposable {
   error(error: Error, data?: Record<string, unknown>): void
   error(error: Error, message: string, data?: Record<string, unknown>): void
 
-  /** @deprecated Use .child() */
-  logger(namespace?: string, props?: Record<string, unknown>): ConditionalLogger
   span(namespace?: string, props?: LazyProps): SpanLogger
   child(namespace: string, props?: Record<string, unknown>): ConditionalLogger
   child(context: Record<string, unknown>): ConditionalLogger
@@ -170,8 +168,6 @@ export interface ConditionalLogger extends Disposable {
     (error: Error, message: string, data?: Record<string, unknown>): void
   }
 
-  /** @deprecated Use .child() */
-  logger(namespace?: string, props?: Record<string, unknown>): ConditionalLogger
   span?(namespace?: string, props?: LazyProps): SpanLogger
   child(namespace: string, props?: Record<string, unknown>): ConditionalLogger
   child(context: Record<string, unknown>): ConditionalLogger
@@ -446,14 +442,6 @@ function createLoggerImpl(
       extraData?: Record<string, unknown>,
     ) => emitLog("error", msgOrError, dataOrMsg, extraData),
 
-    /** @deprecated Use .child() instead */
-    logger(
-      namespace?: string,
-      childProps?: Record<string, unknown>,
-    ): ConditionalLogger {
-      return this.child(namespace ?? "", childProps)
-    },
-
     span(_namespace?: string, _childProps?: LazyProps): SpanLogger {
       throw new Error(
         "loggily: span() requires the withSpans() plugin. Use pipe(baseCreateLogger, withSpans()) or the default createLogger.",
@@ -581,20 +569,6 @@ function augmentWithSpans(
             childProps,
           )
           // Child loggers inherit span state (parent/trace context)
-          return augmentWithSpans(
-            childLogger,
-            spanState.parentSpanId,
-            spanState.traceId,
-            spanState.traceSampled,
-          )
-        }
-      }
-      if (prop === "logger") {
-        return function logger(
-          namespace?: string,
-          childProps?: Record<string, unknown>,
-        ): ConditionalLogger {
-          const childLogger = target.logger(namespace, childProps)
           return augmentWithSpans(
             childLogger,
             spanState.parentSpanId,

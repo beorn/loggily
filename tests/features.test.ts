@@ -268,10 +268,10 @@ describe("child loggers with context", () => {
     expect(spanOutput!).toContain("requestId")
   })
 
-  test("child can create further children via .logger()", () => {
+  test("child can create further children via .child()", () => {
     const log = createLogger("app", [{ level: "trace" }, console])
     const child = log.child({ requestId: "abc" })
-    const subLogger = child.logger("db")
+    const subLogger = child.child("db")
 
     expect(subLogger.name).toBe("app:db")
     expect(subLogger.props).toEqual({ requestId: "abc" })
@@ -593,7 +593,7 @@ describe("pipeline-based configuration", () => {
       { level: "trace", ns: ["*", "-myapp:sql"] },
       writer,
     ])
-    const sqlChild = log.logger("sql")
+    const sqlChild = log.child("sql")
 
     log.info?.("app message")
     sqlChild.info?.("sql message")
