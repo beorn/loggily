@@ -1,4 +1,4 @@
-# vendor-kit: links@72cd90fc5a99 — generated; edit packages/km-infra/vendor-kit/templates/links.yml in km, then re-sync
+# vendor-kit: links@88b6c97945c8 — generated; edit km/packages/km-infra/vendor-kit/templates/links.yml in km, then re-sync
 name: links
 
 # Per-PR + weekly link checking via lychee. The cheapest fast-feedback layer
@@ -41,6 +41,10 @@ jobs:
           # files use GLOB form ('CHANGELOG*.md') — lychee URL-interprets a
           # literal arg naming a missing file (http://changelog.md/ …), while
           # an unmatched glob is skipped.
+          # archive.org 503s under load; the mirror is the fallback for an
+          # already-dead original, so checking it is non-signal — ruled @cto
+          # 2026-08-18. (A '#' inside `args: |` would reach lychee as an
+          # argument, which is why this reason lives up here.)
           args: |
             --max-concurrency 24
             --max-retries 2
@@ -49,6 +53,7 @@ jobs:
             --accept '200..=204,206,301,302,303,307,308,401,403,429'
             --exclude '^(mailto|tel|javascript):'
             --exclude '^file:'
+            --exclude '^https://web\.archive\.org/'
             --exclude 'github\.com/.*/(compare|releases/tag)/v0\.0\.1'
             README.md
             'CHANGELOG*.md'
