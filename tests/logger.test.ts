@@ -186,7 +186,10 @@ describe("child hierarchy", () => {
 
 describe("spans", () => {
   test(".span() creates logger with spanData", () => {
-    const log = createLogger("app", [{ level: "trace" }, console])
+    const log = createLogger("app", [
+      { level: "trace", idFormat: "simple" },
+      console,
+    ])
     const span = log.span!("import")
 
     expect(span.spanData).not.toBeNull()
@@ -267,7 +270,10 @@ describe("spans", () => {
   })
 
   test("nested spans share trace ID", () => {
-    const log = createLogger("app", [{ level: "trace" }, console])
+    const log = createLogger("app", [
+      { level: "trace", idFormat: "simple" },
+      console,
+    ])
 
     const span1 = log.span!("import")
     const span2 = span1.span!("parse")
