@@ -7,7 +7,7 @@
   creation has one canonical method, not two.
 - **Removed the `SpannedLogger` type** — use `ConditionalLogger`.
   `SpannedLogger` was a pure type alias (`type SpannedLogger =
-  ConditionalLogger`), unreferenced anywhere in the codebase and never
+ConditionalLogger`), unreferenced anywhere in the codebase and never
   exported from the browser entry point.
 - **Identifier-safe redaction** — ordinary mixed-case paths, branch names,
   session ids, and other opaque identifiers are no longer classified as
