@@ -48,7 +48,10 @@ afterEach(() => {
 describe("span collection (km-loggily.span-collection-broken)", () => {
   test("startCollecting + span disposal populates collectedSpans", () => {
     startCollecting()
-    const log = createLogger("test", [{ level: "trace" }, console])
+    const log = createLogger("test", [
+      { level: "trace", idFormat: "simple" },
+      console,
+    ])
 
     {
       using span = log.span!("work")
