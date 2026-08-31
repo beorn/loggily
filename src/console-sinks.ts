@@ -6,8 +6,9 @@
  * to `console.*` so the platform can render rich output:
  *
  *   Terminal (Node / Bun):
- *     console.info(ansiPrefix, message, ...userArgs)
+ *     console.error(ansiPrefix, message, ...userArgs)
  *     — util.format keeps objects inspectable in devtools
+ *     — every level goes to STDERR; stdout carries the command's answer
  *
  *   Browser (Chrome / Firefox / Safari DevTools):
  *     console.info("%c<level> %c<namespace>", levelCss, nsCss, message, ...userArgs)
@@ -99,9 +100,9 @@ function userArgsOf(event: Event): unknown[] {
 
 /**
  * Terminal (ANSI) sink. Emits `[ansiPrefix, message, ...userArgs]` so that:
- *   - stdout gets a colored prefix
+ *   - stderr gets a colored prefix, leaving stdout to the command's answer
  *   - util.format leaves objects inspectable
- *   - vi.spyOn(console, 'info') intercepts calls (arrows re-read console)
+ *   - vi.spyOn(console, 'error') intercepts calls (arrows re-read console)
  *
  * Spans and JSON format still go through the pre-formatted single-arg path —
  * their consumers are log aggregators, not humans.
@@ -111,7 +112,7 @@ export function createTerminalConsoleSink(
 ): ConsoleSink {
   if (format === "json") {
     // JSON format: one line, one arg — downstream log collectors expect that.
-    return (event: Event) => routeSingle(event, formatJSONEvent(event))
+    return (event: Event) => routeSingleStderr(event, formatJSONEvent(event))
   }
 
   return (event: Event) => {
@@ -124,8 +125,8 @@ export function createTerminalConsoleSink(
 
     const prefix = `${pc.dim(formatConsoleTime(event.time))} ${levelAnsi(event.level)} ${pc.cyan(event.namespace)}`
     const args = userArgsOf(event)
-    // Arrow → console.<level>: preserves caller frame + stays mockable.
-    invokeForLevel(event.level, prefix, event.message, ...args)
+    // Arrow → console.<stderr method>: preserves caller frame + stays mockable.
+    invokeForLevelStderr(event.level, prefix, event.message, ...args)
   }
 }
 
@@ -274,6 +275,48 @@ function invokeForLevel(level: OutputLogLevel, ...args: unknown[]): void {
       console.error(...args)
       return
   }
+}
+
+/**
+ * Terminal counterpart to `invokeForLevel`: dispatch to a console method that
+ * writes to STDERR.
+ *
+ * Node aliases `console.info`, `console.debug` and `console.log` onto stdout —
+ * the same stream a command's answer travels on. One narration line there and
+ * `cmd --json | jq` reads a SyntaxError instead of a result, which is why
+ * consumers kept growing private workarounds (km and ag each wrote their own
+ * `routeLogsToStderr()`). A log is not product output, so the terminal sink
+ * never calls those three. `console.warn` and `console.error` are the only
+ * Node console methods that reach stderr without decorating what they print —
+ * `console.trace` appends a stack trace.
+ *
+ * Two deliberate consequences:
+ *   - Levels below `warn` share `console.error`. The level is still carried by
+ *     the rendered prefix (`INFO`, `DEBUG`), which is what humans read and
+ *     what log parsers match; the console METHOD was never the level.
+ *   - We route through the GLOBAL console rather than a private
+ *     `new Console({ stdout: process.stderr })`, so `vi.spyOn(console, …)` and
+ *     Ink/silvery's `patchConsole` still see these lines. A private Console
+ *     would silently escape both.
+ *
+ * The browser sink keeps `invokeForLevel`: DevTools has no stdout/stderr
+ * split, and `console.info`/`console.debug` are what drive its level filter.
+ */
+function invokeForLevelStderr(level: OutputLogLevel, ...args: unknown[]): void {
+  if (level === "warn") {
+    console.warn(...args)
+    return
+  }
+  console.error(...args)
+}
+
+/**
+ * Terminal counterpart to `routeSingle`: one pre-formatted string, on stderr.
+ * Used for JSON format and spans, whose consumers are log collectors — and a
+ * collector reading stdout would be reading the command's answer instead.
+ */
+function routeSingleStderr(event: Event, text: string): void {
+  invokeForLevelStderr(event.kind === "span" ? "info" : event.level, text)
 }
 
 /**

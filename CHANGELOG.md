@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- **Console output goes to stderr** — the terminal console sink routed `info`
+  and `debug` through `console.info` and `console.debug`, which Node writes to
+  STDOUT. Diagnostics therefore shared the stream that carries a command's
+  answer: one INFO line and `cmd --json | jq` reads a SyntaxError instead of a
+  result. Every level now reaches stderr — `console.warn` for `warn`,
+  `console.error` for the rest, those being the only two stderr-writing console
+  methods — so `warn` and `error` are unchanged and `trace`, `debug` and `info`
+  move. The level is still rendered in the prefix (`INFO`, `DEBUG`).
+  The BROWSER sink is deliberately unchanged: DevTools has no stdout/stderr
+  split, and `console.info`/`console.debug` are what drive its level filter and
+  `%c` rendering.
+
+  **Migration.** Code that asserts which console METHOD a level uses should
+  assert `console.error`, or read the level from the rendered prefix. Consumers
+  that suppressed the console sink to keep stdout clean — a private
+  `routeLogsToStderr()`, or an unconditional `setSuppressConsole(true)` in a
+  process whose stdout is a protocol — can drop the workaround and get their
+  diagnostics back on stderr.
+
 - **Removed `.logger()`** — use `.child()`. Mechanically equivalent — the
   alias was a one-line delegate to `.child()`. Removed so child-logger
   creation has one canonical method, not two.

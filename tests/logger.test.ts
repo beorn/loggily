@@ -80,20 +80,30 @@ describe("createLogger", () => {
 })
 
 describe("logging methods", () => {
-  // Test all log levels with their expected console method
+  // Every level reaches the console through a STDERR-writing method: Node
+  // routes console.info/debug/log to stdout, and stdout carries the command's
+  // answer, not narration about it. `console.warn` and `console.error` are the
+  // only stderr-writing console methods, so levels below warn share
+  // console.error — the level itself survives in the rendered prefix, which is
+  // what readers and log parsers actually match on. See
+  // console-stream-routing.test.ts for the end-to-end stream proof.
   test.each([
-    ["trace", "debug"], // trace uses console.debug
-    ["debug", "debug"],
-    ["info", "info"],
-    ["warn", "warn"],
-    ["error", "error"],
-  ] as const)("%s level uses console.%s", (logLevel, consoleMethod) => {
-    const log = createLogger("test", [{ level: "trace" }, console])
-    log[logLevel]!(`${logLevel} message`)
+    ["trace", "error", "TRACE"],
+    ["debug", "error", "DEBUG"],
+    ["info", "error", "INFO"],
+    ["warn", "warn", "WARN"],
+    ["error", "error", "ERROR"],
+  ] as const)(
+    "%s level uses console.%s and still renders %s",
+    (logLevel, consoleMethod, label) => {
+      const log = createLogger("test", [{ level: "trace" }, console])
+      log[logLevel]!(`${logLevel} message`)
 
-    expect(consoleMock.output).toHaveLength(1)
-    expect(consoleMock.output[0]!.level).toBe(consoleMethod)
-  })
+      expect(consoleMock.output).toHaveLength(1)
+      expect(consoleMock.output[0]!.level).toBe(consoleMethod)
+      expect(consoleMock.output[0]!.message).toContain(label)
+    },
+  )
 
   test("includes data in output", () => {
     const log = createLogger("test", [{ level: "trace" }, console])
@@ -994,8 +1004,10 @@ describe("output routing", () => {
     expect(stderrOutput).toHaveLength(1)
     expect(stderrOutput[0]!.message).toContain("hello")
 
-    // Should NOT appear in console output
-    const consoleOutput = consoleMock.output.filter((o) => o.level === "info")
+    // Should NOT appear in console output. Filter on every console method, not
+    // just one: the terminal sink picks its method by level, so naming a single
+    // method would let this pass while the sink shouted on another.
+    const consoleOutput = consoleMock.output.filter((o) => o.level !== "stderr")
     expect(consoleOutput).toHaveLength(0)
   })
 
@@ -1011,7 +1023,10 @@ describe("output routing", () => {
     const log = createLogger("test", [{ level: "trace" }, console])
     log.info?.("hello")
 
-    const consoleOutput = consoleMock.output.filter((o) => o.level === "info")
+    // info routes to console.error — the stderr-writing method — not
+    // console.info, which Node puts on stdout beside the command's answer.
+    const consoleOutput = consoleMock.output.filter((o) => o.level === "error")
     expect(consoleOutput).toHaveLength(1)
+    expect(consoleOutput[0]!.message).toContain("hello")
   })
 })

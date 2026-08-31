@@ -415,12 +415,16 @@ describe("createWorkerConsoleHandler", () => {
     })
 
     expect(consoleOutput).toHaveLength(5)
-    // log -> info, debug -> debug, info -> info, warn -> warn, error -> error
-    expect(consoleOutput[0]!.level).toBe("info")
-    expect(consoleOutput[1]!.level).toBe("debug")
-    expect(consoleOutput[2]!.level).toBe("info")
-    expect(consoleOutput[3]!.level).toBe("warn")
-    expect(consoleOutput[4]!.level).toBe("error")
+    // log -> info, debug -> debug, info -> info, warn -> warn, error -> error.
+    // Asserted on the rendered level label, not the console method: the
+    // terminal sink puts every level below warn on console.error so logs stay
+    // off stdout, so the method no longer tells the levels apart. The label
+    // does, and it is what a reader or a log parser matches on anyway.
+    expect(consoleOutput[0]!.message).toContain("INFO")
+    expect(consoleOutput[1]!.message).toContain("DEBUG")
+    expect(consoleOutput[2]!.message).toContain("INFO")
+    expect(consoleOutput[3]!.message).toContain("WARN")
+    expect(consoleOutput[4]!.message).toContain("ERROR")
   })
 
   test("formats multiple args as message", () => {

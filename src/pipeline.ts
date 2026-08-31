@@ -98,7 +98,7 @@ export function serializeCause(cause: unknown, maxDepth: number = 3): unknown {
       stack: cause.stack,
     }
     if ((cause as { code?: string }).code)
-      result.code = (cause as { code?: string }).code
+      {result.code = (cause as { code?: string }).code}
     if (cause.cause !== undefined) {
       result.cause = serializeCause(cause.cause, maxDepth - 1)
     }
@@ -120,7 +120,7 @@ export function safeStringify(value: unknown): string {
         name: val.name,
       }
       if ((val as { code?: string }).code)
-        result.code = (val as { code?: string }).code
+        {result.code = (val as { code?: string }).code}
       if (val.cause !== undefined) result.cause = serializeCause(val.cause)
       return result
     }
@@ -270,18 +270,18 @@ export function writeToConsole(text: string, event: Event): void {
   // Arrow dispatch — no .bind() — so vi.spyOn(console, …) installed AFTER
   // this module loaded still intercepts. DevTools frame attribution is
   // determined by the caller of writeToConsole, not by this switch.
+  //
+  // Every level lands on stderr: `console.info` and `console.debug` are stdout
+  // in Node, and stdout belongs to whatever answer the command was invoked to
+  // produce. `console.warn` and `console.error` are the two stderr-writing
+  // console methods; the level is carried by the formatted `text`, not by the
+  // method. Same contract as the terminal sink in console-sinks.ts — keep the
+  // two in step, or a caller wired to this one reintroduces the stdout leak.
   switch (event.level) {
-    case "trace":
-    case "debug":
-      console.debug(text)
-      break
-    case "info":
-      console.info(text)
-      break
     case "warn":
       console.warn(text)
       break
-    case "error":
+    default:
       console.error(text)
       break
   }
@@ -558,13 +558,13 @@ export function buildPipeline(
       // Scope config — update inherited config
       if (isValidLogLevel(obj.level)) config.level = obj.level
       if (obj.ns !== undefined)
-        config.ns = parseNsFilter(obj.ns as string | string[])
+        {config.ns = parseNsFilter(obj.ns as string | string[])}
       if (obj.format === "console" || obj.format === "json")
-        config.format = obj.format
+        {config.format = obj.format}
       if (obj.spans === true) spansEnabled = true
       if (obj.spans === false) spansEnabled = false
       if (obj.idFormat === "simple" || obj.idFormat === "w3c")
-        setIdFormat(obj.idFormat)
+        {setIdFormat(obj.idFormat)}
       if (typeof obj.sampleRate === "number") setSampleRate(obj.sampleRate)
       continue
     }
@@ -623,7 +623,7 @@ export function buildPipeline(
         e.kind === "log" &&
         LOG_LEVEL_PRIORITY[e.level] < output.levelPriority
       )
-        continue
+        {continue}
       if (output.nsFilter && !output.nsFilter(e.namespace)) continue
       try {
         output.write(e)
@@ -661,7 +661,7 @@ export function buildPipeline(
     if (
       outputs.some((output) => !output.nsFilter || output.nsFilter(namespace))
     )
-      return true
+      {return true}
     if (branches.some((branch) => branch.spanEnabled(namespace))) return true
     // Stages may consume or forward spans themselves, so keep `.span` available
     // for stage-only explicit pipelines.
@@ -751,7 +751,7 @@ export function readEnvTrace(): { enabled: boolean; filter: NsFilter | null } {
   const traceEnv = getEnv("TRACE")
   if (!traceEnv) return { enabled: false, filter: null }
   if (traceEnv === "1" || traceEnv === "true")
-    return { enabled: true, filter: null }
+    {return { enabled: true, filter: null }}
   const prefixes = traceEnv.split(",").map((s) => s.trim())
   return {
     enabled: true,

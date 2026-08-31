@@ -7,8 +7,10 @@
  * colors).
  *
  * After this change:
- *   - Terminal sink: multi-arg spread — `console.info(ansiPrefix, message, ...userArgs)`
- *     so util.format keeps objects expandable in Node DevTools.
+ *   - Terminal sink: multi-arg spread — `console.error(ansiPrefix, message, ...userArgs)`
+ *     so util.format keeps objects expandable in Node DevTools. The method is
+ *     `error` rather than `info` because Node puts console.info on stdout,
+ *     which belongs to the command's answer; see console-stream-routing.test.ts.
  *   - Browser sink: `%c` CSS format specifiers for level+namespace colors,
  *     then user message, then raw user args — so DevTools renders colored
  *     prefix and keeps objects expandable/clickable.
@@ -28,13 +30,13 @@ describe("console sinks receive structured args (not pre-formatted strings)", ()
     let spy: ReturnType<typeof vi.spyOn>
 
     beforeEach(() => {
-      spy = vi.spyOn(console, "info").mockImplementation(() => {})
+      spy = vi.spyOn(console, "error").mockImplementation(() => {})
     })
     afterEach(() => {
       vi.restoreAllMocks()
     })
 
-    test("passes multiple args to console.info (not a single pre-formatted string)", () => {
+    test("passes multiple args to console.error (not a single pre-formatted string)", () => {
       const sink = createTerminalConsoleSink()
       const event: Event = {
         kind: "log",
@@ -192,12 +194,12 @@ describe("console sinks receive structured args (not pre-formatted strings)", ()
   })
 
   describe("arrow functions preserve caller location (console mockable)", () => {
-    test("sink functions are mockable after import — console.info re-read at call time", () => {
-      // If the sink captured console.info via .bind() at creation time, a
-      // later spyOn would NOT intercept calls. Arrows re-read `console.info`
+    test("sink functions are mockable after import — console.error re-read at call time", () => {
+      // If the sink captured console.error via .bind() at creation time, a
+      // later spyOn would NOT intercept calls. Arrows re-read `console.error`
       // on every call, so mocks installed after sink creation still fire.
       const sink = createTerminalConsoleSink()
-      const spy = vi.spyOn(console, "info").mockImplementation(() => {})
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {})
       sink({
         kind: "log",
         time: 0,
@@ -215,13 +217,13 @@ describe("console sinks receive structured args (not pre-formatted strings)", ()
     let spy: ReturnType<typeof vi.spyOn>
 
     beforeEach(() => {
-      spy = vi.spyOn(console, "info").mockImplementation(() => {})
+      spy = vi.spyOn(console, "error").mockImplementation(() => {})
     })
     afterEach(() => {
       vi.restoreAllMocks()
     })
 
-    test("log.info(msg, data) reaches console.info as multi-arg (data stays an object)", () => {
+    test("log.info(msg, data) reaches console.error as multi-arg (data stays an object)", () => {
       const log = createLogger("app", [{ level: "debug" }, "console"])
       const data = { user: "alice", count: 42 }
       log.info?.("greeting", data)
