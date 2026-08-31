@@ -326,10 +326,14 @@ function routeSingleStderr(event: Event, text: string): void {
  */
 function routeSingle(event: Event, text: string): void {
   if (event.kind === "span") {
-    // Spans go to stderr in Node (existing behaviour) but we funnel them
-    // through console.info in the sinks so browser DevTools sees them too;
-    // the Node path for spans remains writeStderr via the pipeline when the
-    // user opts in via `"stderr"`.
+    // BROWSER path only. DevTools has no stdout/stderr split, so `console.info`
+    // is the right call here — it is what puts spans in DevTools' info filter.
+    //
+    // This comment used to claim spans "go to stderr in Node", which was true
+    // of the intent and false of the code: every terminal caller reached this
+    // same function and landed on stdout. The terminal sink now has its own
+    // `routeSingleStderr`, so the claim and the code agree by construction —
+    // Node spans are asserted on stderr in console-stream-routing.test.ts.
     console.info(text)
     return
   }

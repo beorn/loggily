@@ -68,6 +68,20 @@ describe("terminal sink writes diagnostics to stderr, never stdout", () => {
           userArgs: [],
         })
       }
+      // Spans are diagnostics too. They reach the terminal by a different route
+      // in each format — writeStderrLine for console, routeSingleStderr for
+      // json — so both need asserting or one of them regresses unseen.
+      sink({
+        kind: "span",
+        time: 0,
+        namespace: "payload-spanmarker",
+        name: "op",
+        duration: 7,
+        spanId: "sp_1",
+        traceId: "tr_1",
+        parentId: null,
+        userArgs: [],
+      })
     `
     const res = spawnSync(bunBin, ["-e", script], { encoding: "utf8" })
     expect(res.error).toBeUndefined()
@@ -80,12 +94,12 @@ describe("terminal sink writes diagnostics to stderr, never stdout", () => {
     "%s format: every level lands on stderr and none on stdout",
     (format) => {
       const { stdout, stderr } = runInChild(format)
-      for (const level of LEVELS) {
-        expect(stderr, `${level} must reach stderr`).toContain(
-          `payload-${level}`,
+      for (const marker of [...LEVELS, "spanmarker"]) {
+        expect(stderr, `${marker} must reach stderr`).toContain(
+          `payload-${marker}`,
         )
-        expect(stdout, `${level} must not reach stdout`).not.toContain(
-          `payload-${level}`,
+        expect(stdout, `${marker} must not reach stdout`).not.toContain(
+          `payload-${marker}`,
         )
       }
     },
