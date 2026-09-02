@@ -62,14 +62,15 @@ const log = createLogger("myapp", [
 
 The `ns` config key and the `DEBUG` environment variable accept the same filter syntax:
 
-| Pattern            | Matches                                                        |
-| ------------------ | -------------------------------------------------------------- |
-| `*`                | Everything                                                     |
-| `myapp`            | Exact match + children (`myapp`, `myapp:db`, `myapp:db:query`) |
-| `myapp:*`          | Same as `myapp` — explicit wildcard                            |
-| `myapp:db`         | Exact match + children (`myapp:db`, `myapp:db:query`)          |
-| `-myapp:sql`       | Exclude `myapp:sql` and its children                           |
-| `myapp,-myapp:sql` | Include myapp, exclude sql subtree                             |
+| Pattern            | Matches                                                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `*`                | Everything                                                                                                                                       |
+| `myapp`            | Exact match + children (`myapp`, `myapp:db`, `myapp:db:query`)                                                                                   |
+| `myapp:*`          | Same as `myapp` — explicit wildcard                                                                                                              |
+| `myapp*`           | `debug`-package glob: `*` is any run of characters anywhere in the pattern (`myapp`, `myapp:db`, `myappx`; `app:*:query` matches `app:db:query`) |
+| `myapp:db`         | Exact match + children (`myapp:db`, `myapp:db:query`)                                                                                            |
+| `-myapp:sql`       | Exclude `myapp:sql` and its children                                                                                                             |
+| `myapp,-myapp:sql` | Include myapp, exclude sql subtree                                                                                                               |
 
 Patterns are comma-separated. Include patterns are matched first; if any include pattern matches, the namespace passes. Exclude patterns (prefixed with `-`) take priority over includes.
 

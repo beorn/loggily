@@ -870,6 +870,45 @@ describe("DEBUG namespace filtering", () => {
     expect(consoleMock.output).toHaveLength(2)
   })
 
+  test("debug-package glob 'yrd*' admits yrd and its children, never a literal namespace 'yrd*'", () => {
+    // Regression 2026-09-01: 'yrd*' fell through to the literal branch of the
+    // matcher, named a namespace called "yrd*" and matched nothing — and an
+    // include list that matches nothing admits NOTHING at any level, so an
+    // operator's pass log came back empty, ERROR rows included, while the docs
+    // promised debug-package compatibility.
+    process.env.DEBUG = "yrd*,-yrd:storage:*"
+
+    const root = createLogger("yrd")
+    const receiver = root.child("receiver")
+    const storage = root.child("storage")
+    const other = createLogger("other")
+
+    root.error!("root row")
+    receiver.error!("receiver row")
+    storage.error!("storage row")
+    other.error!("other row")
+
+    expect(consoleMock.output.map((line) => line.message)).toEqual([
+      expect.stringContaining("root row"),
+      expect.stringContaining("receiver row"),
+    ])
+  })
+
+  test("a '*' anywhere in a pattern is a glob, as in the debug package", () => {
+    process.env.DEBUG = "app:*:query"
+
+    const app = createLogger("app")
+    app.child("db").child("query").info!("db query")
+    app.child("cache").child("query").info!("cache query")
+    app.child("db").info!("db only")
+    app.info!("app only")
+
+    expect(consoleMock.output.map((line) => line.message)).toEqual([
+      expect.stringContaining("db query"),
+      expect.stringContaining("cache query"),
+    ])
+  })
+
   test("negative pattern excludes matching namespace", () => {
     process.env.DEBUG = "myapp,-myapp:noisy"
 
