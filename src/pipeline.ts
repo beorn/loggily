@@ -97,8 +97,9 @@ export function serializeCause(cause: unknown, maxDepth: number = 3): unknown {
       message: cause.message,
       stack: cause.stack,
     }
-    if ((cause as { code?: string }).code)
-      {result.code = (cause as { code?: string }).code}
+    if ((cause as { code?: string }).code) {
+      result.code = (cause as { code?: string }).code
+    }
     if (cause.cause !== undefined) {
       result.cause = serializeCause(cause.cause, maxDepth - 1)
     }
@@ -119,8 +120,9 @@ export function safeStringify(value: unknown): string {
         stack: val.stack,
         name: val.name,
       }
-      if ((val as { code?: string }).code)
-        {result.code = (val as { code?: string }).code}
+      if ((val as { code?: string }).code) {
+        result.code = (val as { code?: string }).code
+      }
       if (val.cause !== undefined) result.cause = serializeCause(val.cause)
       return result
     }
@@ -207,12 +209,34 @@ export function formatJSONEvent(event: Event): string {
 
 export type NsFilter = (namespace: string) => boolean
 
+/** Compiled `debug`-style globs, keyed by pattern: every dispatch runs the
+ * filter, so the regex is built once per distinct pattern, not per event. */
+const globCache = new Map<string, RegExp>()
+
+function globRegex(pattern: string): RegExp {
+  let regex = globCache.get(pattern)
+  if (regex === undefined) {
+    const source = pattern
+      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*?")
+    regex = new RegExp(`^${source}$`)
+    globCache.set(pattern, regex)
+  }
+  return regex
+}
+
 function matchesPattern(namespace: string, pattern: string): boolean {
   if (pattern === "*") return true
   if (pattern.endsWith(":*")) {
     const prefix = pattern.slice(0, -2)
     return namespace === prefix || namespace.startsWith(prefix + ":")
   }
+  // Any other `*` is a `debug`-package glob (`yrd*`, `*:sql`, `app:*:query`),
+  // which the docs promise "work as-is". Until 2026-09-01 it fell through to
+  // the literal branch below: `DEBUG='yrd*'` named a namespace called "yrd*",
+  // matched nothing, and — an include list that matches nothing admits nothing
+  // at any level — silently blanked every row, ERROR rows included.
+  if (pattern.includes("*")) return globRegex(pattern).test(namespace)
   return namespace === pattern || namespace.startsWith(pattern + ":")
 }
 
@@ -557,14 +581,17 @@ export function buildPipeline(
 
       // Scope config — update inherited config
       if (isValidLogLevel(obj.level)) config.level = obj.level
-      if (obj.ns !== undefined)
-        {config.ns = parseNsFilter(obj.ns as string | string[])}
-      if (obj.format === "console" || obj.format === "json")
-        {config.format = obj.format}
+      if (obj.ns !== undefined) {
+        config.ns = parseNsFilter(obj.ns as string | string[])
+      }
+      if (obj.format === "console" || obj.format === "json") {
+        config.format = obj.format
+      }
       if (obj.spans === true) spansEnabled = true
       if (obj.spans === false) spansEnabled = false
-      if (obj.idFormat === "simple" || obj.idFormat === "w3c")
-        {setIdFormat(obj.idFormat)}
+      if (obj.idFormat === "simple" || obj.idFormat === "w3c") {
+        setIdFormat(obj.idFormat)
+      }
       if (typeof obj.sampleRate === "number") setSampleRate(obj.sampleRate)
       continue
     }
@@ -622,8 +649,9 @@ export function buildPipeline(
       if (
         e.kind === "log" &&
         LOG_LEVEL_PRIORITY[e.level] < output.levelPriority
-      )
-        {continue}
+      ) {
+        continue
+      }
       if (output.nsFilter && !output.nsFilter(e.namespace)) continue
       try {
         output.write(e)
@@ -660,8 +688,9 @@ export function buildPipeline(
     if (!spansEnabled) return false
     if (
       outputs.some((output) => !output.nsFilter || output.nsFilter(namespace))
-    )
-      {return true}
+    ) {
+      return true
+    }
     if (branches.some((branch) => branch.spanEnabled(namespace))) return true
     // Stages may consume or forward spans themselves, so keep `.span` available
     // for stage-only explicit pipelines.
@@ -750,8 +779,9 @@ export function readEnvFormat(): LogFormat {
 export function readEnvTrace(): { enabled: boolean; filter: NsFilter | null } {
   const traceEnv = getEnv("TRACE")
   if (!traceEnv) return { enabled: false, filter: null }
-  if (traceEnv === "1" || traceEnv === "true")
-    {return { enabled: true, filter: null }}
+  if (traceEnv === "1" || traceEnv === "true") {
+    return { enabled: true, filter: null }
+  }
   const prefixes = traceEnv.split(",").map((s) => s.trim())
   return {
     enabled: true,

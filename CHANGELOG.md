@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **`debug`-package globs match** — a pattern with a `*` that is neither the
+  bare `*` nor a trailing `:*` (`DEBUG='yrd*'`) fell through to the literal
+  branch of the matcher, so it named a namespace called `yrd*` and matched
+  nothing; and because an include list that matches nothing admits nothing at
+  any level, it silently blanked every row, ERROR rows included, while the docs
+  promised `debug`-compatible patterns (measured 2026-09-01 on a merge-queue
+  pass log that came back empty). `*` now matches any run of characters
+  anywhere in a pattern, as in `debug`: `yrd*` admits `yrd`, `yrd:cli` and
+  `yrdx`; `app:*:query` admits `app:db:query`. Bare names, `name:*` and `*`
+  are unchanged.
+
 - **Console output goes to stderr** — the terminal console sink routed `info`
   and `debug` through `console.info` and `console.debug`, which Node writes to
   STDOUT. Diagnostics therefore shared the stream that carries a command's
