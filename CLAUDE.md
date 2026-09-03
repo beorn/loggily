@@ -17,7 +17,7 @@ VitePress docs at `docs/` -- deployed to loggily.dev via GitHub Pages.
 
 **Do NOT create or edit `docs/site/`** -- docs live directly in `docs/`.
 
-**README & landing page style**: follow the [readme-style guide](../../.claude/skills/docs/readme-style.md) when editing README.md or docs/index.md. Core principles: progressive disclosure, show don't tell, density without clutter, iterate prose not structure.
+**README & landing page style**: follow the [readme-style guide](../../../.claude/skills/docs/references/readme-style.md).
 
 ## Quick Start
 
