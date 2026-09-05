@@ -74,6 +74,7 @@
   },
   "scripts": {
     "build": "tsdown",
+    "prepack": "bun run build",
     "typecheck": "tsc --noEmit",
     "test": "bunx --bun vitest run",
     "docs:dev": "vitepress dev docs",
