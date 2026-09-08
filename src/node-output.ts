@@ -4,6 +4,11 @@
  * The default drains stdout and stderr; callers can select a subset or an
  * empty list. Every selected stream settles before this rejects with the
  * original first failure, and this helper never decides the exit itself.
+ *
+ * No deadline is imposed: slow pipes retain backpressure until they drain
+ * or fail. A caller-supplied stream that never settles leaves this promise
+ * pending. The helper adds no polling and makes no liveness guarantee for
+ * a permanently nonsettling sink.
  */
 export async function drainOutput(
   streams: readonly NodeJS.WritableStream[] = [process.stdout, process.stderr],
