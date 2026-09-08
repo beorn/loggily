@@ -1,6 +1,22 @@
 # Changelog
 
-## Unreleased
+## 0.11.0
+
+- **Drain final CLI output** — the Node entry exports `drainOutput()` to
+  finish stdout and stderr before the caller exits. It waits for every
+  selected stream and rejects with the first original failure; the caller
+  keeps control of the exit status. The browser entry does not export it.
+
+- **Console defaults** — console timestamps use local time; JSON timestamps
+  stay in UTC. `NODE_ENV=production` no longer changes the default output
+  format; set `LOG_FORMAT=json` to request JSON explicitly.
+
+- **Shared verbosity calculation** — `resolveVerbosityLevel()` adjusts a
+  base logging level by verbose and quiet counts using the canonical level
+  order, bounded at trace and silent.
+
+- **Trace header input** — `traceparent()` accepts an object with `id` and
+  `traceId`; callers no longer need to provide unrelated span fields.
 
 - **`debug`-package globs match** — a pattern with a `*` that is neither the
   bare `*` nor a trailing `:*` (`DEBUG='yrd*'`) fell through to the literal
