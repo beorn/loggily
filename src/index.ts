@@ -71,6 +71,9 @@ export {
 
 export { withRedaction, type RedactionOptions } from "./redaction.js"
 
+/** Node-only completion for CLI stdout/stderr before a caller-owned forced exit. */
+export { drainOutput } from "./node-output.js"
+
 export {
   createFileWriter,
   type FileWriter,
