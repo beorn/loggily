@@ -31,6 +31,8 @@ log.error?.(new Error("connection lost"))
 
 ## Getting Started
 
+> Install from npm; a git install resolves the TypeScript source and runs only under Bun.
+
 ```console
 $ npm install loggily
 
