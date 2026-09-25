@@ -52,6 +52,7 @@ export {
   type SpanRecorder,
 
   // Deprecated v1 API (throws with migration instructions)
+  // oxlint-disable-next-line typescript/no-deprecated -- compatibility export for the deprecated setter
   setLogLevel,
   getLogLevel,
   enableSpans,
@@ -64,6 +65,7 @@ export {
   setLogFormat,
   getLogFormat,
   setSuppressConsole,
+  setDefaultOutput,
   setOutputMode,
   getOutputMode,
   addWriter,
@@ -75,12 +77,16 @@ export { withRedaction, type RedactionOptions } from "./redaction.js"
 
 // Tracing utilities (runtime-agnostic, work in browser)
 export {
+  // oxlint-disable-next-line typescript/no-deprecated -- compatibility export for the deprecated setter
   setIdFormat,
+  // oxlint-disable-next-line typescript/no-deprecated -- compatibility export for the deprecated setter
   getIdFormat,
   type IdFormat,
   traceparent,
   type TraceparentOptions,
+  // oxlint-disable-next-line typescript/no-deprecated -- compatibility export for the deprecated setter
   setSampleRate,
+  // oxlint-disable-next-line typescript/no-deprecated -- compatibility export for the deprecated setter
   getSampleRate,
 } from "./tracing.js"
 

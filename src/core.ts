@@ -37,7 +37,6 @@ import {
   readEnvNs,
   readEnvFormat,
   readEnvTrace,
-  writeToConsole,
   formatConsoleEvent,
   formatJSONEvent,
   parseNsFilter,
@@ -831,6 +830,11 @@ export type WriterFn = (
 // Runtime state for legacy addWriter/setSuppressConsole
 const _writers: Array<WriterFn> = []
 let _suppressConsole = false
+/** Host loggers set by {@link setDefaultOutput}, innermost last. */
+const _defaultOutputs: Array<{ readonly host: ConditionalLogger }> = []
+function defaultOutput(): ConditionalLogger | undefined {
+  return _defaultOutputs.at(-1)?.host
+}
 
 // File writer factory — set by index.ts (avoids node:fs in core.ts for browser compat)
 let _logFileWriterFactory:
@@ -856,12 +860,14 @@ export function withEnvDefaults(): LoggerPlugin {
     // Apply tracing env vars (once per logger creation, idempotent)
     const envIdFormat = _env.TRACE_ID_FORMAT?.toLowerCase()
     if (envIdFormat === "simple" || envIdFormat === "w3c") {
+      // oxlint-disable-next-line typescript/no-deprecated -- the env var's own reader applies it
       setIdFormat(envIdFormat as IdFormat)
     }
     const envSampleRate = _env.TRACE_SAMPLE_RATE
     if (envSampleRate !== undefined) {
       const rate = Number.parseFloat(envSampleRate)
       if (!Number.isNaN(rate) && rate >= 0 && rate <= 1) {
+        // oxlint-disable-next-line typescript/no-deprecated -- the env var's own reader applies it
         setSampleRate(rate)
       }
     }
@@ -906,6 +912,8 @@ function applyNamespaceGating(logger: ConditionalLogger): ConditionalLogger {
       if (prop === SPAN_ENABLED) {
         return (namespace: string): boolean => {
           if (collectSpans) return true
+          const host = defaultOutput()
+          if (host !== undefined) return spanIsEnabled(host, namespace)
           const trace = currentTrace()
           if (!trace.enabled) return false
           if (trace.filter && !trace.filter(namespace)) return false
@@ -919,7 +927,11 @@ function applyNamespaceGating(logger: ConditionalLogger): ConditionalLogger {
         prop in LOG_LEVEL_PRIORITY &&
         prop !== "silent"
       ) {
-        const nsLevel = readEnvLevelForNamespace(target.name)
+        const host = defaultOutput()
+        const nsLevel =
+          host === undefined
+            ? readEnvLevelForNamespace(target.name)
+            : host.level
         if (
           LOG_LEVEL_PRIORITY[prop as keyof typeof LOG_LEVEL_PRIORITY] <
           LOG_LEVEL_PRIORITY[nsLevel]
@@ -947,11 +959,15 @@ function createEnvPipeline(): Pipeline {
   }
 
   const dispatch = (event: Event): void => {
+    // A host's default output replaces the console and LOG_FILE sinks, and
+    // filters by its own level and DEBUG scope. Writers below keep theirs.
+    defaultOutput()?.dispatch(event)
     if (
       event.kind === "log" &&
       LOG_LEVEL_PRIORITY[event.level] < LOG_LEVEL_PRIORITY[currentLevel()]
-    )
+    ) {
       return
+    }
     if (event.kind === "span") {
       const trace = currentTrace()
       if (!trace.enabled) return
@@ -972,6 +988,7 @@ function createEnvPipeline(): Pipeline {
     // expandable objects; Node sees ANSI prefix + util.format-inspectable
     // objects. The sink is recreated per dispatch so LOG_FORMAT env flips
     // take effect without logger rebuild.
+    if (defaultOutput() !== undefined) return
     if (!_suppressConsole) createStructuredConsoleSink(format)(event)
     fileSink?.(event)
   }
@@ -1091,6 +1108,31 @@ export function getLogFormat(): LogFormat {
 }
 export function setSuppressConsole(value: boolean): void {
   _suppressConsole = value
+}
+
+/**
+ * Make `host` the output of every logger created without a config array
+ * (`createLogger("lib:thing")`), for as long as the returned handle is not
+ * disposed. Such a logger dispatches each event, with its own namespace, to
+ * the host's pipeline, and gates its levels and spans by the host's, so a
+ * library's fallback logger lands on the host's stream, file and filters.
+ *
+ * Nested calls stack: disposing restores the output that was set before, and
+ * disposing twice, or out of order, removes only that handle's own entry.
+ *
+ * With no host set, such a logger writes to the console (and LOG_FILE), as it
+ * always has: a process that owns its output is responsible for setting one.
+ * {@link addWriter} writers receive these events either way.
+ */
+export function setDefaultOutput(host: ConditionalLogger): Disposable {
+  const entry = { host }
+  _defaultOutputs.push(entry)
+  return {
+    [Symbol.dispose](): void {
+      const at = _defaultOutputs.indexOf(entry)
+      if (at !== -1) _defaultOutputs.splice(at, 1)
+    },
+  }
 }
 export type OutputMode = "console" | "stderr" | "writers-only"
 export function setOutputMode(_mode: OutputMode): void {

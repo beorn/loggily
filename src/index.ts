@@ -50,6 +50,7 @@ export {
   _clearContextHooks,
   createSpanDataProxy,
   // Deprecated v1 API (maps to env vars for backwards compat)
+  // oxlint-disable-next-line typescript/no-deprecated -- compatibility export for the deprecated setter
   setLogLevel,
   getLogLevel,
   enableSpans,
@@ -62,6 +63,7 @@ export {
   setLogFormat,
   getLogFormat,
   setSuppressConsole,
+  setDefaultOutput,
   setOutputMode,
   getOutputMode,
   addWriter,
@@ -86,12 +88,16 @@ import { _setLogFileWriterFactory } from "./core.js"
 _setLogFileWriterFactory(_cfw)
 
 export {
+  // oxlint-disable-next-line typescript/no-deprecated -- compatibility export for the deprecated setter
   setIdFormat,
+  // oxlint-disable-next-line typescript/no-deprecated -- compatibility export for the deprecated setter
   getIdFormat,
   type IdFormat,
   traceparent,
   type TraceparentOptions,
+  // oxlint-disable-next-line typescript/no-deprecated -- compatibility export for the deprecated setter
   setSampleRate,
+  // oxlint-disable-next-line typescript/no-deprecated -- compatibility export for the deprecated setter
   getSampleRate,
 } from "./tracing.js"
 

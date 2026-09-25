@@ -305,6 +305,21 @@ import { createTestLogger } from "loggily"
 const log = createTestLogger("test") // all levels enabled, console output
 ```
 
+### Host Default Output
+
+A library logs through `createLogger("lib:thing")` with no config array. Such a logger writes to the console (and `LOG_FILE`) unless a host that owns its output names one:
+
+```typescript
+import { createLogger, setDefaultOutput } from "loggily"
+
+const host = createLogger("app", [{ level: "debug" }, { write: (text) => stderr(text), objectMode: false }])
+using _ = setDefaultOutput(host)
+// Every pipeline-less logger now dispatches to `host`'s pipeline, under its own
+// namespace, gated by the host's level, DEBUG scope and span settings.
+```
+
+Nested calls stack; disposing a handle restores the one set before it. `addWriter` writers still receive these events. The console fallback is the default when no host sets one: a process that owns its output is responsible for calling `setDefaultOutput`.
+
 ### Pipeline Builder (power users)
 
 ```typescript
