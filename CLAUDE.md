@@ -312,7 +312,10 @@ A library logs through `createLogger("lib:thing")` with no config array. Such a 
 ```typescript
 import { createLogger, setDefaultOutput } from "loggily"
 
-const host = createLogger("app", [{ level: "debug" }, { write: (text) => stderr(text), objectMode: false }])
+const host = createLogger("app", [
+  { level: "debug" },
+  { write: (text) => stderr(text), objectMode: false },
+])
 using _ = setDefaultOutput(host)
 // Every pipeline-less logger now dispatches to `host`'s pipeline, under its own
 // namespace, gated by the host's level, DEBUG scope and span settings.
