@@ -6,12 +6,13 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
+import { fileURLToPath } from "node:url"
 
 describe("universal runtime compatibility", () => {
   describe("core module (no fs dependency)", () => {
     test("core.ts does not import node:fs", async () => {
       const coreSource = await Bun.file(
-        new URL("../src/core.ts", import.meta.url).pathname,
+        fileURLToPath(new URL("../src/core.ts", import.meta.url)),
       ).text()
       expect(coreSource).not.toContain('from "fs"')
       expect(coreSource).not.toContain('from "node:fs"')
@@ -20,7 +21,7 @@ describe("universal runtime compatibility", () => {
 
     test("index.browser.ts does not import node:fs or file-writer", async () => {
       const browserSource = await Bun.file(
-        new URL("../src/index.browser.ts", import.meta.url).pathname,
+        fileURLToPath(new URL("../src/index.browser.ts", import.meta.url)),
       ).text()
       expect(browserSource).not.toContain('from "node:fs"')
       // Type-only imports from file-writer are fine (erased at compile time)
@@ -41,10 +42,10 @@ describe("universal runtime compatibility", () => {
 
     test("withRedaction has no runtime imports and is exported by the browser entry", async () => {
       const redactionSource = await Bun.file(
-        new URL("../src/redaction.ts", import.meta.url).pathname,
+        fileURLToPath(new URL("../src/redaction.ts", import.meta.url)),
       ).text()
       const browserSource = await Bun.file(
-        new URL("../src/index.browser.ts", import.meta.url).pathname,
+        fileURLToPath(new URL("../src/index.browser.ts", import.meta.url)),
       ).text()
       const runtimeImports = redactionSource
         .split("\n")
@@ -72,14 +73,14 @@ describe("universal runtime compatibility", () => {
   describe("file-writer separation", () => {
     test("file-writer.ts imports from node:fs", async () => {
       const fwSource = await Bun.file(
-        new URL("../src/file-writer.ts", import.meta.url).pathname,
+        fileURLToPath(new URL("../src/file-writer.ts", import.meta.url)),
       ).text()
       expect(fwSource).toContain('from "node:fs"')
     })
 
     test("index.ts re-exports createFileWriter from file-writer", async () => {
       const indexSource = await Bun.file(
-        new URL("../src/index.ts", import.meta.url).pathname,
+        fileURLToPath(new URL("../src/index.ts", import.meta.url)),
       ).text()
       expect(indexSource).toContain("./file-writer.js")
       expect(indexSource).toContain("createFileWriter")
@@ -89,7 +90,7 @@ describe("universal runtime compatibility", () => {
   describe("getEnv guard", () => {
     test("process.env reads use getEnv helper (no bare process.env)", async () => {
       const coreSource = await Bun.file(
-        new URL("../src/core.ts", import.meta.url).pathname,
+        fileURLToPath(new URL("../src/core.ts", import.meta.url)),
       ).text()
       // Should not have bare process.env reads (except in the getEnv function itself and _process init)
       const lines = coreSource.split("\n")
@@ -108,7 +109,7 @@ describe("universal runtime compatibility", () => {
   describe("writeStderr guard", () => {
     test("no bare process.stderr.write calls in core", async () => {
       const coreSource = await Bun.file(
-        new URL("../src/core.ts", import.meta.url).pathname,
+        fileURLToPath(new URL("../src/core.ts", import.meta.url)),
       ).text()
       const lines = coreSource.split("\n")
       const bareStderrLines = lines.filter(
@@ -125,7 +126,7 @@ describe("universal runtime compatibility", () => {
   describe("no bare process references in core", () => {
     test("all process usage goes through _process guard", async () => {
       const coreSource = await Bun.file(
-        new URL("../src/core.ts", import.meta.url).pathname,
+        fileURLToPath(new URL("../src/core.ts", import.meta.url)),
       ).text()
       const lines = coreSource.split("\n")
       const bareProcessLines = lines.filter(
