@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.12.0
+
+- Add `setDefaultOutput()` so pipeline-less library loggers can use a host logger's output, level, and lifetime.
+- Build before packing so a clean checkout ships the compiled package.
+
 ## 0.11.0
 
 - **Drain final CLI output** — the Node entry exports `drainOutput()` to
