@@ -25,13 +25,13 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      PACKAGE_NAME: \${{ inputs.package }}
-      PACKAGE_VERSION: \${{ inputs.version }}
-      SOURCE_COMMIT: \${{ inputs.commit }}
+      PACKAGE_NAME: ${{ inputs.package }}
+      PACKAGE_VERSION: ${{ inputs.version }}
+      SOURCE_COMMIT: ${{ inputs.commit }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: \${{ inputs.commit }}
+          ref: ${{ inputs.commit }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -131,11 +131,11 @@ jobs:
           echo "Verified $TARBALL at $INTEGRITY"
 
       - name: Publish the verified artifact with OIDC
-        run: pnpm publish "\${{ steps.artifact.outputs.tarball }}" --access public --no-git-checks --provenance
+        run: pnpm publish "${{ steps.artifact.outputs.tarball }}" --access public --no-git-checks --provenance
 
       - name: Confirm registry bytes
         env:
-          EXPECTED_INTEGRITY: \${{ steps.artifact.outputs.integrity }}
+          EXPECTED_INTEGRITY: ${{ steps.artifact.outputs.integrity }}
         shell: bash
         run: |
           for attempt in 1 2 3 4 5 6; do
