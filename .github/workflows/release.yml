@@ -64,6 +64,11 @@ jobs:
             echo "::error::manifest version $ACTUAL_VERSION differs from requested $PACKAGE_VERSION"
             exit 1
           fi
+          REPOSITORY_URL="$(node -p "require('./package.json').repository.url")"
+          if [[ "$REPOSITORY_URL" != "https://github.com/beorn/loggily.git" ]]; then
+            echo "::error::manifest repository $REPOSITORY_URL does not match this public publisher"
+            exit 1
+          fi
           VERSION_URL="https://registry.npmjs.org/loggily/$PACKAGE_VERSION"
           HTTP_STATUS="$(curl --location --silent --show-error --max-time 15 --output "$RUNNER_TEMP/loggily-version.json" --write-out '%{http_code}' "$VERSION_URL")"
           case "$HTTP_STATUS" in
