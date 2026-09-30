@@ -1,11 +1,8 @@
 {
   "modules": ["release", "format-check", "oxfmt", "links"],
-  "overrides": {
-    "release": "#26691 dispatch/OIDC identity spike; fold the proven workflow back into vendor-kit before bulk rollout"
-  },
   "vars": {
     "testCommand": "bun run test",
-    "bunVersion": "1.3.13",
+    "bunVersion": "1.4.2",
     "linksCronMinute": "10"
   },
   "overrides": {
