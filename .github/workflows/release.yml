@@ -1,4 +1,4 @@
-# vendor-kit: release@6670932030a4 — generated; edit km/packages/km-infra/vendor-kit/templates/release.yml in km, then re-sync
+# vendor-kit: release@a30bcf1595cd — generated; edit km/packages/km-infra/vendor-kit/templates/release.yml in km, then re-sync
 name: Release
 
 on:
@@ -162,6 +162,7 @@ jobs:
               break
             }
             save()
+            if (row.state !== 'published_confirmed') fail(item.name + '@' + item.version + ' registry did not confirm the published file within the readback window')
             console.log(item.name + '@' + item.version + ': ' + row.state + ' ' + item.digest)
           }
           NODE
