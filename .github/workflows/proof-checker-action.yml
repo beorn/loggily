@@ -1,0 +1,55 @@
+# PROOF ONLY (hh 26691, @cto d603245d): the checker runs as a GitHub Action, called in one line pinned by full
+# commit, cold on Node 24. Nothing is published: the last step re-hashes the retained tarballs against the report,
+# as km-infra's release template does before its publish. This branch is never merged.
+name: Proof checker action
+
+on:
+  push:
+    branches: [proof/26691-pinned-checker]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: No checker comes from this repository's dependencies
+        run: test ! -e node_modules/.bin/verify-publishable && ! grep -q verify-publishable package.json bun.lock
+      - run: mkdir "$RUNNER_TEMP/verified-tarballs"
+      - id: verify
+        uses: beorn/verify-publishable@8c1406b3605e7ff720b1962777f097859ce385b3
+        with:
+          output-dir: ${{ runner.temp }}/verified-tarballs
+      - name: The retained tarballs match the report
+        env:
+          REPORT: ${{ steps.verify.outputs.report }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto'
+          import { readFileSync, realpathSync } from 'node:fs'
+          import { isAbsolute, join, relative } from 'node:path'
+          const fail = message => { throw Error('PROOF: ' + message) }
+          if (!process.env.REPORT) fail('the action returned no report path')
+          const verified = JSON.parse(readFileSync(process.env.REPORT, 'utf8'))
+          if (verified.schema !== 'verify-publishable/v1' || verified.ok !== true || !Array.isArray(verified.packages) || verified.packages.length === 0) fail('verifier did not report a passed package set')
+          const outputDir = realpathSync(join(process.env.RUNNER_TEMP, 'verified-tarballs'))
+          for (const artifact of verified.packages) {
+            const id = artifact.name + '@' + artifact.version
+            if (typeof artifact.tarballPath !== 'string' || typeof artifact.sha512 !== 'string') fail(id + ' has no retained tarball or SHA-512')
+            const path = realpathSync(artifact.tarballPath)
+            const rel = relative(outputDir, path)
+            if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) fail(id + ' artifact escaped output directory')
+            const digest = 'sha512-' + createHash('sha512').update(readFileSync(path)).digest('base64')
+            if (digest !== artifact.sha512) fail(id + ' retained digest differs from verifier')
+            console.log('retained ' + id + ' ' + digest)
+          }
+          NODE
