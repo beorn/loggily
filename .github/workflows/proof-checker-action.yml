@@ -26,7 +26,7 @@ jobs:
         run: test ! -e node_modules/.bin/verify-publishable && ! grep -q verify-publishable package.json bun.lock
       - run: mkdir "$RUNNER_TEMP/verified-tarballs"
       - id: verify
-        uses: beorn/verify-publishable@8f4b0b932e1ea08e61eb7d5e7a538cdee59266d5
+        uses: beorn/verify-publishable@84544e987d89716b004f53afcc89d8627ca50a9e
         with:
           output-dir: ${{ runner.temp }}/verified-tarballs
       - name: The retained tarballs match the report
