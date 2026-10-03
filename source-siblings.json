@@ -1,0 +1,12 @@
+{
+  "schema": "vendor-kit/source-siblings/v1",
+  "siblings": [
+    {
+      "name": "vitepress-enrich",
+      "repository": "beorn/bearly",
+      "commit": "4661a112548ee052b303e5e09481344bb2da5d2b",
+      "directory": "packages/vitepress-enrich",
+      "pack": true
+    }
+  ]
+}

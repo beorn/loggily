@@ -6,3 +6,6 @@ coverage/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+
+# Public sibling source/build/pack inputs used only by CI
+.ci-siblings/
