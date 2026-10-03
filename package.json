@@ -73,7 +73,7 @@
     }
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown --config package.json",
     "prepack": "bun run build",
     "typecheck": "tsc --noEmit",
     "test": "bunx --bun vitest run",
