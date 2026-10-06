@@ -954,6 +954,79 @@ describe("full composition chain", () => {
 describe("withRedaction", () => {
   const replacement = "[REDACTED]"
 
+  /**
+   * @failure Opaque CLI credentials leak in process evidence even when generic string redaction is enabled.
+   * @level l0
+   * @consumer Hab memory incident bodies and protected offender reading artifacts.
+   * @testonly none
+   * Existing cases cover structured secret keys and text prefixes, not an argv flag's adjacent value.
+   */
+  test.each([
+    {
+      name: "adjacent and assignment secret flags",
+      argv: [
+        "bun",
+        "--password",
+        "opaque password",
+        "--api-key=opaque-key",
+        "--input",
+        "ordinary path",
+      ],
+      expected: [
+        "bun",
+        "--password",
+        replacement,
+        `--api-key=${replacement}`,
+        "--input",
+        "ordinary path",
+      ],
+    },
+    {
+      name: "known GitHub credential prefix",
+      argv: ["bun", `ghp_${"a".repeat(36)}`, "ordinary-X7a9B2"],
+      expected: ["bun", replacement, "ordinary-X7a9B2"],
+    },
+    {
+      name: "positional arguments after option terminator",
+      argv: [
+        "bun",
+        "--token=opaque-token",
+        "--",
+        "--password",
+        "ordinary positional value",
+      ],
+      expected: [
+        "bun",
+        `--token=${replacement}`,
+        "--",
+        "--password",
+        "ordinary positional value",
+      ],
+    },
+  ])(
+    "redacts argv: $name, preserving boundaries and inputs",
+    ({ argv, expected }) => {
+      const seen: Event[] = []
+      const original = [...argv]
+      const log = pipe(baseCreateLogger, withRedaction())("process-evidence", [
+        { level: "trace" },
+        (event) => {
+          seen.push(event)
+          return event
+        },
+      ])
+      log.info?.("memory offender", { args: argv, offender: { argv } })
+      expect(seen).toHaveLength(1)
+      expect((seen[0]!.props?.offender as { argv: string[] }).argv).toEqual(
+        expected,
+      )
+      expect(seen[0]!.props?.args).toBe(
+        (seen[0]!.props?.offender as { argv: string[] }).argv,
+      )
+      expect(argv).toEqual(original)
+    },
+  )
+
   test("preserves ordinary mixed-case identifiers and paths", () => {
     const seen: Event[] = []
     const tempPath = "/tmp/hab-pane-state-corrupt-FeA2ZM/.km/panes.json"

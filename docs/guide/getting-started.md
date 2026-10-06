@@ -250,6 +250,8 @@ const log = myCreateLogger("myapp")
 
 Custom factories built from `baseCreateLogger()` opt in to `withRedaction()`. Keep it before `withEnvDefaults()` as shown: the environment plugin forwards events to console, file, and global writers, so redaction must run first. The plugin replaces common credential keys and recognized bearer, `sk-…`, AWS access-key, and 32-character hex forms across messages, structured props, raw arguments, errors, and spans. Anonymous mixed-case identifiers are preserved because their shape alone cannot distinguish a secret from a path, branch name, or session id.
 
+Structured `argv` arrays also redact named secret flags, such as `--password VALUE` and `--api-key=VALUE`, while preserving array length and argument boundaries. Flag interpretation stops at `--`; recognized credential prefixes, including GitHub token prefixes, are redacted in text on either side. Redaction is best-effort: unlabelled positional secrets cannot be reliably distinguished from ordinary arguments. Hosts collecting process evidence should keep argv out of summaries and external relays and protect persisted artifacts with restrictive permissions.
+
 ## Test Helper
 
 For tests, `createTestLogger` creates a logger with all levels enabled:

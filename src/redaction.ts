@@ -31,6 +31,8 @@ const SECRET_TEXT_PATTERNS = [
   /\bBearer\s+[A-Za-z0-9._~+/-]+=*/giu,
   /\bsk[-_][A-Za-z0-9_-]{8,}\b/gu,
   /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/gu,
+  /\bgh[pousr]_[A-Za-z0-9]{36}\b/gu,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}\b/gu,
   /\b[0-9a-fA-F]{32}\b/gu,
 ] as const
 
@@ -97,6 +99,7 @@ function redactValue(
   replacement: string,
   seen: WeakMap<object, unknown>,
   redactStringValues: boolean,
+  argv = false,
 ): unknown {
   if (typeof value === "string") {
     return redactStringValues ? redactText(value, replacement) : value
@@ -109,7 +112,12 @@ function redactValue(
   }
 
   const existing = seen.get(value)
-  if (existing !== undefined) return existing
+  if (existing !== undefined) {
+    if (argv && Array.isArray(value) && Array.isArray(existing)) {
+      redactArgv(value, existing, replacement)
+    }
+    return existing
+  }
 
   if (typeof value === "function") {
     return redactFunction(
@@ -154,6 +162,7 @@ function redactValue(
     for (const entry of value) {
       clone.push(redactValue(entry, replacement, seen, true))
     }
+    if (argv) redactArgv(value, clone, replacement)
     return clone
   }
 
@@ -170,6 +179,7 @@ function redactValue(
       replacement,
       seen,
       !isCorrelationKey(key),
+      key === "argv",
     )
   }
   return clone
@@ -194,6 +204,7 @@ function redactFunction(
           replacement,
           seen,
           !isCorrelationKey(key),
+          key === "argv",
         )
   }
   return clone
@@ -224,10 +235,30 @@ function redactError(
         replacement,
         seen,
         !isCorrelationKey(key),
+        key === "argv",
       )
     }
   }
   return clone
+}
+
+/** Best-effort CLI redaction: named secret flags, not arbitrary positional values. */
+function redactArgv(
+  original: readonly unknown[],
+  redacted: unknown[],
+  replacement: string,
+): void {
+  // Index zero is the executable. The remaining values retain their original argument boundaries.
+  for (let index = 1; index < original.length; index++) {
+    const argument = original[index]
+    if (argument === "--") break
+    if (typeof argument !== "string" || !argument.startsWith("-")) continue
+    const assignment = argument.indexOf("=")
+    const flag = assignment < 0 ? argument : argument.slice(0, assignment)
+    if (!isSecretKey(flag)) continue
+    if (assignment >= 0) redacted[index] = `${flag}=${replacement}`
+    else if (index + 1 < original.length) redacted[++index] = replacement
+  }
 }
 
 function isSecretKey(key: string): boolean {
