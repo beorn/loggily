@@ -946,9 +946,22 @@ function applyNamespaceGating(logger: ConditionalLogger): ConditionalLogger {
 
 function createEnvPipeline(): Pipeline {
   const disposables: (() => void)[] = []
+  let disposed = false
   const logFile = _env.LOG_FILE
   let fileSink: ((event: Event) => void) | null = null
-  if (logFile && _logFileWriterFactory) {
+  // A selected host OWNS output and replaces the LOG_FILE sink for its lifetime
+  // (see the dispatch below), so opening the ambient file up front while a host
+  // is installed would be unused — and would abort construction on an unusable
+  // path before any event is emitted (28430). A logger created while a host owns
+  // output therefore opens the file lazily, at its first actual no-host dispatch,
+  // and still writes the path selected here once that host is disposed. A logger
+  // created with no host opens it at construction, as documented, so an unusable
+  // active path keeps its failure timing. Idempotent; dispose() blocks a sink
+  // created after close.
+  const ensureFileSink = (): void => {
+    if (disposed || fileSink !== null || !logFile || !_logFileWriterFactory) {
+      return
+    }
     const writer = _logFileWriterFactory(logFile)
     fileSink = (event: Event) => {
       const fmt =
@@ -957,6 +970,10 @@ function createEnvPipeline(): Pipeline {
     }
     disposables.push(() => writer.close())
   }
+
+  // No host owns output at construction: select the documented no-host
+  // destination now, so an unusable active LOG_FILE still fails right here.
+  if (defaultOutput() === undefined) ensureFileSink()
 
   const dispatch = (event: Event): void => {
     // A host's default output replaces the console and LOG_FILE sinks, and
@@ -989,6 +1006,7 @@ function createEnvPipeline(): Pipeline {
     // objects. The sink is recreated per dispatch so LOG_FORMAT env flips
     // take effect without logger rebuild.
     if (defaultOutput() !== undefined) return
+    ensureFileSink()
     if (!_suppressConsole) createStructuredConsoleSink(format)(event)
     fileSink?.(event)
   }
@@ -1007,6 +1025,7 @@ function createEnvPipeline(): Pipeline {
       return currentLevel()
     },
     dispose: () => {
+      disposed = true
       for (const d of disposables) d()
     },
   }
