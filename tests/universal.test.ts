@@ -3,6 +3,7 @@
  *
  * Verifies that the core logger works when Node.js globals (process, fs) are unavailable,
  * as they would be in browser/edge/Deno environments.
+ * @source-grep the universal-runtime contract: core/browser/redaction/index/fw sources are read to pin that the logger core has no node:fs dependency and works where Node globals are unavailable (browser/edge/Deno)
  */
 
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
