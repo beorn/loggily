@@ -29,10 +29,10 @@ export const LINE_SINK_PENDING_BYTES = 65_536
 /** How long {@link LineSink.close} waits for the pending bytes to drain before the writer is stopped. */
 export const LINE_SINK_CLOSE_DRAIN_MS = 500
 
-// The control slots, shared by every producer and the writer.
+// The control slots, shared by every producer and the writer: 0 pending bytes, 1 lines dropped since the last marker,
+// 2 the first drop's epoch seconds, 3 the bound, 4 lines dropped in all, 5 the closed flag. postSinkLine and the
+// writer source address them by number, because both must reference nothing outside themselves.
 const PENDING = 0
-const DROPPED = 1
-const FIRST_DROP_S = 2
 const BOUND = 3
 const DROPPED_TOTAL = 4
 const CLOSED = 5
@@ -197,7 +197,9 @@ export function openLineSink(options: LineSinkOptions): LineSink {
           Atomics.load(control, CLOSED) === 0) &&
         Date.now() < deadline
       ) {
-        await new Promise((resolve) => setTimeout(resolve, 5))
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 5)
+        })
       }
       // A writer parked in a write does not answer terminate until the write returns: never await it.
       void worker.terminate()
