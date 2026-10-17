@@ -92,6 +92,8 @@ next log line once the reader stalls (under Bun, ~10 KB unread on a pty).
 `loggily/sink` moves the one blocking write to a writer thread: `openLineSink({ fd: 2 })`
 takes whole lines from any thread and returns at once, bounds the bytes in
 flight, and says on the next written line how many lines it dropped meanwhile.
+`setStderrLineWriter((line) => sink.push(line + "\n"))` then routes every line loggily would put on
+fd 2 through that sink; `setStderrLineWriter(null)` restores the direct path.
 
 Also supports [async context propagation](https://loggily.dev/api/context), [worker threads](https://loggily.dev/guide/workers), and [browser](https://loggily.dev/guide/getting-started#browser-support).
 

@@ -34,6 +34,7 @@ import {
   formatConsoleEvent,
   formatConsoleTime,
   formatJSONEvent,
+  getStderrLineWriter,
   safeStringify,
 } from "./pipeline.js"
 
@@ -116,6 +117,14 @@ export function createTerminalConsoleSink(
   }
 
   return (event: Event) => {
+    // With a stderr line writer set (km 25947) the writer owns fd 2: every
+    // event becomes the one pretty line the "stderr" output produces, and
+    // console is never touched.
+    const writer = getStderrLineWriter()
+    if (writer !== null) {
+      writer(formatConsoleEvent(event))
+      return
+    }
     // Spans bypass console and go straight to stderr — that's what Ink's
     // patchConsole relies on to keep span output outside the TUI surface.
     if (event.kind === "span") {
@@ -132,6 +141,11 @@ export function createTerminalConsoleSink(
 
 /** Emit one line to process.stderr when available (no-op in browser). */
 function writeStderrLine(text: string): void {
+  const writer = getStderrLineWriter()
+  if (writer !== null) {
+    writer(text)
+    return
+  }
   const p = typeof process !== "undefined" ? process : undefined
   if (p?.stderr && typeof p.stderr.write === "function") {
     p.stderr.write(text + "\n")
@@ -316,6 +330,11 @@ function invokeForLevelStderr(level: OutputLogLevel, ...args: unknown[]): void {
  * collector reading stdout would be reading the command's answer instead.
  */
 function routeSingleStderr(event: Event, text: string): void {
+  const writer = getStderrLineWriter()
+  if (writer !== null) {
+    writer(text)
+    return
+  }
   invokeForLevelStderr(event.kind === "span" ? "info" : event.level, text)
 }
 

@@ -191,9 +191,10 @@ describe("loggily/sink: a line sink that never parks its producers (km 25947)", 
 
   test("a line dropped at the bound is refused at once, counted, and the control slots say so", () => {
     const control = new Int32Array(
-      new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 6),
+      new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 7),
     )
     Atomics.store(control, 3, 16)
+    Atomics.store(control, 6, (Date.now() / 1000) | 0)
     const posted: unknown[] = []
     const port = { postMessage: (value: unknown) => posted.push(value) }
     expect(postSinkLine(port, control, "0123456789\n")).toBe(true)

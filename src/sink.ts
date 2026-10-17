@@ -30,13 +30,16 @@ export const LINE_SINK_PENDING_BYTES = 65_536
 export const LINE_SINK_CLOSE_DRAIN_MS = 500
 
 // The control slots, shared by every producer and the writer: 0 pending bytes, 1 lines dropped since the last marker,
-// 2 the first drop's epoch seconds, 3 the bound, 4 lines dropped in all, 5 the closed flag. postSinkLine and the
-// writer source address them by number, because both must reference nothing outside themselves.
+// 2 the first drop's time as seconds since the sink opened plus one (0 = none), 3 the bound, 4 lines dropped in all,
+// 5 the closed flag, 6 the sink's open time. Times are epoch seconds wrapped to int32 (`| 0`), and only their
+// differences are read, so they stay right for 68 years from any open, not until January 2038. postSinkLine and the
+// writer source address the slots by number, because both must reference nothing outside themselves.
 const PENDING = 0
 const BOUND = 3
 const DROPPED_TOTAL = 4
 const CLOSED = 5
-const CONTROL_SLOTS = 6
+const OPENED = 6
+const CONTROL_SLOTS = 7
 
 /** What a producer on another thread needs: the port to post on (transfer it) and the control buffer. */
 export interface LineSinkProducer {
@@ -88,7 +91,8 @@ export function postSinkLine(
     Atomics.sub(control, 0, bytes.length)
     Atomics.add(control, 1, 1)
     Atomics.add(control, 4, 1)
-    Atomics.compareExchange(control, 2, 0, Math.floor(Date.now() / 1000))
+    const sinceOpen = ((Date.now() / 1000) | 0) - Atomics.load(control, 6)
+    Atomics.compareExchange(control, 2, 0, (sinceOpen | 0) + 1)
     return false
   }
   port.postMessage(bytes, [bytes.buffer])
@@ -114,8 +118,9 @@ const write = (bytes) => {
 const marker = () => {
   const dropped = Atomics.exchange(control, 1, 0)
   if (dropped === 0) return null
-  const since = Atomics.exchange(control, 2, 0)
-  const blockedS = since > 0 ? Math.max(0, Math.floor(Date.now() / 1000) - since) : 0
+  const first = Atomics.exchange(control, 2, 0)
+  const now = (((Date.now() / 1000) | 0) - Atomics.load(control, 6)) | 0
+  const blockedS = first > 0 ? Math.max(0, now - (first - 1)) : 0
   return "(" + dropped + " line" + (dropped === 1 ? "" : "s") + " dropped while fd " + fd + " was blocked for " + blockedS + "s)"
 }
 const onLine = (bytes) => {
@@ -157,6 +162,7 @@ export function openLineSink(options: LineSinkOptions): LineSink {
   )
   const control = new Int32Array(controlBuffer)
   Atomics.store(control, BOUND, bound)
+  Atomics.store(control, OPENED, (Date.now() / 1000) | 0)
   const worker = new Worker(LINE_SINK_WORKER_SOURCE, {
     eval: true,
     workerData: { fd: options.fd, control: controlBuffer },
@@ -164,7 +170,9 @@ export function openLineSink(options: LineSinkOptions): LineSink {
   worker.unref()
   let closed = false
   // A writer that dies leaves every producer posting into nothing: say so once, on the fd itself. This one write
-  // is direct and can park if the reader is stalled; it runs only on the failure path of the failure path.
+  // is direct and runs only once the writer is gone, so a dead writer is never silent. The residual: a writer that
+  // dies for a non-I/O reason while the pipe is full parks the main thread on this notice. A broken pipe (EPIPE)
+  // throws instead, which ends the process loudly, the same as a direct stderr write does today.
   worker.on("error", (error: unknown) => {
     const reason = error instanceof Error ? error.message : String(error)
     writeSync(

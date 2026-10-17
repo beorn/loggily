@@ -103,6 +103,11 @@ export {
 
 // Re-export pipeline builder and utilities for power users
 export { buildPipeline, type Pipeline, serializeCause } from "./pipeline.js"
+export {
+  setStderrLineWriter,
+  getStderrLineWriter,
+  type StderrLineWriter,
+} from "./pipeline.js"
 export { resolveVerbosityLevel } from "./pipeline.js"
 
 // Re-export config types for typed pipeline construction

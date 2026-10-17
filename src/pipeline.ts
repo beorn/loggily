@@ -78,7 +78,42 @@ function getEnv(key: string): string | undefined {
   return _process?.env?.[key]
 }
 
+// ============ The stderr line writer (km 25947) ============
+
+/** One formatted line, without its newline, bound for fd 2. */
+export type StderrLineWriter = (line: string) => void
+
+let stderrLineWriter: StderrLineWriter | null = null
+
+/**
+ * Route every line loggily would put on fd 2 through `writer` instead: the
+ * terminal console sinks (both formats), the `"stderr"` output, spans and the
+ * pipeline guard's own reports. fd 2 belongs to the process, so a writer is
+ * set once per process by whatever owns its stderr (a daemon that opened
+ * `loggily/sink`), and unset with `null`; the one it replaced is returned.
+ * With a writer set, the terminal console sink hands over the same pretty or
+ * JSON line the `"stderr"` output and a file writer produce; it no longer
+ * calls console. The browser sink and file writers are outside the seam:
+ * neither writes fd 2.
+ */
+export function setStderrLineWriter(
+  writer: StderrLineWriter | null,
+): StderrLineWriter | null {
+  const previous = stderrLineWriter
+  stderrLineWriter = writer
+  return previous
+}
+
+/** The writer set by {@link setStderrLineWriter}, or null while fd 2 is written directly. */
+export function getStderrLineWriter(): StderrLineWriter | null {
+  return stderrLineWriter
+}
+
 function writeStderr(text: string): void {
+  if (stderrLineWriter !== null) {
+    stderrLineWriter(text)
+    return
+  }
   if (_process?.stderr?.write) {
     _process.stderr.write(text + "\n")
   } else {
@@ -301,6 +336,10 @@ export function writeToConsole(text: string, event: Event): void {
   // console methods; the level is carried by the formatted `text`, not by the
   // method. Same contract as the terminal sink in console-sinks.ts — keep the
   // two in step, or a caller wired to this one reintroduces the stdout leak.
+  if (stderrLineWriter !== null) {
+    stderrLineWriter(text)
+    return
+  }
   switch (event.level) {
     case "warn":
       console.warn(text)
@@ -340,6 +379,22 @@ function isNodeStream(obj: unknown): boolean {
     obj !== null &&
     ("_write" in obj || "writable" in obj || "fd" in obj)
   )
+}
+
+/** The `"stderr"` output: fd 2 directly, or the stderr line writer while one is set. */
+function createStderrSink(format: LogFormat): (event: Event) => void {
+  const direct = createWritableSink(
+    process.stderr as unknown as Writable,
+    format,
+  )
+  const formatter = format === "json" ? formatJSONEvent : formatConsoleEvent
+  return (event: Event) => {
+    if (stderrLineWriter !== null) {
+      stderrLineWriter(formatter(event))
+      return
+    }
+    direct(event)
+  }
 }
 
 function createWritableSink(
@@ -524,6 +579,17 @@ export function buildPipeline(
       continue
     }
 
+    // 4a. The process's own stderr stream, by object → the "stderr" output,
+    //     so a stderr line writer covers it too (km 25947)
+    if (typeof process !== "undefined" && element === process.stderr) {
+      outputs.push({
+        levelPriority: LOG_LEVEL_PRIORITY[config.level],
+        nsFilter: config.ns,
+        write: createStderrSink(config.format),
+      })
+      continue
+    }
+
     // 4. Writable ({ write }) → writable sink (checked BEFORE POJO so { write: fn } works)
     if (isWritable(element)) {
       outputs.push({
@@ -601,10 +667,7 @@ export function buildPipeline(
       outputs.push({
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
         nsFilter: config.ns,
-        write: createWritableSink(
-          process.stderr as unknown as Writable,
-          config.format,
-        ),
+        write: createStderrSink(config.format),
       })
       continue
     }
