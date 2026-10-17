@@ -9,7 +9,13 @@
 import { afterEach, describe, expect, test } from "vitest"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -91,12 +97,10 @@ async function scenario(
   try {
     summary = JSON.parse(readFileSync(summaryPath, "utf8")) as Summary
   } catch (error) {
-    let progress = "(no phase marks)"
-    try {
-      progress = readFileSync(progressPath, "utf8")
-    } catch {
-      // No mark was written: the scenario stopped before its first phase.
-    }
+    // No mark means the scenario stopped before its first phase.
+    const progress = existsSync(progressPath)
+      ? readFileSync(progressPath, "utf8")
+      : "(no phase marks)"
     throw new Error(
       `the scenario ended (code ${code}, signal ${signal}) after ${Date.now() - started}ms without a summary (${error instanceof Error ? error.message : String(error)}); phases: ${JSON.stringify(progress)}; stderr tail: ${JSON.stringify(stderr.slice(-400))}`,
     )
@@ -237,10 +241,9 @@ describe("loggily/sink: a line sink that never parks its producers (km 25947)", 
       NodeJS.Signals | null,
     ]
     clearTimeout(guard)
-    let summary = "(none)"
-    try {
-      summary = readFileSync(summaryPath, "utf8")
-    } catch {}
+    const summary = existsSync(summaryPath)
+      ? readFileSync(summaryPath, "utf8")
+      : "(none)"
     expect(
       { code, signal },
       `the child must end on its own with its summary; got ${summary}; stderr ${JSON.stringify(stderr.slice(-300))}`,

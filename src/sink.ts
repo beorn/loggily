@@ -195,7 +195,8 @@ export function openLineSink(options: LineSinkOptions): LineSink {
     try {
       writeSync(options.fd, text)
     } catch {
-      // The fd cannot take it, and nothing on this thread may wait for it.
+      // silent-fallback-allow: the notice is best effort. A full non-blocking fd (EAGAIN) or a gone reader (EPIPE)
+      // drops it, and nothing on this thread may wait for fd 2: waiting here is the stall the sink exists to end.
     }
   }
   worker.on("error", (error: unknown) => {
