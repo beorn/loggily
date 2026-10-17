@@ -5,6 +5,7 @@
  *          announce exactly what it dropped.
  * @level l2
  * @consumer @km/daemon/25947-bd-close-blocks-daemon
+ * @testonly none
  */
 import { afterEach, describe, expect, test } from "vitest"
 import { spawn } from "node:child_process"

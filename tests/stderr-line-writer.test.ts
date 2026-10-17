@@ -1,9 +1,12 @@
 /**
- * The stderr line writer seam (km 25947): with a writer set, loggily writes
- * nothing to fd 1 or fd 2 itself. Every terminal sink kind and level, spans,
- * the "stderr" output by name and by stream, writeToConsole and the pipeline
- * guard's own report reach the writer, while console.*, process.stdout.write
- * and process.stderr.write see no call. Unsetting it restores the direct path.
+ * @failure A loggily byte bound for fd 2 that bypasses the stderr line writer is a direct write, and a
+ *          direct write parks the process on a stalled stderr reader (km 25947). With a writer set, every
+ *          terminal sink kind and level, spans, the "stderr" output by name and by stream, writeToConsole
+ *          and the pipeline guard's own report must reach the writer while console.*, process.stdout.write
+ *          and process.stderr.write see no call; unsetting it restores the direct path.
+ * @level l1
+ * @consumer @km/daemon/25947-bd-close-blocks-daemon
+ * @testonly none
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { createTerminalConsoleSink } from "../src/console-sinks.ts"
