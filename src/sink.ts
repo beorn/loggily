@@ -7,9 +7,11 @@
  * and Bun.stderr.writer() alike, on the main thread and in a worker. A
  * long-lived service whose fd 2 is a supervisor's capture therefore wedges
  * with its reader, and a watchdog that writes its kill line the same way never
- * kills. A non-blocking fd (the pipe a Bun or Node parent opens for a child)
- * answers EAGAIN instead of parking, and a thrown EAGAIN is the same wedge one
- * step later: the uncaught error is printed to the same full fd. This sink
+ * kills. Bun sets O_NONBLOCK on its own fd 2 when that is a pipe, whatever
+ * the parent opened (measured 2026-10-17: a blocking parent pipe still
+ * answered EAGAIN), so for any pipe on fd 2 the production path is EAGAIN
+ * instead of parking, and a thrown EAGAIN is the same wedge one step later:
+ * the uncaught error is printed to the same full fd. This sink
  * moves the one blocking write to a writer worker: producers
  * post whole lines over a MessagePort and return at once, and a shared Atomics
  * byte counter bounds what is pending ({@link LINE_SINK_PENDING_BYTES}). A
@@ -73,6 +75,14 @@ export interface LineSinkOptions {
   readonly fd: number
   /** The pending-byte bound; {@link LINE_SINK_PENDING_BYTES} by default. */
   readonly pendingBytes?: number
+  /**
+   * Called once, with the reason, when the writer died and lines to `fd` stop
+   * here: a failed write (EPIPE: the reader is gone) or an exit the sink did not
+   * ask for. Never called for {@link LineSink.close}. The sink's own notice goes
+   * to the fd that just failed, so this is the signal that reliably arrives; an
+   * owner that keeps a second copy (a file writer) says so there.
+   */
+  readonly onWriterGone?: (reason: string) => void
 }
 
 /**
@@ -117,16 +127,21 @@ const encoder = new TextEncoder()
 const sleeper = new Int32Array(new SharedArrayBuffer(4))
 const write = (bytes) => {
   let offset = 0
+  let waitMs = 2
   while (offset < bytes.length) {
     try {
-      offset += writeSync(fd, bytes, offset, bytes.length - offset)
+      const wrote = writeSync(fd, bytes, offset, bytes.length - offset)
+      offset += wrote
+      if (wrote > 0) waitMs = 2
     } catch (error) {
       // A non-blocking fd whose reader stalled answers EAGAIN instead of parking the caller: wait here, on this
-      // thread only, and retry; the bound and the drop count hold exactly as for a parked write. Anything else
-      // (EPIPE: the reader is gone) ends the writer, and the main thread says so once.
+      // thread only, and retry, 2 ms doubling to 50 ms while nothing moves and back to 2 ms on progress; the bound
+      // and the drop count hold exactly as for a parked write. Anything else (EPIPE: the reader is gone) ends the
+      // writer, and the main thread says so once.
       const code = error !== null && typeof error === "object" ? error.code : undefined
       if (code === "EAGAIN" || code === "EWOULDBLOCK") {
-        Atomics.wait(sleeper, 0, 0, 2)
+        Atomics.wait(sleeper, 0, 0, waitMs)
+        waitMs = Math.min(waitMs * 2, 50)
         continue
       }
       throw error
@@ -187,10 +202,12 @@ export function openLineSink(options: LineSinkOptions): LineSink {
   })
   worker.unref()
   let closed = false
-  // A writer that dies leaves every producer posting into nothing: say so once, on the fd itself, best effort. The
-  // notice never throws and never retries: a full non-blocking fd (EAGAIN) or a gone reader (EPIPE) drops it, and a
-  // file writer beside the sink still holds every line. The residual: on a BLOCKING fd whose reader stalled, this
-  // one direct write parks the main thread, the same as a direct stderr write does today.
+  let gone = false
+  // A writer that dies leaves every producer posting into nothing: say so once, on the fd itself, best effort, and
+  // to the owner through onWriterGone, the signal that reliably arrives. The notice never throws and never retries:
+  // a full non-blocking fd (EAGAIN) or a gone reader (EPIPE) drops it, and a file writer beside the sink still
+  // holds every line. The residual: on a BLOCKING fd whose reader stalled, this one direct write parks the main
+  // thread, the same as a direct stderr write does today.
   const notice = (text: string): void => {
     try {
       writeSync(options.fd, text)
@@ -199,17 +216,22 @@ export function openLineSink(options: LineSinkOptions): LineSink {
       // drops it, and nothing on this thread may wait for fd 2: waiting here is the stall the sink exists to end.
     }
   }
-  worker.on("error", (error: unknown) => {
-    const reason = error instanceof Error ? error.message : String(error)
+  // Once only: a failed write is followed by the writer's exit, and a deliberate close is not a death.
+  const writerGone = (reason: string): void => {
+    if (closed || gone) return
+    gone = true
     notice(
-      `loggily sink: its writer failed, so lines to fd ${options.fd} stop here: ${reason}\n`,
+      `loggily sink: its writer is gone (${reason}), so lines to fd ${options.fd} stop here\n`,
+    )
+    options.onWriterGone?.(reason)
+  }
+  worker.on("error", (error: unknown) => {
+    writerGone(
+      `write failed: ${error instanceof Error ? error.message : String(error)}`,
     )
   })
   worker.on("exit", (code: number) => {
-    if (closed) return
-    notice(
-      `loggily sink: its writer exited (code ${code}), so lines to fd ${options.fd} stop here\n`,
-    )
+    writerGone(`exited with code ${code}`)
   })
   return {
     push: (line) => postSinkLine(worker, control, line),

@@ -13,6 +13,14 @@
   `producer()` hands a transferable port to another thread. Built for a
   long-lived Bun service whose stderr is a supervisor's capture (km 25947):
   once ~10 KB sits unread on a pty, every in-process write parks its thread.
+- **The owner hears when the writer dies** — `openLineSink({ onWriterGone })`
+  is called once, with the reason, for a failed write (EPIPE: the reader is
+  gone) or an exit the sink did not ask for, never for `close()`. The sink's
+  own notice goes to the fd that just failed, so this is the signal that
+  arrives; an owner with a file writer beside the sink says so there.
+- **A full non-blocking fd is waited out with a bounded backoff** — the
+  writer's EAGAIN wait starts at 2 ms, doubles to 50 ms while nothing moves,
+  and returns to 2 ms on progress.
 - **One line writer for everything bound for fd 2** — `setStderrLineWriter()`
   on the main entry routes the terminal console sinks (both formats), the
   `"stderr"` output by name or by the process's own stream, spans and

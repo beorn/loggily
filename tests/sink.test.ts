@@ -109,6 +109,9 @@ async function scenario(
   return { code, signal, stderr, summary }
 }
 
+/** The 1000-byte filler every scenario line carries after its tag. */
+const pad = (n: number): string => "x".repeat(n)
+
 // A written line: an optional drop marker, then one of ours. A marker alone is what close writes when drops are still owed.
 const LINE =
   /^(?:\((\d+) lines? dropped while fd 2 was blocked for \d+s\)(?: |$))?(M\d+ m{1000}|W\d+ w{1000}|TAIL\d)?$/u
@@ -194,14 +197,15 @@ describe("loggily/sink: a line sink that never parks its producers (km 25947)", 
     expect(lines.some((line) => /(^|\) )W\d+ /u.test(line))).toBe(true)
   }, 60_000)
 
-  test("a full non-blocking fd answers EAGAIN: the writer waits it out on its own thread, the producer keeps running, and the process exits on its own", async () => {
-    // Measured 2026-10-17 with strace: the pipe a Bun parent opens for a child is non-blocking, so the writer's
-    // write(2) answered EAGAIN once the pipe was full; a writer that threw on it died, its main-thread notice threw
-    // EAGAIN too, and Bun's error printer parked the main thread in poll(fd 2, POLLOUT, -1) for good. The child
-    // builds that fd itself: a FIFO it opens non-blocking at both ends and never reads.
+  test("a full non-blocking fd answers EAGAIN: the writer waits it out on its own thread, the producer keeps running, and once the reader drains, every pending line is written with the drop marker on a later line", async () => {
+    // Measured 2026-10-17 with strace: Bun sets O_NONBLOCK on its fd 2 when that is a pipe, so the writer's write(2)
+    // answered EAGAIN once the pipe was full; a writer that threw on it died, its main-thread notice threw EAGAIN
+    // too, and Bun's error printer parked the main thread in poll(fd 2, POLLOUT, -1) for good. The child builds that
+    // fd itself: a FIFO it opens non-blocking at both ends and reads only after the burst. A writer that died during
+    // the stall would leave the bound's worth pending for good and no later line, so this row fails for that bug.
     const root = mkdtempSync(join(tmpdir(), "loggily-sink-"))
     roots.push(root)
-    const script = join(root, "never-drained.ts")
+    const script = join(root, "drained-later.ts")
     const summaryPath = join(root, "summary.json")
     const fifo = join(root, "unread.fifo")
     writeFileSync(
@@ -209,23 +213,43 @@ describe("loggily/sink: a line sink that never parks its producers (km 25947)", 
       [
         `import { openLineSink } from ${JSON.stringify(MODULE)}`,
         `import { execFileSync } from "node:child_process"`,
-        `import { constants, openSync, writeFileSync } from "node:fs"`,
+        `import { constants, openSync, readSync, writeFileSync } from "node:fs"`,
         `execFileSync("mkfifo", [${JSON.stringify(fifo)}])`,
-        `openSync(${JSON.stringify(fifo)}, constants.O_RDONLY | constants.O_NONBLOCK)`,
+        `const rfd = openSync(${JSON.stringify(fifo)}, constants.O_RDONLY | constants.O_NONBLOCK)`,
         `const fd = openSync(${JSON.stringify(fifo)}, constants.O_WRONLY | constants.O_NONBLOCK)`,
         `const sink = openLineSink({ fd })`,
         `const pad = "x".repeat(1000)`,
         `for (let i = 0; i < 400; i++) sink.push("B" + i + " " + pad + "\\n")`,
+        `const atBurst = { dropped: sink.dropped(), pending: sink.pending() }`,
+        `let text = ""`,
+        `const buf = Buffer.alloc(65536)`,
+        `const drain = () => {`,
+        `  for (;;) {`,
+        `    let n = 0`,
+        `    try {`,
+        `      n = readSync(rfd, buf, 0, buf.length, null)`,
+        `    } catch (error) {`,
+        `      if (error !== null && typeof error === "object" && error.code === "EAGAIN") return`,
+        `      throw error`,
+        `    }`,
+        `    if (n === 0) return`,
+        `    text += buf.toString("utf8", 0, n)`,
+        `  }`,
+        `}`,
         `let ticks = 0`,
         `const timer = setInterval(() => {`,
-        `  sink.push("T" + ticks + " " + pad + "\\n")`,
-        `  ticks += 1`,
-        `  if (ticks === 5) {`,
-        `    clearInterval(timer)`,
-        `    writeFileSync(${JSON.stringify(summaryPath)}, JSON.stringify({ ticks, dropped: sink.dropped(), pending: sink.pending() }))`,
-        `    process.exit(0)`,
+        `  drain()`,
+        `  if (ticks < 5) {`,
+        `    sink.push("T" + ticks + " " + pad + "\\n")`,
+        `    ticks += 1`,
+        `    return`,
         `  }`,
-        `}, 100)`,
+        `  if (sink.pending() > 0 || !text.includes("T4 " + pad + "\\n")) return`,
+        `  drain()`,
+        `  clearInterval(timer)`,
+        `  writeFileSync(${JSON.stringify(summaryPath)}, JSON.stringify({ atBurst, ticks, dropped: sink.dropped(), pending: sink.pending(), text }))`,
+        `  process.exit(0)`,
+        `}, 20)`,
       ].join("\n"),
     )
     const child = spawn(process.execPath, [script], {
@@ -236,7 +260,99 @@ describe("loggily/sink: a line sink that never parks its producers (km 25947)", 
     child.stderr.on("data", (chunk: string) => {
       stderr += chunk
     })
-    const guard = setTimeout(() => child.kill("SIGKILL"), 10_000)
+    const guard = setTimeout(() => child.kill("SIGKILL"), 15_000)
+    const [code, signal] = (await once(child, "exit")) as [
+      number | null,
+      NodeJS.Signals | null,
+    ]
+    clearTimeout(guard)
+    const summary = existsSync(summaryPath)
+      ? readFileSync(summaryPath, "utf8")
+      : "(none)"
+    expect(
+      { code, signal },
+      `the child must end on its own with its summary; got ${summary.slice(0, 300)}; stderr ${JSON.stringify(stderr.slice(-300))}`,
+    ).toEqual({ code: 0, signal: null })
+    const parsed = JSON.parse(summary) as {
+      atBurst: { dropped: number; pending: number }
+      ticks: number
+      dropped: number
+      pending: number
+      text: string
+    }
+    expect(parsed.ticks).toBe(5)
+    // The FIFO took its 64 KiB and the bound held the rest: during the stall the writer waited, nothing was lost silently.
+    expect(parsed.atBurst.dropped).toBeGreaterThan(0)
+    expect(parsed.atBurst.pending).toBeGreaterThan(0)
+    // Once the reader drained, the writer put every pending byte out and the later lines arrived whole.
+    expect(parsed.pending).toBe(0)
+    for (let i = 0; i < 5; i++) {
+      expect(
+        parsed.text,
+        `tick line T${i} must have been written whole`,
+      ).toContain(`\nT${i} ${pad(1000)}\n`)
+    }
+    // Every drop recorded during the burst was announced on a later line, as the marker before one of ours.
+    const markers = [
+      ...parsed.text.matchAll(
+        /\((\d+) lines? dropped while fd \d+ was blocked for \d+s\) [BT]\d+ /gu,
+      ),
+    ]
+    expect(
+      markers.length,
+      `the drop marker must prefix a later line; text tail ${JSON.stringify(parsed.text.slice(-200))}`,
+    ).toBeGreaterThan(0)
+    const announced = markers.reduce((sum, m) => sum + Number(m[1]), 0)
+    expect(announced).toBeGreaterThanOrEqual(parsed.atBurst.dropped)
+    expect(announced).toBeLessThanOrEqual(parsed.dropped)
+    expect(stderr, "the writer must not have died").not.toContain(
+      "loggily sink:",
+    )
+  }, 30_000)
+
+  test("a reader that goes away (EPIPE) ends the writer: onWriterGone fires once with the reason, the producer keeps running, and the process exits on its own", async () => {
+    // The sink's own notice goes to the fd that just failed, so without this signal the owner learns nothing and
+    // every later line goes nowhere. The child closes the FIFO's only read end itself, then keeps pushing.
+    const root = mkdtempSync(join(tmpdir(), "loggily-sink-"))
+    roots.push(root)
+    const script = join(root, "reader-gone.ts")
+    const summaryPath = join(root, "summary.json")
+    const fifo = join(root, "gone.fifo")
+    writeFileSync(
+      script,
+      [
+        `import { openLineSink } from ${JSON.stringify(MODULE)}`,
+        `import { execFileSync } from "node:child_process"`,
+        `import { closeSync, constants, openSync, writeFileSync } from "node:fs"`,
+        `execFileSync("mkfifo", [${JSON.stringify(fifo)}])`,
+        `const rfd = openSync(${JSON.stringify(fifo)}, constants.O_RDONLY | constants.O_NONBLOCK)`,
+        `const fd = openSync(${JSON.stringify(fifo)}, constants.O_WRONLY | constants.O_NONBLOCK)`,
+        `const reasons = []`,
+        `const sink = openLineSink({ fd, onWriterGone: (reason) => reasons.push(reason) })`,
+        `sink.push("before the reader left\\n")`,
+        `closeSync(rfd)`,
+        `let pushes = 0`,
+        `let sinceGone = -1`,
+        `const timer = setInterval(() => {`,
+        `  sink.push("after the reader left " + pushes + "\\n")`,
+        `  pushes += 1`,
+        `  if (reasons.length > 0) sinceGone += 1`,
+        `  if (sinceGone < 20 && pushes < 300) return`,
+        `  clearInterval(timer)`,
+        `  writeFileSync(${JSON.stringify(summaryPath)}, JSON.stringify({ reasons, pushes, pending: sink.pending() }))`,
+        `  process.exit(0)`,
+        `}, 10)`,
+      ].join("\n"),
+    )
+    const child = spawn(process.execPath, [script], {
+      stdio: ["ignore", "ignore", "pipe"],
+    })
+    let stderr = ""
+    child.stderr.setEncoding("utf8")
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk
+    })
+    const guard = setTimeout(() => child.kill("SIGKILL"), 15_000)
     const [code, signal] = (await once(child, "exit")) as [
       number | null,
       NodeJS.Signals | null,
@@ -250,17 +366,15 @@ describe("loggily/sink: a line sink that never parks its producers (km 25947)", 
       `the child must end on its own with its summary; got ${summary}; stderr ${JSON.stringify(stderr.slice(-300))}`,
     ).toEqual({ code: 0, signal: null })
     const parsed = JSON.parse(summary) as {
-      ticks: number
-      dropped: number
+      reasons: string[]
+      pushes: number
       pending: number
     }
-    expect(parsed.ticks).toBe(5)
-    // The FIFO took its 64 KiB and the bound held the rest: the writer is parked in its retry, nothing was lost silently.
-    expect(parsed.dropped).toBeGreaterThan(0)
-    expect(parsed.pending).toBeGreaterThan(0)
-    expect(stderr, "the writer must not have died").not.toContain(
-      "loggily sink:",
-    )
+    expect(parsed.reasons, "the owner is told exactly once").toHaveLength(1)
+    expect(parsed.reasons[0]).toMatch(/EPIPE/u)
+    expect(parsed.pushes).toBeGreaterThan(20)
+    // The notice went to the dead fd, never to this process's real stderr, and nothing parked.
+    expect(stderr).not.toContain("loggily sink:")
   }, 30_000)
 
   test("a line dropped at the bound is refused at once, counted, and the control slots say so", () => {
