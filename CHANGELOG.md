@@ -28,6 +28,10 @@
   so a process that opened a sink owns its stderr with one call; `null`
   restores the direct path. The sink's first-drop clock counts seconds since
   the sink opened, so its marker stays right past January 2038.
+- **`writeStderrLine(text)`** on the main entry puts one line on the same
+  route: the line writer when one is set, else the direct path. Not gated by
+  level or namespace and independent of every output, for a report that a
+  logger's own output just failed (km 29702).
 - **Removed `writeToConsole`**, an export off the entry that nothing called.
 
 ## 0.12.0

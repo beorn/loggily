@@ -109,6 +109,18 @@ export function getStderrLineWriter(): StderrLineWriter | null {
   return stderrLineWriter
 }
 
+/**
+ * Put one line on the process's stderr route: the line writer set with
+ * {@link setStderrLineWriter} when there is one, else the direct path. Not
+ * gated by any level or namespace and independent of every pipeline output,
+ * so a report that a logger's own output just failed still gets out, and a
+ * process that owns its stderr (km 25947) never parks on it (km 29702).
+ * `text` is one line without its newline.
+ */
+export function writeStderrLine(text: string): void {
+  writeStderr(text)
+}
+
 function writeStderr(text: string): void {
   if (stderrLineWriter !== null) {
     stderrLineWriter(text)
