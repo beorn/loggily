@@ -1,8 +1,8 @@
 /**
  * @failure A loggily byte bound for fd 2 that bypasses the stderr line writer is a direct write, and a
  *          direct write parks the process on a stalled stderr reader (km 25947). With a writer set, every
- *          terminal sink kind and level, spans, the "stderr" output by name and by stream, writeToConsole
- *          and the pipeline guard's own report must reach the writer while console.*, process.stdout.write
+ *          terminal sink kind and level, spans, the "stderr" output by name and by stream and the
+ *          pipeline guard's own report must reach the writer while console.*, process.stdout.write
  *          and process.stderr.write see no call; unsetting it restores the direct path.
  * @level l1
  * @consumer @km/daemon/25947-bd-close-blocks-daemon
@@ -14,7 +14,6 @@ import {
   buildPipeline,
   getStderrLineWriter,
   setStderrLineWriter,
-  writeToConsole,
 } from "../src/pipeline.ts"
 import type { Event, OutputLogLevel } from "../src/pipeline.ts"
 
@@ -104,17 +103,6 @@ describe("every fd 2 path goes through the stderr line writer", () => {
       expect(lines).toHaveLength(EVENTS.length)
     },
   )
-
-  test("writeToConsole: five levels and a span", () => {
-    for (const event of EVENTS) {
-      writeToConsole(
-        event.kind === "span" ? event.namespace : event.message,
-        event,
-      )
-    }
-    expectEveryLevelAndNoDirectCall(true)
-    expect(lines).toHaveLength(EVENTS.length)
-  })
 
   test.each(["console", "json"] as const)(
     'the "stderr" output by name, %s format',

@@ -15,11 +15,12 @@
   once ~10 KB sits unread on a pty, every in-process write parks its thread.
 - **One line writer for everything bound for fd 2** — `setStderrLineWriter()`
   on the main entry routes the terminal console sinks (both formats), the
-  `"stderr"` output by name or by the process's own stream, spans,
-  `writeToConsole` and the pipeline guard's own reports through one function,
+  `"stderr"` output by name or by the process's own stream, spans and
+  the pipeline guard's own reports through one function,
   so a process that opened a sink owns its stderr with one call; `null`
   restores the direct path. The sink's first-drop clock counts seconds since
   the sink opened, so its marker stays right past January 2038.
+- **Removed `writeToConsole`**, an export off the entry that nothing called.
 
 ## 0.12.0
 

@@ -310,46 +310,6 @@ export function parseNsFilter(ns: string | string[]): NsFilter {
 // helpers from this file; we want the pipeline to reuse them too.
 import { createConsoleSink as _createConsoleSink } from "./console-sinks.js"
 
-/**
- * Legacy text-based console writer. Retained so older code paths (the
- * env-dynamic pipeline in core.ts, writeSpan) still work, but the modern
- * pipeline now routes through `createConsoleSink` which spreads structured
- * args to `console.*` — that's what preserves expandable objects in browser
- * DevTools and makes `vi.spyOn(console, 'info')` interception work.
- *
- * For spans we still write to stderr in Node because the pipeline-level
- * spanEnabled gate handles human-readable span output; JSON/console sinks
- * route spans through their normal formatters when invoked directly.
- */
-export function writeToConsole(text: string, event: Event): void {
-  if (event.kind === "span") {
-    writeStderr(text)
-    return
-  }
-  // Arrow dispatch — no .bind() — so vi.spyOn(console, …) installed AFTER
-  // this module loaded still intercepts. DevTools frame attribution is
-  // determined by the caller of writeToConsole, not by this switch.
-  //
-  // Every level lands on stderr: `console.info` and `console.debug` are stdout
-  // in Node, and stdout belongs to whatever answer the command was invoked to
-  // produce. `console.warn` and `console.error` are the two stderr-writing
-  // console methods; the level is carried by the formatted `text`, not by the
-  // method. Same contract as the terminal sink in console-sinks.ts — keep the
-  // two in step, or a caller wired to this one reintroduces the stdout leak.
-  if (stderrLineWriter !== null) {
-    stderrLineWriter(text)
-    return
-  }
-  switch (event.level) {
-    case "warn":
-      console.warn(text)
-      break
-    default:
-      console.error(text)
-      break
-  }
-}
-
 // ============ Sinks ============
 
 /**
