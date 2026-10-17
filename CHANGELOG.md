@@ -7,7 +7,8 @@
   to a writer worker: producers post whole lines over a MessagePort and return
   at once, a shared byte counter bounds what is pending, and a line past the
   bound is dropped and counted; the next line written says how many were
-  dropped and for how long the fd was blocked. `postSinkLine` references
+  dropped and for how long the fd was blocked; a non-blocking fd's EAGAIN
+  is waited out on the writer's thread, never thrown. `postSinkLine` references
   nothing outside itself, so a worker built from source can embed it, and
   `producer()` hands a transferable port to another thread. Built for a
   long-lived Bun service whose stderr is a supervisor's capture (km 25947):

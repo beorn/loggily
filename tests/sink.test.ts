@@ -189,6 +189,76 @@ describe("loggily/sink: a line sink that never parks its producers (km 25947)", 
     expect(lines.some((line) => /(^|\) )W\d+ /u.test(line))).toBe(true)
   }, 60_000)
 
+  test("a full non-blocking fd answers EAGAIN: the writer waits it out on its own thread, the producer keeps running, and the process exits on its own", async () => {
+    // Measured 2026-10-17 with strace: the pipe a Bun parent opens for a child is non-blocking, so the writer's
+    // write(2) answered EAGAIN once the pipe was full; a writer that threw on it died, its main-thread notice threw
+    // EAGAIN too, and Bun's error printer parked the main thread in poll(fd 2, POLLOUT, -1) for good. The child
+    // builds that fd itself: a FIFO it opens non-blocking at both ends and never reads.
+    const root = mkdtempSync(join(tmpdir(), "loggily-sink-"))
+    roots.push(root)
+    const script = join(root, "never-drained.ts")
+    const summaryPath = join(root, "summary.json")
+    const fifo = join(root, "unread.fifo")
+    writeFileSync(
+      script,
+      [
+        `import { openLineSink } from ${JSON.stringify(MODULE)}`,
+        `import { execFileSync } from "node:child_process"`,
+        `import { constants, openSync, writeFileSync } from "node:fs"`,
+        `execFileSync("mkfifo", [${JSON.stringify(fifo)}])`,
+        `openSync(${JSON.stringify(fifo)}, constants.O_RDONLY | constants.O_NONBLOCK)`,
+        `const fd = openSync(${JSON.stringify(fifo)}, constants.O_WRONLY | constants.O_NONBLOCK)`,
+        `const sink = openLineSink({ fd })`,
+        `const pad = "x".repeat(1000)`,
+        `for (let i = 0; i < 400; i++) sink.push("B" + i + " " + pad + "\\n")`,
+        `let ticks = 0`,
+        `const timer = setInterval(() => {`,
+        `  sink.push("T" + ticks + " " + pad + "\\n")`,
+        `  ticks += 1`,
+        `  if (ticks === 5) {`,
+        `    clearInterval(timer)`,
+        `    writeFileSync(${JSON.stringify(summaryPath)}, JSON.stringify({ ticks, dropped: sink.dropped(), pending: sink.pending() }))`,
+        `    process.exit(0)`,
+        `  }`,
+        `}, 100)`,
+      ].join("\n"),
+    )
+    const child = spawn(process.execPath, [script], {
+      stdio: ["ignore", "ignore", "pipe"],
+    })
+    let stderr = ""
+    child.stderr.setEncoding("utf8")
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk
+    })
+    const guard = setTimeout(() => child.kill("SIGKILL"), 10_000)
+    const [code, signal] = (await once(child, "exit")) as [
+      number | null,
+      NodeJS.Signals | null,
+    ]
+    clearTimeout(guard)
+    let summary = "(none)"
+    try {
+      summary = readFileSync(summaryPath, "utf8")
+    } catch {}
+    expect(
+      { code, signal },
+      `the child must end on its own with its summary; got ${summary}; stderr ${JSON.stringify(stderr.slice(-300))}`,
+    ).toEqual({ code: 0, signal: null })
+    const parsed = JSON.parse(summary) as {
+      ticks: number
+      dropped: number
+      pending: number
+    }
+    expect(parsed.ticks).toBe(5)
+    // The FIFO took its 64 KiB and the bound held the rest: the writer is parked in its retry, nothing was lost silently.
+    expect(parsed.dropped).toBeGreaterThan(0)
+    expect(parsed.pending).toBeGreaterThan(0)
+    expect(stderr, "the writer must not have died").not.toContain(
+      "loggily sink:",
+    )
+  }, 30_000)
+
   test("a line dropped at the bound is refused at once, counted, and the control slots say so", () => {
     const control = new Int32Array(
       new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 7),
