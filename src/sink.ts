@@ -216,14 +216,16 @@ export function openLineSink(options: LineSinkOptions): LineSink {
       // drops it, and nothing on this thread may wait for fd 2: waiting here is the stall the sink exists to end.
     }
   }
-  // Once only: a failed write is followed by the writer's exit, and a deliberate close is not a death.
+  // Once only: a failed write is followed by the writer's exit, and a deliberate close is not a death. The owner
+  // hears first: on a blocking fd with a stalled reader the notice below can park this thread, and the owner's
+  // own record (a daemon.log line) must not wait behind it.
   const writerGone = (reason: string): void => {
     if (closed || gone) return
     gone = true
+    options.onWriterGone?.(reason)
     notice(
       `loggily sink: its writer is gone (${reason}), so lines to fd ${options.fd} stop here\n`,
     )
-    options.onWriterGone?.(reason)
   }
   worker.on("error", (error: unknown) => {
     writerGone(

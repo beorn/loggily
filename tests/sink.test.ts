@@ -239,8 +239,11 @@ describe("loggily/sink: a line sink that never parks its producers (km 25947)", 
         `let ticks = 0`,
         `const timer = setInterval(() => {`,
         `  drain()`,
+        // A tick line goes only once the writer has put everything out and the sink takes it: pushed while the
+        // writer still backs off (up to 50 ms) with the bound nearly full, it is dropped as designed, and this row
+        // is about later lines arriving whole, not about the bound.
         `  if (ticks < 5) {`,
-        `    sink.push("T" + ticks + " " + pad + "\\n")`,
+        `    if (sink.pending() > 0 || !sink.push("T" + ticks + " " + pad + "\\n")) return`,
         `    ticks += 1`,
         `    return`,
         `  }`,
@@ -305,7 +308,8 @@ describe("loggily/sink: a line sink that never parks its producers (km 25947)", 
     const announced = markers.reduce((sum, m) => sum + Number(m[1]), 0)
     expect(announced).toBeGreaterThanOrEqual(parsed.atBurst.dropped)
     expect(announced).toBeLessThanOrEqual(parsed.dropped)
-    expect(stderr, "the writer must not have died").not.toContain(
+    // The sink's notice goes to the fd it writes, the FIFO, so a dead writer shows in the text read from it.
+    expect(parsed.text, "the writer must not have died").not.toContain(
       "loggily sink:",
     )
   }, 30_000)
