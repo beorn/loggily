@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.13.0
+
+- **A line sink that never parks its producers** — the Node entry gains the
+  `loggily/sink` subpath. `openLineSink({ fd })` moves the one blocking write
+  to a writer worker: producers post whole lines over a MessagePort and return
+  at once, a shared byte counter bounds what is pending, and a line past the
+  bound is dropped and counted; the next line written says how many were
+  dropped and for how long the fd was blocked. `postSinkLine` references
+  nothing outside itself, so a worker built from source can embed it, and
+  `producer()` hands a transferable port to another thread. Built for a
+  long-lived Bun service whose stderr is a supervisor's capture (km 25947):
+  once ~10 KB sits unread on a pty, every in-process write parks its thread.
+
 ## 0.12.0
 
 - Add `setDefaultOutput()` so pipeline-less library loggers can use a host logger's output, level, and lifetime.
