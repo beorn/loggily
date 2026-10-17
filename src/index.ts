@@ -106,6 +106,7 @@ export { buildPipeline, type Pipeline, serializeCause } from "./pipeline.js"
 export {
   setStderrLineWriter,
   getStderrLineWriter,
+  writeStderrLine,
   type StderrLineWriter,
 } from "./pipeline.js"
 export { resolveVerbosityLevel } from "./pipeline.js"
