@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `DEBUG` namespace patterns filter debug and trace output without hiding info,
+  warn, or error records from other namespaces when allowed by `LOG_LEVEL`.
+  This also applies to configured pipelines inheriting `DEBUG`; explicit `ns`
+  filters still select namespaces at every level.
+
 ## 0.13.0
 
 - **A line sink that never parks its producers** — the Node entry gains the

@@ -6,11 +6,13 @@
 
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
 import {
+  addWriter,
   createLogger,
   resetIds,
   type Logger,
   type SpanLogger,
   type ConditionalLogger,
+  type Event,
 } from "../src/index.ts"
 import { createConsoleMock } from "./helpers.ts"
 
@@ -806,6 +808,121 @@ describe("TRACE namespace filtering", () => {
 })
 
 describe("DEBUG namespace filtering", () => {
+  test("configured writers inherit DEBUG only for debug/trace while explicit ns filters every level", () => {
+    process.env.DEBUG = "foo:*"
+    process.env.LOG_LEVEL = "trace"
+    const ambient: string[] = []
+    const branch: string[] = []
+    const excluded: string[] = []
+    const excludedBranch: string[] = []
+    const included: string[] = []
+    const writer = (rows: string[]) => ({
+      write: (event: Event) =>
+        rows.push(event.kind === "log" ? event.level : "span"),
+    })
+    const log = createLogger("bar", [
+      writer(ambient),
+      [{ level: "warn" }, writer(branch)],
+      { ns: "baz:*" },
+      writer(excluded),
+      [writer(excludedBranch)],
+      { ns: "bar" },
+      writer(included),
+    ])
+
+    log.trace?.("trace")
+    log.debug?.("debug")
+    log.info?.("info")
+    log.warn?.("warn")
+    log.error?.("error")
+
+    expect(ambient).toEqual(["info", "warn", "error"])
+    expect(branch).toEqual(["warn", "error"])
+    expect(excluded).toEqual([])
+    expect(excludedBranch).toEqual([])
+    expect(included).toEqual(["trace", "debug", "info", "warn", "error"])
+  })
+
+  test.each([
+    ["trace", ["info", "warn", "error"]],
+    ["info", ["info", "warn", "error"]],
+    ["warn", ["warn", "error"]],
+    ["error", ["error"]],
+    ["silent", []],
+  ] as const)(
+    "DEBUG preserves non-debug writer output outside its pattern at LOG_LEVEL=%s",
+    (level, expectedLevels) => {
+      process.env.DEBUG = "foo:*"
+      process.env.LOG_LEVEL = level
+      const rows: Array<{ level: string; namespace: string }> = []
+      const configuredRows: Array<{ level: string; namespace: string }> = []
+      const removeWriter = addWriter((_text, level, namespace) => {
+        rows.push({ level, namespace })
+      })
+      try {
+        const logs = [
+          createLogger("bar"),
+          createLogger("bar", [
+            {
+              write: (event: Event) => {
+                if (event.kind === "log") {
+                  configuredRows.push({
+                    level: event.level,
+                    namespace: event.namespace,
+                  })
+                }
+              },
+            },
+          ]),
+        ]
+        for (const log of logs) {
+          if (level === "trace") expect(log.trace).toBeTypeOf("function")
+          log.trace?.("filtered trace")
+          log.debug?.("filtered debug")
+          log.info?.("visible info")
+          log.warn?.("visible warn")
+          log.error?.("visible error")
+        }
+
+        expect(rows).toEqual(
+          expectedLevels.map((level) => ({ level, namespace: "bar" })),
+        )
+        expect(configuredRows).toEqual(
+          expectedLevels.map((level) => ({ level, namespace: "bar" })),
+        )
+
+        // Worker forwarding dispatches events directly, bypassing optional methods.
+        rows.length = 0
+        configuredRows.length = 0
+        for (const log of logs) {
+          for (const level of [
+            "trace",
+            "debug",
+            "info",
+            "warn",
+            "error",
+          ] as const) {
+            log.dispatch({
+              kind: "log",
+              time: 0,
+              namespace: "bar",
+              level,
+              message: `forwarded ${level}`,
+            })
+          }
+        }
+        expect(rows).toEqual(
+          expectedLevels.map((level) => ({ level, namespace: "bar" })),
+        )
+        expect(configuredRows).toEqual(
+          expectedLevels.map((level) => ({ level, namespace: "bar" })),
+        )
+      } finally {
+        removeWriter()
+      }
+    },
+  )
+
   test("DEBUG env var enables namespace filtering", () => {
     process.env.DEBUG = "myapp"
     const log = createLogger("myapp")
@@ -837,7 +954,7 @@ describe("DEBUG namespace filtering", () => {
   test("filter blocks non-matching namespace", () => {
     process.env.DEBUG = "myapp"
     const log = createLogger("other")
-    log.info!("hidden")
+    log.debug?.("hidden")
 
     expect(consoleMock.output).toHaveLength(0)
   })
@@ -849,9 +966,9 @@ describe("DEBUG namespace filtering", () => {
     const log2 = createLogger("other")
     const log3 = createLogger("blocked")
 
-    log1.info!("msg1")
-    log2.info!("msg2")
-    log3.info!("msg3")
+    log1.debug?.("msg1")
+    log2.debug?.("msg2")
+    log3.debug?.("msg3")
 
     expect(consoleMock.output).toHaveLength(2)
     expect(consoleMock.output[0]!.message).toContain("myapp")
@@ -871,11 +988,8 @@ describe("DEBUG namespace filtering", () => {
   })
 
   test("debug-package glob 'yrd*' admits yrd and its children, never a literal namespace 'yrd*'", () => {
-    // Regression 2026-09-01: 'yrd*' fell through to the literal branch of the
-    // matcher, named a namespace called "yrd*" and matched nothing — and an
-    // include list that matches nothing admits NOTHING at any level, so an
-    // operator's pass log came back empty, ERROR rows included, while the docs
-    // promised debug-package compatibility.
+    // Glob compatibility applies to debug output; higher severity records
+    // remain visible outside the namespace pattern.
     process.env.DEBUG = "yrd*,-yrd:storage:*"
 
     const root = createLogger("yrd")
@@ -883,10 +997,10 @@ describe("DEBUG namespace filtering", () => {
     const storage = root.child("storage")
     const other = createLogger("other")
 
-    root.error!("root row")
-    receiver.error!("receiver row")
-    storage.error!("storage row")
-    other.error!("other row")
+    root.debug?.("root row")
+    receiver.debug?.("receiver row")
+    storage.debug?.("storage row")
+    other.debug?.("other row")
 
     expect(consoleMock.output.map((line) => line.message)).toEqual([
       expect.stringContaining("root row"),
@@ -898,10 +1012,10 @@ describe("DEBUG namespace filtering", () => {
     process.env.DEBUG = "app:*:query"
 
     const app = createLogger("app")
-    app.child("db").child("query").info!("db query")
-    app.child("cache").child("query").info!("cache query")
-    app.child("db").info!("db only")
-    app.info!("app only")
+    app.child("db").child("query").debug?.("db query")
+    app.child("cache").child("query").debug?.("cache query")
+    app.child("db").debug?.("db only")
+    app.debug?.("app only")
 
     expect(consoleMock.output.map((line) => line.message)).toEqual([
       expect.stringContaining("db query"),
@@ -916,9 +1030,9 @@ describe("DEBUG namespace filtering", () => {
     const quiet = log.child("db")
     const noisy = log.child("noisy")
 
-    log.info!("root")
-    quiet.info!("db msg")
-    noisy.info!("noisy msg")
+    log.debug?.("root")
+    quiet.debug?.("db msg")
+    noisy.debug?.("noisy msg")
 
     expect(consoleMock.output).toHaveLength(2)
     expect(consoleMock.output[0]!.message).toContain("root")
@@ -933,10 +1047,10 @@ describe("DEBUG namespace filtering", () => {
     const sql = storage.child("sql")
     const sqlChild = sql.child("detail")
 
-    log.info!("visible")
-    storage.info!("visible")
-    sql.info!("hidden")
-    sqlChild.info!("also hidden")
+    log.debug?.("visible")
+    storage.debug?.("visible")
+    sql.debug?.("hidden")
+    sqlChild.debug?.("also hidden")
 
     expect(consoleMock.output).toHaveLength(2)
   })
@@ -948,9 +1062,9 @@ describe("DEBUG namespace filtering", () => {
     const log2 = createLogger("km").child("noisy")
     const log3 = createLogger("other")
 
-    log1.info!("visible")
-    log2.info!("hidden")
-    log3.info!("visible")
+    log1.debug?.("visible")
+    log2.debug?.("hidden")
+    log3.debug?.("visible")
 
     expect(consoleMock.output).toHaveLength(2)
     expect(consoleMock.output[0]!.message).toContain("km")

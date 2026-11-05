@@ -981,7 +981,8 @@ function createEnvPipeline(): Pipeline {
     defaultOutput()?.dispatch(event)
     if (
       event.kind === "log" &&
-      LOG_LEVEL_PRIORITY[event.level] < LOG_LEVEL_PRIORITY[currentLevel()]
+      LOG_LEVEL_PRIORITY[event.level] <
+        LOG_LEVEL_PRIORITY[readEnvLevelForNamespace(event.namespace)]
     ) {
       return
     }
@@ -991,7 +992,15 @@ function createEnvPipeline(): Pipeline {
       if (trace.filter && !trace.filter(event.namespace)) return
     }
     const ns = currentNs()
-    if (ns && !ns(event.namespace)) return
+    if (
+      ns &&
+      (event.kind === "span" ||
+        event.level === "debug" ||
+        event.level === "trace") &&
+      !ns(event.namespace)
+    ) {
+      return
+    }
 
     // Writers receive pre-formatted text + structural fields. Two-arg
     // legacy writers ignore the trailing namespace + event args.

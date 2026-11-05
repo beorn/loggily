@@ -394,7 +394,11 @@ export interface Pipeline {
 
 interface Output {
   levelPriority: number
+  /** Only ambient DEBUG may promote an inherited level per namespace. */
+  levelFromEnv: boolean
   nsFilter: NsFilter | null
+  /** Explicit ns filters every level; ambient DEBUG filters debug/trace. */
+  nsFromEnv: boolean
   write: (event: Event) => void
   dispose?: () => void
   /** Consecutive write failures (guarded dispatch); reset on success. */
@@ -504,7 +508,9 @@ export type ConfigElement =
 
 interface ScopeConfig {
   level: LogLevel
+  levelFromEnv: boolean
   ns: NsFilter | null
+  nsFromEnv: boolean
   format: LogFormat
 }
 
@@ -512,9 +518,17 @@ export function buildPipeline(
   elements: ConfigElement[],
   parentConfig?: Partial<ScopeConfig>,
 ): Pipeline {
+  const envNs = readEnvNs()
+  const envLevel = getEnv("LOG_LEVEL")?.toLowerCase()
+  const envLevelPriority = isValidLogLevel(envLevel)
+    ? LOG_LEVEL_PRIORITY[envLevel]
+    : LOG_LEVEL_PRIORITY.info
   const config: ScopeConfig = {
     level: parentConfig?.level ?? readEnvLevel(),
-    ns: parentConfig?.ns ?? readEnvNs(),
+    levelFromEnv:
+      parentConfig?.levelFromEnv ?? parentConfig?.level === undefined,
+    ns: parentConfig?.ns ?? envNs,
+    nsFromEnv: parentConfig?.nsFromEnv ?? !parentConfig?.ns,
     format: parentConfig?.format ?? readEnvFormat(),
   }
   // Spans always pass through explicit pipelines. { spans: false } to opt out.
@@ -539,7 +553,9 @@ export function buildPipeline(
     if (element === console || element === "console") {
       outputs.push({
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
+        levelFromEnv: config.levelFromEnv,
         nsFilter: config.ns,
+        nsFromEnv: config.nsFromEnv,
         write: createConsoleSink(config.format),
       })
       continue
@@ -556,7 +572,9 @@ export function buildPipeline(
     if (typeof process !== "undefined" && element === process.stderr) {
       outputs.push({
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
+        levelFromEnv: config.levelFromEnv,
         nsFilter: config.ns,
+        nsFromEnv: config.nsFromEnv,
         write: createStderrSink(config.format),
       })
       continue
@@ -566,7 +584,9 @@ export function buildPipeline(
     if (isWritable(element)) {
       outputs.push({
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
+        levelFromEnv: config.levelFromEnv,
         nsFilter: config.ns,
+        nsFromEnv: config.nsFromEnv,
         write: createWritableSink(element, config.format),
       })
       continue
@@ -604,7 +624,9 @@ export function buildPipeline(
           disposables.push(sink.dispose)
           outputs.push({
             levelPriority: LOG_LEVEL_PRIORITY[outputLevel],
+            levelFromEnv: !isValidLogLevel(obj.level) && config.levelFromEnv,
             nsFilter: outputNs,
+            nsFromEnv: !obj.ns && config.nsFromEnv,
             write: sink.write,
             dispose: sink.dispose,
           })
@@ -618,9 +640,13 @@ export function buildPipeline(
       }
 
       // Scope config — update inherited config
-      if (isValidLogLevel(obj.level)) config.level = obj.level
+      if (isValidLogLevel(obj.level)) {
+        config.level = obj.level
+        config.levelFromEnv = false
+      }
       if (obj.ns !== undefined) {
         config.ns = parseNsFilter(obj.ns as string | string[])
+        config.nsFromEnv = false
       }
       if (obj.format === "console" || obj.format === "json") {
         config.format = obj.format
@@ -638,7 +664,9 @@ export function buildPipeline(
     if (element === "stderr" && typeof process !== "undefined") {
       outputs.push({
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
+        levelFromEnv: config.levelFromEnv,
         nsFilter: config.ns,
+        nsFromEnv: config.nsFromEnv,
         write: createStderrSink(config.format),
       })
       continue
@@ -683,11 +711,23 @@ export function buildPipeline(
       if (output.disabled) continue
       if (
         e.kind === "log" &&
-        LOG_LEVEL_PRIORITY[e.level] < output.levelPriority
+        LOG_LEVEL_PRIORITY[e.level] <
+          (output.levelFromEnv && envNs && !envNs(e.namespace)
+            ? envLevelPriority
+            : output.levelPriority)
       ) {
         continue
       }
-      if (output.nsFilter && !output.nsFilter(e.namespace)) continue
+      if (
+        output.nsFilter &&
+        (!output.nsFromEnv ||
+          e.kind === "span" ||
+          e.level === "debug" ||
+          e.level === "trace") &&
+        !output.nsFilter(e.namespace)
+      ) {
+        continue
+      }
       try {
         output.write(e)
         if (output.failures) output.failures = 0
