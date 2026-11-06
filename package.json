@@ -45,7 +45,6 @@
     "./otel": "./src/otel.ts"
   },
   "publishConfig": {
-    "access": "public",
     "exports": {
       ".": {
         "browser": {
@@ -75,7 +74,8 @@
         "types": "./dist/otel.d.mts",
         "import": "./dist/otel.mjs"
       }
-    }
+    },
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown --config package.json",
@@ -92,7 +92,7 @@
   "devDependencies": {
     "@types/node": "26.6.5",
     "mitata": "^1.0.34",
-    "oxfmt": "0.38.0",
+    "oxfmt": "0.76.0",
     "tsdown": "0.22.13",
     "typescript": "^5.9.3",
     "vitepress": "^1.6.4",
