@@ -91,17 +91,17 @@ DEBUG='myapp:db,myapp:cache' bun run app  # Only db and cache subtrees
 
 `createLogger` includes the `withEnvDefaults()` plugin by default. When no config array is provided, it reads from environment variables:
 
-| Variable            | Values                                  | Default   |
-| ------------------- | --------------------------------------- | --------- |
+| Variable            | Values                                         | Default   |
+| ------------------- | ---------------------------------------------- | --------- |
 | `LOG_LEVEL`         | trace, debug, info, warn, error, fatal, silent | `info`    |
-| `LOG_FORMAT`        | console, json                           | `console` |
-| `LOG_FILE`          | file path                               | (none)    |
-| `DEBUG`             | `*`, namespace prefixes, `-prefix`      | (none)    |
-| `TRACE`             | `1`, `true`, namespace prefixes         | (none)    |
-| `TRACE_FORMAT`      | json                                    | (none)    |
-| `TRACE_ID_FORMAT`   | simple, w3c                             | `simple`  |
-| `TRACE_SAMPLE_RATE` | 0.0 -- 1.0                              | `1.0`     |
-| `NODE_ENV`          | production                              | (none)    |
+| `LOG_FORMAT`        | console, json                                  | `console` |
+| `LOG_FILE`          | file path                                      | (none)    |
+| `DEBUG`             | `*`, namespace prefixes, `-prefix`             | (none)    |
+| `TRACE`             | `1`, `true`, namespace prefixes                | (none)    |
+| `TRACE_FORMAT`      | json                                           | (none)    |
+| `TRACE_ID_FORMAT`   | simple, w3c                                    | `simple`  |
+| `TRACE_SAMPLE_RATE` | 0.0 -- 1.0                                     | `1.0`     |
+| `NODE_ENV`          | production                                     | (none)    |
 
 ## Pipeline Builder (power users)
 
