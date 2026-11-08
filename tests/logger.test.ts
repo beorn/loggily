@@ -81,6 +81,65 @@ describe("createLogger", () => {
   })
 })
 
+// ADR0031: fatal is the highest emitted severity, not an alternate error serializer.
+describe("fatal level", () => {
+  test.each(["fatal", "error", "info", "silent"] as const)(
+    "threshold %s preserves minimum-severity gating for fatal",
+    (level) => {
+      const events: Event[] = []
+      const log = createLogger("critical", [
+        { level },
+        (event) => {
+          events.push(event)
+          return null
+        },
+      ])
+      if (level === "silent") {
+        expect(log.fatal).toBeUndefined()
+      } else {
+        log.fatal!("disk unavailable", { unit: "worker" })
+      }
+      if (level === "fatal") {
+        for (const lower of [
+          "trace",
+          "debug",
+          "info",
+          "warn",
+          "error",
+        ] as const) {
+          expect(log[lower]).toBeUndefined()
+        }
+      }
+      expect(events).toEqual(
+        level === "silent"
+          ? []
+          : [
+              expect.objectContaining({
+                kind: "log",
+                level: "fatal",
+                message: "disk unavailable",
+                props: { unit: "worker" },
+              }),
+            ],
+      )
+    },
+  )
+
+  test.each([undefined, "other:*"])(
+    "env fatal survives ambient DEBUG=%s",
+    (debug) => {
+      process.env.LOG_LEVEL = "fatal"
+      if (debug !== undefined) process.env.DEBUG = debug
+      const log = createLogger("critical")
+      expect(log.error).toBeUndefined()
+      log.fatal!("critical event")
+      expect(consoleMock.output).toHaveLength(1)
+      expect(consoleMock.output[0]!.message).toContain("FATAL")
+      expect(consoleMock.output[0]!.message).toContain("critical event")
+    },
+  )
+})
+
 describe("logging methods", () => {
   // Every level reaches the console through a STDERR-writing method: Node
   // routes console.info/debug/log to stdout, and stdout carries the command's
@@ -95,6 +154,7 @@ describe("logging methods", () => {
     ["info", "error", "INFO"],
     ["warn", "warn", "WARN"],
     ["error", "error", "ERROR"],
+    ["fatal", "error", "FATAL"],
   ] as const)(
     "%s level uses console.%s and still renders %s",
     (logLevel, consoleMethod, label) => {

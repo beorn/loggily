@@ -31,8 +31,16 @@ import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import { createTerminalConsoleSink } from "../src/console-sinks.ts"
 import type { Event, OutputLogLevel } from "../src/pipeline.ts"
+import { setStderrLineWriter } from "../src/pipeline.ts"
 
-const LEVELS: OutputLogLevel[] = ["trace", "debug", "info", "warn", "error"]
+const LEVELS: OutputLogLevel[] = [
+  "trace",
+  "debug",
+  "info",
+  "warn",
+  "error",
+  "fatal",
+]
 
 function logEvent(level: OutputLogLevel, message: string): Event {
   return {
@@ -46,6 +54,29 @@ function logEvent(level: OutputLogLevel, message: string): Event {
 }
 
 describe("terminal sink writes diagnostics to stderr, never stdout", () => {
+  test.each(["console", "json"] as const)(
+    "%s fatal preserves the installed stderr line writer",
+    (format) => {
+      const lines: string[] = []
+      const previous = setStderrLineWriter((line) => lines.push(line))
+      try {
+        createTerminalConsoleSink(format)(logEvent("fatal", "critical event"))
+      } finally {
+        setStderrLineWriter(previous)
+      }
+      expect(lines).toHaveLength(1)
+      if (format === "json") {
+        expect(JSON.parse(lines[0]!)).toMatchObject({
+          level: "fatal",
+          msg: "critical event",
+        })
+      } else {
+        expect(lines[0]).toContain("FATAL")
+        expect(lines[0]).toContain("critical event")
+      }
+    },
+  )
+
   const sinkModule = fileURLToPath(
     new URL("../src/console-sinks.ts", import.meta.url),
   )

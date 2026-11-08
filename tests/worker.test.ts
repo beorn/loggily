@@ -868,34 +868,38 @@ describe("full logger end-to-end", () => {
     expect(consoleOutput.some((o) => o.message.includes("done"))).toBe(true)
   })
 
-  test("events survive round-trip", () => {
-    const posted: unknown[] = []
-    const mockPostMessage = (msg: unknown) => posted.push(msg)
+  test.each(["info", "fatal"] as const)(
+    "%s events survive round-trip",
+    (level) => {
+      const posted: unknown[] = []
+      const mockPostMessage = (msg: unknown) => posted.push(msg)
 
-    // Worker side
-    const log = createWorkerLogger(mockPostMessage, "test")
-    log.info?.("round-trip", { key: "value" })
+      // Worker side
+      const log = createWorkerLogger(mockPostMessage, "test")
+      log[level]!("round-trip", { key: "value" })
 
-    // Simulate structuredClone (what postMessage does)
-    const cloned = structuredClone(posted[0])
+      // Simulate structuredClone (what postMessage does)
+      const cloned = structuredClone(posted[0])
 
-    // Main thread side
-    const dispatched: Event[] = []
-    const target = {
-      dispatch(event: Event) {
-        dispatched.push(event)
-      },
-    }
-    const handler = handleWorkerEvents(target)
-    handler(cloned)
+      // Main thread side
+      const dispatched: Event[] = []
+      const target = {
+        dispatch(event: Event) {
+          dispatched.push(event)
+        },
+      }
+      const handler = handleWorkerEvents(target)
+      handler(cloned)
 
-    expect(dispatched).toHaveLength(1)
-    const event = dispatched[0] as LogEvent
-    expect(event.kind).toBe("log")
-    expect(event.namespace).toBe("test")
-    expect(event.message).toBe("round-trip")
-    expect(event.props).toEqual(expect.objectContaining({ key: "value" }))
-  })
+      expect(dispatched).toHaveLength(1)
+      const event = dispatched[0] as LogEvent
+      expect(event.kind).toBe("log")
+      expect(event.level).toBe(level)
+      expect(event.namespace).toBe("test")
+      expect(event.message).toBe("round-trip")
+      expect(event.props).toEqual(expect.objectContaining({ key: "value" }))
+    },
+  )
 })
 
 // ============ Edge Cases ============

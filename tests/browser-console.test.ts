@@ -93,6 +93,36 @@ describe("console sinks receive structured args (not pre-formatted strings)", ()
       vi.restoreAllMocks()
     })
 
+    test.each(["console", "json"] as const)(
+      "%s fatal routes to console.error with its severity intact",
+      (format) => {
+        const error = vi.spyOn(console, "error").mockImplementation(() => {})
+        createBrowserConsoleSink(format)({
+          kind: "log",
+          time: 0,
+          namespace: "critical",
+          level: "fatal",
+          message: "critical event",
+          userArgs: [],
+        })
+        expect(error).toHaveBeenCalledOnce()
+        const args = error.mock.calls[0]!
+        if (format === "json") {
+          expect(JSON.parse(String(args[0]))).toMatchObject({
+            level: "fatal",
+            msg: "critical event",
+          })
+        } else {
+          expect(args.join(" ")).toContain("FATAL")
+          expect(
+            args.some(
+              (arg) => typeof arg === "string" && arg.includes("color:"),
+            ),
+          ).toBe(true)
+        }
+      },
+    )
+
     test("uses %c CSS format specifiers for colored level + namespace", () => {
       const sink = createBrowserConsoleSink()
       sink({

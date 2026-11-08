@@ -103,6 +103,7 @@ export interface Logger extends Disposable {
   error(message: LazyMessage, data?: Record<string, unknown>): void
   error(error: Error, data?: Record<string, unknown>): void
   error(error: Error, message: string, data?: Record<string, unknown>): void
+  fatal(message: LazyMessage, data?: Record<string, unknown>): void
 
   span(namespace?: string, props?: LazyProps): SpanLogger
   child(namespace: string, props?: Record<string, unknown>): ConditionalLogger
@@ -155,6 +156,7 @@ export interface ConditionalLogger extends Disposable {
   debug?: (message: LazyMessage, data?: Record<string, unknown>) => void
   info?: (message: LazyMessage, data?: Record<string, unknown>) => void
   warn?: (message: LazyMessage, data?: Record<string, unknown>) => void
+  fatal?: (message: LazyMessage, data?: Record<string, unknown>) => void
   error?: {
     (message: LazyMessage, data?: Record<string, unknown>): void
     (error: Error, data?: Record<string, unknown>): void
@@ -429,6 +431,7 @@ function createLoggerImpl(
     debug: (msg, data) => emitLog("debug", msg, data),
     info: (msg, data) => emitLog("info", msg, data),
     warn: (msg, data) => emitLog("warn", msg, data),
+    fatal: (msg, data) => emitLog("fatal", msg, data),
     error: (
       msgOrError: LazyMessage | Error,
       dataOrMsg?: Record<string, unknown> | string,

@@ -5,7 +5,13 @@ import type { IdFormat } from "./tracing.js"
 
 // ============ Types ============
 
-export type OutputLogLevel = "trace" | "debug" | "info" | "warn" | "error"
+export type OutputLogLevel =
+  | "trace"
+  | "debug"
+  | "info"
+  | "warn"
+  | "error"
+  | "fatal"
 export type LogLevel = OutputLogLevel | "silent"
 export type LogFormat = "console" | "json"
 
@@ -53,7 +59,8 @@ export const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
   info: 2,
   warn: 3,
   error: 4,
-  silent: 5,
+  fatal: 5,
+  silent: 6,
 }
 
 /** Shift a base level along Loggily's canonical severity ladder. */
@@ -218,6 +225,9 @@ export function formatConsoleEvent(event: Event): string {
       break
     case "error":
       levelStr = pc.red("ERROR")
+      break
+    case "fatal":
+      levelStr = pc.red("FATAL")
       break
   }
 
@@ -792,6 +802,7 @@ export function readEnvLevel(): LogLevel {
     env === "info" ||
     env === "warn" ||
     env === "error" ||
+    env === "fatal" ||
     env === "silent"
       ? env
       : "info"
@@ -817,6 +828,7 @@ export function readEnvLevelForNamespace(namespace: string): LogLevel {
     env === "info" ||
     env === "warn" ||
     env === "error" ||
+    env === "fatal" ||
     env === "silent"
       ? env
       : "info"

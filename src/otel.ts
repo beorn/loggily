@@ -52,6 +52,7 @@ const SEVERITY_MAP: Record<string, { number: number; text: string }> = {
   info: { number: 9, text: "INFO" },
   warn: { number: 13, text: "WARN" },
   error: { number: 17, text: "ERROR" },
+  fatal: { number: 21, text: "FATAL" },
 }
 
 function msToHrTime(ms: number): [number, number] {

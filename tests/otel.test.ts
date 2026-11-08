@@ -1,8 +1,38 @@
-import { describe, test, expect } from "vitest"
+import { describe, test, expect, vi } from "vitest"
 import { toOtel } from "../src/otel.ts"
 import type { LogEvent, SpanEvent } from "loggily"
 
 describe("OTEL bridge", () => {
+  test("fatal maps to severity21 through the existing injected logs API", () => {
+    const emit = vi.fn()
+    const stage = toOtel({
+      api: {
+        logs: {
+          getLoggerProvider: () => ({
+            getLogger: () => ({ emit }),
+          }),
+        },
+      },
+    })
+    const event: LogEvent = {
+      kind: "log",
+      time: 0,
+      namespace: "critical",
+      level: "fatal",
+      message: "critical event",
+      props: { unit: "worker" },
+    }
+    expect(stage(event)).toBe(event)
+    expect(emit).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        severityNumber: 21,
+        severityText: "FATAL",
+        body: "critical event",
+        attributes: { "loggily.namespace": "critical", unit: "worker" },
+      }),
+    )
+  })
+
   test("toOtel returns a stage function", () => {
     const stage = toOtel()
     expect(typeof stage).toBe("function")

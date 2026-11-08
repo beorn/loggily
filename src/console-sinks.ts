@@ -72,6 +72,8 @@ function levelLabel(level: OutputLogLevel): string {
       return "WARN"
     case "error":
       return "ERROR"
+    case "fatal":
+      return "FATAL"
   }
 }
 
@@ -166,6 +168,8 @@ function levelAnsi(level: OutputLogLevel): string {
       return pc.yellow("WARN")
     case "error":
       return pc.red("ERROR")
+    case "fatal":
+      return pc.red("FATAL")
   }
 }
 
@@ -257,6 +261,7 @@ function cssLevel(level: OutputLogLevel): string {
     case "warn":
       return "color: #b80; font-weight: bold"
     case "error":
+    case "fatal":
       return "color: #c33; font-weight: bold"
   }
 }
@@ -286,6 +291,7 @@ function invokeForLevel(level: OutputLogLevel, ...args: unknown[]): void {
       console.warn(...args)
       return
     case "error":
+    case "fatal":
       console.error(...args)
       return
   }
@@ -368,6 +374,7 @@ function routeSingle(event: Event, text: string): void {
       console.warn(text)
       return
     case "error":
+    case "fatal":
       console.error(text)
       return
   }
