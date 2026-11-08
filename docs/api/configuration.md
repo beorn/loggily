@@ -93,7 +93,7 @@ DEBUG='myapp:db,myapp:cache' bun run app  # Only db and cache subtrees
 
 | Variable            | Values                                  | Default   |
 | ------------------- | --------------------------------------- | --------- |
-| `LOG_LEVEL`         | trace, debug, info, warn, error, silent | `info`    |
+| `LOG_LEVEL`         | trace, debug, info, warn, error, fatal, silent | `info`    |
 | `LOG_FORMAT`        | console, json                           | `console` |
 | `LOG_FILE`          | file path                               | (none)    |
 | `DEBUG`             | `*`, namespace prefixes, `-prefix`      | (none)    |
