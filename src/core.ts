@@ -1191,7 +1191,7 @@ export function getOutputMode(): OutputMode {
  *   - `ns: string | string[]` — DEBUG-style glob (e.g. `"bg-recall:*"`,
  *     `"myapp,-myapp:noisy"`). Substring excludes count.
  *   - `level: LogLevel` — record's level must be >= this. `"trace"` < `"debug"`
- *     < `"info"` < `"warn"` < `"error"` < `"silent"`.
+ *     < `"info"` < `"warn"` < `"error"` < `"fatal"` < `"silent"`.
  *
  * Returns an unsubscribe handle.
  *
