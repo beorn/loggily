@@ -6,18 +6,23 @@
 
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest"
 
-// Mock node:fs to control writeSync behavior
+// Mock node:fs to control writeSync behavior. stat and read stay real so a
+// missing fake path is an empty file, not a failed open.
 const { mockOpenSync, mockWriteSync, mockCloseSync } = vi.hoisted(() => ({
   mockOpenSync: vi.fn((_path?: string, _flags?: string) => 42), // fake fd
   mockWriteSync: vi.fn(),
   mockCloseSync: vi.fn(),
 }))
 
-vi.mock("node:fs", () => ({
-  openSync: (path: string, flags: string) => mockOpenSync(path, flags),
-  writeSync: (fd: number, data: string) => mockWriteSync(fd, data),
-  closeSync: (fd: number) => mockCloseSync(fd),
-}))
+vi.mock("node:fs", async () => {
+  const actual = await vi.importActual<typeof import("node:fs")>("node:fs")
+  return {
+    ...actual,
+    openSync: (path: string, flags: string) => mockOpenSync(path, flags),
+    writeSync: (fd: number, data: string) => mockWriteSync(fd, data),
+    closeSync: (fd: number) => mockCloseSync(fd),
+  }
+})
 
 // Import AFTER mock setup
 const { createFileWriter } = await import("../src/file-writer.ts")

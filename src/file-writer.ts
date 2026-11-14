@@ -5,7 +5,7 @@
  * Uses dynamic import("node:fs") to avoid static dependency on Node APIs.
  */
 
-import { openSync, writeSync, closeSync } from "node:fs"
+import { closeSync, openSync, readSync, statSync, writeSync } from "node:fs"
 
 /** Options for creating an async buffered file writer */
 export interface FileWriterOptions {
@@ -69,15 +69,21 @@ export function createFileWriter(
   // (CI runners). The borrowed fd is never closed — it belongs to the process.
   const stdFd = stdStreamFd(filePath)
 
+  // Decided once, here. The newline rides the first append so a torn tail and
+  // the next record are not two writes. Cleared only after that write lands.
+  let pendingNewline = ""
+  if (stdFd === null) pendingNewline = leadingNewline(filePath)
+
   // Open file in append mode (regular paths only)
   fd = stdFd ?? fs.openSync(filePath, "a")
 
   /** Flush buffer contents to disk synchronously */
   function flush(): void {
     if (buffer.length === 0 || fd === null) return
-    const data = buffer
+    const data = pendingNewline + buffer
     fs.writeSync(fd, data)
     buffer = ""
+    pendingNewline = ""
   }
 
   // Set up periodic flush
@@ -132,6 +138,72 @@ export function createFileWriter(
  * paths. Covers the portable spellings: /dev/stdout, /dev/stderr, /dev/fd/N
  * (macOS + Linux), /proc/self/fd/N (Linux).
  */
+function errnoCode(error: unknown): string | undefined {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    return String(error.code)
+  }
+  return undefined
+}
+
+/** "" when the first append needs no boundary. Throws with the path on a failed stat or read, and on a non-file. */
+function leadingNewline(filePath: string): string {
+  const size = fileSize(filePath)
+  if (size === null || size === 0) return ""
+  let probe: number
+  try {
+    probe = openSync(filePath, "r")
+  } catch (error) {
+    const code = errnoCode(error)
+    throw new Error(
+      `createFileWriter: read failed for ${filePath}${code ? ` (${code})` : ""}`,
+    )
+  }
+  try {
+    const buf = Buffer.alloc(1)
+    const n = readSync(probe, buf, 0, 1, size - 1)
+    if (n !== 1) {
+      throw new Error(`createFileWriter: read failed for ${filePath}`)
+    }
+    if (buf[0] === 0x0a) return ""
+    return "\n"
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith("createFileWriter:")
+    ) {
+      throw error
+    }
+    const code = errnoCode(error)
+    throw new Error(
+      `createFileWriter: read failed for ${filePath}${code ? ` (${code})` : ""}`,
+    )
+  } finally {
+    closeSync(probe)
+  }
+}
+
+function fileSize(filePath: string): number | null {
+  try {
+    const st = statSync(filePath)
+    if (!st.isFile()) {
+      throw new Error(`createFileWriter: ${filePath} is not a regular file`)
+    }
+    return st.size
+  } catch (error) {
+    if (errnoCode(error) === "ENOENT") return null
+    if (
+      error instanceof Error &&
+      error.message.startsWith("createFileWriter:")
+    ) {
+      throw error
+    }
+    const code = errnoCode(error)
+    throw new Error(
+      `createFileWriter: stat failed for ${filePath}${code ? ` (${code})` : ""}`,
+    )
+  }
+}
+
 function stdStreamFd(filePath: string): number | null {
   if (filePath === "/dev/stdout") return 1
   if (filePath === "/dev/stderr") return 2

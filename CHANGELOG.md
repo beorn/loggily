@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.13.1
+
+- A regular-file writer whose last byte is not LF sends one leading newline
+  with the first record, in the same append. The torn tail stays. An empty
+  file, a file that already ends in LF, and a std-stream descriptor are
+  unchanged. A failed stat or read, or a path that is not a regular file,
+  fails the open and names the path.
 
 - `DEBUG` namespace patterns filter debug and trace output without hiding info,
   warn, or error records from other namespaces when allowed by `LOG_LEVEL`.
