@@ -85,6 +85,12 @@ describe("file writer torn tail", () => {
     expect(writes).toEqual([`${record("A")}\n`])
   })
 
+  test("/dev/null opens, writes, and closes", () => {
+    const writer = createFileWriter("/dev/null", { bufferSize: 1, flushInterval: 60_000 })
+    writer.write(record("A"))
+    writer.close()
+  })
+
   test("a directory fails the open and names the path", () => {
     dir = mkdtempSync(join(tmpdir(), "loggily-dir-"))
     expect(() => createFileWriter(dir, { flushInterval: 60_000 })).toThrow(dir)

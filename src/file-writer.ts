@@ -145,7 +145,7 @@ function errnoCode(error: unknown): string | undefined {
   return undefined
 }
 
-/** "" when the first append needs no boundary. Throws with the path on a failed stat or read, and on a non-file. */
+/** "" when the first append needs no boundary. A non-file is left to the append open. A failed stat or read of a regular file throws with the path. */
 function leadingNewline(filePath: string): string {
   const size = fileSize(filePath)
   if (size === null || size === 0) return ""
@@ -185,9 +185,7 @@ function leadingNewline(filePath: string): string {
 function fileSize(filePath: string): number | null {
   try {
     const st = statSync(filePath)
-    if (!st.isFile()) {
-      throw new Error(`createFileWriter: ${filePath} is not a regular file`)
-    }
+    if (!st.isFile()) return null
     return st.size
   } catch (error) {
     if (errnoCode(error) === "ENOENT") return null
