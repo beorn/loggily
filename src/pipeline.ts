@@ -1,6 +1,6 @@
 import { colors as pc } from "./colors.js"
 import { createFileWriter } from "./file-writer.js"
-import { setIdFormat, setSampleRate } from "./tracing.js"
+import { setIdFormat, validateSampleRate } from "./tracing.js"
 import type { IdFormat } from "./tracing.js"
 
 // ============ Types ============
@@ -402,7 +402,29 @@ export interface Pipeline {
   dispose: () => void
 }
 
+// Private to the package: public dispatch transports supplied events, while
+// span creation captures a selection for this pipeline and its descendants.
+export const CAPTURE_SPAN = Symbol("loggily.captureSpan")
+
+export interface CapturedSpan {
+  sampled: boolean
+  dispatch: (event: Event, forward?: (event: Event) => void) => void
+}
+
+export interface SpanSamplingCarrier {
+  [CAPTURE_SPAN]?: (sample: (rate?: number) => boolean) => CapturedSpan
+}
+
+type SamplingPipeline = Pipeline & Required<SpanSamplingCarrier>
+
+interface SpanSelection {
+  sampled: boolean
+  outputs: boolean[]
+  branches: CapturedSpan[]
+}
+
 interface Output {
+  sampleRate: number | undefined
   levelPriority: number
   /** Only ambient DEBUG may promote an inherited level per namespace. */
   levelFromEnv: boolean
@@ -522,6 +544,7 @@ interface ScopeConfig {
   ns: NsFilter | null
   nsFromEnv: boolean
   format: LogFormat
+  sampleRate?: number
 }
 
 export function buildPipeline(
@@ -540,6 +563,7 @@ export function buildPipeline(
     ns: parentConfig?.ns ?? envNs,
     nsFromEnv: parentConfig?.nsFromEnv ?? !parentConfig?.ns,
     format: parentConfig?.format ?? readEnvFormat(),
+    sampleRate: parentConfig?.sampleRate,
   }
   // Spans always pass through explicit pipelines. { spans: false } to opt out.
   // The defaultPipeline handles TRACE env var gating separately.
@@ -547,13 +571,15 @@ export function buildPipeline(
 
   const stages: Stage[] = []
   const outputs: Output[] = []
-  const branches: Pipeline[] = []
+  const branches: SamplingPipeline[] = []
   const disposables: (() => void)[] = []
 
   for (const element of elements) {
     // 1. Array → branch
     if (Array.isArray(element)) {
-      const branch = buildPipeline(element as ConfigElement[], { ...config })
+      const branch = buildPipeline(element as ConfigElement[], {
+        ...config,
+      }) as SamplingPipeline
       branches.push(branch)
       disposables.push(() => branch.dispose())
       continue
@@ -562,6 +588,7 @@ export function buildPipeline(
     // 2. console (literal or "console" string) → console sink (check before function — console is function-like)
     if (element === console || element === "console") {
       outputs.push({
+        sampleRate: config.sampleRate,
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
         levelFromEnv: config.levelFromEnv,
         nsFilter: config.ns,
@@ -581,6 +608,7 @@ export function buildPipeline(
     //     so a stderr line writer covers it too (km 25947)
     if (typeof process !== "undefined" && element === process.stderr) {
       outputs.push({
+        sampleRate: config.sampleRate,
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
         levelFromEnv: config.levelFromEnv,
         nsFilter: config.ns,
@@ -593,6 +621,7 @@ export function buildPipeline(
     // 4. Writable ({ write }) → writable sink (checked BEFORE POJO so { write: fn } works)
     if (isWritable(element)) {
       outputs.push({
+        sampleRate: config.sampleRate,
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
         levelFromEnv: config.levelFromEnv,
         nsFilter: config.ns,
@@ -633,6 +662,7 @@ export function buildPipeline(
           const sink = createFileSink(obj.file, outputFormat)
           disposables.push(sink.dispose)
           outputs.push({
+            sampleRate: config.sampleRate,
             levelPriority: LOG_LEVEL_PRIORITY[outputLevel],
             levelFromEnv: !isValidLogLevel(obj.level) && config.levelFromEnv,
             nsFilter: outputNs,
@@ -666,13 +696,17 @@ export function buildPipeline(
       if (obj.idFormat === "simple" || obj.idFormat === "w3c") {
         setIdFormat(obj.idFormat)
       }
-      if (typeof obj.sampleRate === "number") setSampleRate(obj.sampleRate)
+      if (typeof obj.sampleRate === "number") {
+        validateSampleRate(obj.sampleRate)
+        config.sampleRate = obj.sampleRate
+      }
       continue
     }
 
     // 6. String "stderr" → stderr sink
     if (element === "stderr" && typeof process !== "undefined") {
       outputs.push({
+        sampleRate: config.sampleRate,
         levelPriority: LOG_LEVEL_PRIORITY[config.level],
         levelFromEnv: config.levelFromEnv,
         nsFilter: config.ns,
@@ -695,7 +729,8 @@ export function buildPipeline(
   // once via reportGuard (direct stderr — never through the pipeline).
   const stageReported: boolean[] = []
   const branchReported: boolean[] = []
-  const dispatch = (event: Event): void => {
+  const dispatchSelected = (event: Event, selection?: SpanSelection): void => {
+    if (selection && !selection.sampled) return
     // Span gate: { spans: false } disables span output for this pipeline
     if (event.kind === "span" && !spansEnabled) return
 
@@ -717,7 +752,8 @@ export function buildPipeline(
       if (result === null) return
       if (result !== undefined) e = result
     }
-    for (const output of outputs) {
+    for (const [i, output] of outputs.entries()) {
+      if (selection && !selection.outputs[i]) continue
       if (output.disabled) continue
       if (
         e.kind === "log" &&
@@ -755,9 +791,9 @@ export function buildPipeline(
         }
       }
     }
-    for (let i = 0; i < branches.length; i++) {
+    for (const [i, branch] of (selection?.branches ?? branches).entries()) {
       try {
-        branches[i]!.dispatch(e)
+        branch.dispatch(e)
       } catch (err) {
         // Branch pipelines guard themselves; this catch is the backstop for
         // anything that escapes (e.g. a foreign Pipeline implementation).
@@ -766,6 +802,64 @@ export function buildPipeline(
           reportGuard(`branch #${i} dispatch threw (reported once)`, err)
         }
       }
+    }
+  }
+
+  // A logger decorator may clone the event before forwarding it. Match the
+  // existing span identity only during that synchronous call; no Event token
+  // or process-wide registry is needed. Clear it before entering stages so
+  // reentrant ordinary dispatch remains ordinary dispatch.
+  let pendingSpan: { event: SpanEvent; selection: SpanSelection } | undefined
+  const dispatch = (event: Event): void => {
+    const pending = pendingSpan
+    const selection =
+      event.kind === "span" &&
+      pending &&
+      event.spanId === pending.event.spanId &&
+      event.traceId === pending.event.traceId
+        ? pending.selection
+        : undefined
+    pendingSpan = undefined
+    try {
+      dispatchSelected(event, selection)
+    } finally {
+      pendingSpan = pending
+    }
+  }
+
+  const captureSpan = (sample: (rate?: number) => boolean): CapturedSpan => {
+    const outputSelection = outputs.map((output) => sample(output.sampleRate))
+    const branchSelection = branches.map((branch) =>
+      branch[CAPTURE_SPAN](sample),
+    )
+    const sampled =
+      spansEnabled &&
+      (outputSelection.some(Boolean) ||
+        branchSelection.some((branch) => branch.sampled) ||
+        (outputs.length === 0 &&
+          branches.length === 0 &&
+          stages.length > 0 &&
+          sample(config.sampleRate)))
+    const selection: SpanSelection = {
+      sampled,
+      outputs: outputSelection,
+      branches: branchSelection,
+    }
+    return {
+      sampled,
+      dispatch(event, forward) {
+        if (!forward) {
+          dispatchSelected(event, selection)
+          return
+        }
+        const previous = pendingSpan
+        if (event.kind === "span") pendingSpan = { event, selection }
+        try {
+          forward(event)
+        } finally {
+          pendingSpan = previous
+        }
+      },
     }
   }
 
@@ -782,7 +876,8 @@ export function buildPipeline(
     return stages.length > 0
   }
 
-  return {
+  const pipeline: SamplingPipeline = {
+    [CAPTURE_SPAN]: captureSpan,
     dispatch,
     spanEnabled: spanEnabledForNamespace,
     level: config.level,
@@ -790,6 +885,7 @@ export function buildPipeline(
       for (const d of disposables) d()
     },
   }
+  return pipeline
 }
 
 // ============ Env Var Readers (exported for withEnvDefaults plugin) ============

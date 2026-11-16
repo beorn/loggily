@@ -16,6 +16,13 @@ import {
   traceparent,
   setSampleRate,
   getSampleRate,
+  baseCreateLogger,
+  buildPipeline,
+  pipe,
+  withSpans,
+  withRedaction,
+  setDefaultOutput,
+  type LoggerPlugin,
   type Event,
 } from "../src/index.ts"
 import {
@@ -715,7 +722,10 @@ describe("config object idFormat", () => {
 })
 
 describe("config object sampleRate", () => {
-  test.each([[0, 1], [1, 0]])(
+  test.each([
+    [0, 1],
+    [1, 0],
+  ])(
     "keeps independent logger sampling isolated (%s then %s)",
     (firstRate, secondRate) => {
       const emitted: string[] = []
@@ -746,12 +756,261 @@ describe("config object sampleRate", () => {
         expect(span.spanData.id).toBeTruthy()
         span.end()
       }
-      expect.soft(emitted.sort()).toEqual([
-        "existing:work",
-        "local-1:work",
-        "subsequent:work",
-      ])
+      expect
+        .soft(emitted.sort())
+        .toEqual(["existing:work", "local-1:work", "subsequent:work"])
       expect.soft(getSampleRate()).toBe(1)
+    },
+  )
+
+  // A2/A5: a single global decision cannot represent differently sampled
+  // destinations, or preserve an earlier output's scope after a later config.
+  test.each([
+    [0, 1, ["nested"]],
+    [1, 0, ["root", "inherited"]],
+    [0.25, 0.75, ["nested"]],
+  ] as const)(
+    "captures scoped destinations and descendants (%s then %s)",
+    (rootRate, nestedRate, kept) => {
+      const emitted: string[] = []
+      const sink = (destination: string) => ({
+        write(event: Event) {
+          if (event.kind === "span") {
+            emitted.push(`${destination}:${event.name}`)
+          }
+        },
+      })
+      const random = vi.spyOn(Math, "random").mockReturnValue(0.5)
+      const log = createLogger("scoped", [
+        { sampleRate: rootRate },
+        sink("root"),
+        [sink("inherited"), { sampleRate: nestedRate }, sink("nested")],
+        { sampleRate: 0 },
+        sink("later"),
+      ])
+      const root = log.span!("root")
+      const expectedDraws = rootRate === 0.25 ? 1 : 0
+      expect(random).toHaveBeenCalledTimes(expectedDraws)
+      setSampleRate(0)
+      createLogger("unrelated", [{ sampleRate: 1 }, console])
+      const child = root.child("branch").span!("child")
+      const grandchild = child.span!("grandchild")
+      grandchild.end()
+      child.end()
+      root.end()
+      expect(emitted.sort()).toEqual(
+        kept
+          .flatMap((destination) => [
+            `${destination}:scoped:root`,
+            `${destination}:scoped:root:branch:child`,
+            `${destination}:scoped:root:branch:child:grandchild`,
+          ])
+          .sort(),
+      )
+      expect(random).toHaveBeenCalledTimes(expectedDraws)
+      expect(getSampleRate()).toBe(0)
+    },
+  )
+
+  // A3/A4: the existing env tests only construct one logger at a time.
+  test.each([
+    [0, 1],
+    [1, 0],
+  ])(
+    "snapshots env %s while explicit %s and live defaults stay independent",
+    (envRate, explicitRate) => {
+      const emitted: string[] = []
+      const sink = {
+        write: (event: Event) => {
+          if (event.kind === "span") emitted.push(event.name)
+        },
+      }
+      process.env.TRACE_SAMPLE_RATE = String(envRate)
+      const fromEnv = createLogger("env", [sink])
+      const explicit = createLogger("explicit", [
+        { sampleRate: explicitRate },
+        sink,
+      ])
+      const withoutEnvPlugin = pipe(baseCreateLogger, withSpans())(
+        "without-env",
+        [sink],
+      )
+      delete process.env.TRACE_SAMPLE_RATE
+      const inherited = createLogger("inherited", [sink])
+      expect(getSampleRate()).toBe(1)
+
+      for (const globalRate of [0, 1]) {
+        setSampleRate(globalRate)
+        for (const logger of [fromEnv, explicit, withoutEnvPlugin, inherited]) {
+          logger.span!(`global-${globalRate}`).end()
+        }
+      }
+      expect(emitted.sort()).toEqual(
+        [
+          `${envRate === 1 ? "env" : "explicit"}:global-0`,
+          `${envRate === 1 ? "env" : "explicit"}:global-1`,
+          "inherited:global-1",
+          "without-env:global-1",
+        ].sort(),
+      )
+    },
+  )
+
+  test("preserves NaN validation without changing the compatibility default", () => {
+    const emitted: Event[] = []
+    const log = createLogger("nan", [
+      { sampleRate: Number.NaN },
+      { write: (event: Event) => emitted.push(event) },
+    ])
+    log.span!("work").end()
+    expect(emitted).toEqual([])
+    expect(getSampleRate()).toBe(1)
+    setSampleRate(Number.NaN)
+    expect(Number.isNaN(getSampleRate())).toBe(true)
+    createLogger("default-nan", [
+      { write: (event: Event) => emitted.push(event) },
+    ]).span!("work").end()
+    expect(emitted).toEqual([])
+  })
+
+  // A5: public dispatch transports supplied data; only span creation samples.
+  test.each([0, 0.5])(
+    "keeps ordinary dispatch unsampled at rate %s",
+    (sampleRate) => {
+      const emitted: string[] = []
+      const sink = {
+        write: (event: Event) => {
+          if (event.kind === "span") emitted.push(event.name)
+        },
+      }
+      const event: Event = {
+        kind: "span",
+        time: 0,
+        namespace: "supplied",
+        name: "supplied",
+        duration: 1,
+        spanId: "supplied",
+        traceId: "supplied",
+        parentId: null,
+      }
+      const random = vi.spyOn(Math, "random")
+      buildPipeline([{ sampleRate }, sink]).dispatch(event)
+      createLogger("supplied", [{ sampleRate }, sink]).dispatch(event)
+      expect(emitted).toEqual(["supplied", "supplied"])
+      expect(random).not.toHaveBeenCalled()
+    },
+  )
+
+  test("preserves dispatch decorators, redaction and replacement stages during scoped sampling", () => {
+    const emitted: { destination: string; event: Event }[] = []
+    const decorated: string[] = []
+    const decorate: LoggerPlugin = (factory) => (name, config) => {
+      const logger = factory(name, config)
+      return new Proxy(logger, {
+        get(target, prop, receiver) {
+          if (prop === "dispatch") {
+            return (event: Event) => {
+              decorated.push(event.namespace)
+              target.dispatch({
+                ...event,
+                props: { ...event.props, decorated: true },
+              })
+            }
+          }
+          return Reflect.get(target, prop, receiver)
+        },
+      })
+    }
+    const sink = (destination: string) => ({
+      write: (event: Event) => emitted.push({ destination, event }),
+    })
+    const log = pipe(
+      baseCreateLogger,
+      withRedaction(),
+      decorate,
+      withSpans(),
+    )("wrapped", [
+      { sampleRate: 0 },
+      (event: Event) => {
+        if (event.kind !== "span" || event.name !== "wrapped:root") return event
+        // A nested public dispatch is its own supplied event, even while
+        // another trace's transform is running through this same pipeline.
+        log.dispatch({
+          kind: "span",
+          time: 0,
+          namespace: "raw",
+          name: "raw",
+          duration: 1,
+          spanId: "raw",
+          traceId: "raw",
+          parentId: null,
+        })
+        // Fresh event, deliberately not a spread of the original object.
+        return {
+          kind: "span",
+          time: event.time,
+          namespace: event.namespace,
+          name: event.name,
+          duration: event.duration,
+          props: event.props,
+          spanId: event.spanId,
+          traceId: event.traceId,
+          parentId: event.parentId,
+        }
+      },
+      sink("root"),
+      [{ sampleRate: 1 }, sink("nested")],
+    ])
+    log.span!("root", { password: "private-value" }).end()
+    expect(decorated).toEqual(["wrapped:root", "raw"])
+    expect(
+      emitted.map(
+        ({ destination, event }) => `${destination}:${event.namespace}`,
+      ),
+    ).toEqual(["root:raw", "nested:raw", "nested:wrapped:root"])
+    expect(emitted[2]!.event.props).toEqual({
+      password: "[REDACTED]",
+      decorated: true,
+    })
+  })
+
+  test.each([
+    [false, 0],
+    [false, 1],
+    [true, 0],
+    [true, 1],
+  ] as const)(
+    "routes to the current host without adopting its sampling (initial host %s, origin %s)",
+    (initialHost, originRate) => {
+      const a: string[] = []
+      const b: string[] = []
+      const hostA = createLogger("host-a", [
+        { sampleRate: 1 },
+        {
+          write: (event: Event) => {
+            if (event.kind === "span") a.push(event.name)
+          },
+        },
+      ])
+      const hostB = createLogger("host-b", [
+        { sampleRate: 0 },
+        {
+          write: (event: Event) => {
+            if (event.kind === "span") b.push(event.name)
+          },
+        },
+      ])
+      using initial = initialHost ? setDefaultOutput(hostA) : undefined
+      process.env.TRACE_SAMPLE_RATE = String(originRate)
+      const random = vi.spyOn(Math, "random")
+      const root = createLogger("library").span!("work")
+      using replacement = setDefaultOutput(hostB)
+      root.end()
+      hostB.span!("own").end()
+      expect(a).toEqual([])
+      expect(b).toEqual(originRate === 1 ? ["library:work"] : [])
+      expect(random).not.toHaveBeenCalled()
+      expect(getSampleRate()).toBe(1)
     },
   )
 

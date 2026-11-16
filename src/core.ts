@@ -21,6 +21,8 @@ import {
   type LogEvent,
   type SpanEvent,
   type Pipeline,
+  type CapturedSpan,
+  type SpanSamplingCarrier,
   type Stage,
   type LogLevel,
   type OutputLogLevel,
@@ -29,6 +31,7 @@ import {
   type ConfigElement,
   type ConfigObject,
   LOG_LEVEL_PRIORITY,
+  CAPTURE_SPAN,
   buildPipeline,
   safeStringify,
   serializeCause,
@@ -191,7 +194,7 @@ import {
   resetIdCounters,
   shouldSample,
   setIdFormat,
-  setSampleRate,
+  getSampleRate,
 } from "./tracing.js"
 import type { IdFormat } from "./tracing.js"
 
@@ -407,7 +410,7 @@ function createLoggerImpl(
     pipeline.dispatch(event)
   }
 
-  const logger: Logger & SpanEnabledCarrier = {
+  const logger: Logger & SpanEnabledCarrier & SpanSamplingCarrier = {
     name,
     props: Object.freeze({ ...props }),
 
@@ -418,6 +421,8 @@ function createLoggerImpl(
     [SPAN_ENABLED](namespace: string): boolean {
       return pipeline.spanEnabled(namespace)
     },
+
+    [CAPTURE_SPAN]: (pipeline as Pipeline & SpanSamplingCarrier)[CAPTURE_SPAN],
 
     dispatch(event: Event): void {
       pipeline.dispatch(event)
@@ -528,7 +533,7 @@ export function withSpans(): LoggerPlugin {
   return (factory, _ctx) => {
     return (name, configOrProps?) => {
       const logger = factory(name, configOrProps)
-      return augmentWithSpans(logger, null, null, true)
+      return augmentWithSpans(logger, null, null, null)
     }
   }
 }
@@ -536,16 +541,16 @@ export function withSpans(): LoggerPlugin {
 interface SpanState {
   parentSpanId: string | null
   traceId: string | null
-  traceSampled: boolean
+  sampling: CapturedSpan | null
 }
 
 function augmentWithSpans(
   logger: ConditionalLogger,
   parentSpanId: string | null,
   traceId: string | null,
-  traceSampled: boolean,
+  sampling: CapturedSpan | null,
 ): ConditionalLogger {
-  const spanState: SpanState = { parentSpanId, traceId, traceSampled }
+  const spanState: SpanState = { parentSpanId, traceId, sampling }
   const spanMethod = spanIsEnabled(logger, logger.name)
     ? createSpanMethod(logger, spanState)
     : undefined
@@ -569,7 +574,7 @@ function augmentWithSpans(
             childLogger,
             spanState.parentSpanId,
             spanState.traceId,
-            spanState.traceSampled,
+            spanState.sampling,
           )
         }
       }
@@ -602,7 +607,27 @@ function createSpanMethod(
 
     const isNewTrace = !resolvedTraceId
     const finalTraceId = resolvedTraceId || generateTraceId()
-    const sampled = isNewTrace ? shouldSample() : spanState.traceSampled
+    let sampling = spanState.sampling
+    if (!sampling) {
+      const capture = (logger as ConditionalLogger & SpanSamplingCarrier)[
+        CAPTURE_SPAN
+      ]
+      if (capture) {
+        // oxlint-disable-next-line typescript/no-deprecated -- capture the explicit compatibility default once per root
+        const defaultRate = getSampleRate()
+        let draw: number | undefined
+        sampling = capture((rate) =>
+          shouldSample(rate ?? defaultRate, () => (draw ??= Math.random())),
+        )
+      } else {
+        // Foreign factories keep withSpans' existing global/public-dispatch path.
+        sampling = {
+          sampled: isNewTrace ? shouldSample() : true,
+          dispatch: (event, forward = (value) => logger.dispatch(value)) =>
+            forward(event),
+        }
+      }
+    }
 
     const newSpanData: MutableSpanData = {
       id: newSpanId,
@@ -622,7 +647,7 @@ function createSpanMethod(
       childLogger,
       newSpanId,
       finalTraceId,
-      sampled,
+      sampling,
     )
 
     _enterContext?.(newSpanId, finalTraceId, resolvedParentId)
@@ -650,7 +675,7 @@ function createSpanMethod(
       }
 
       _exitContext?.(newSpanId)
-      if (sampled) {
+      if (sampling.sampled) {
         // Emit laps as a flat { name: deltaMs } object — compact for both
         // console and JSON output. spanData.laps stays available for
         // programmatic consumers that want elapsedMs / per-lap details.
@@ -675,7 +700,7 @@ function createSpanMethod(
           traceId: newSpanData.traceId,
           parentId: newSpanData.parentId,
         }
-        logger.dispatch(spanEvent)
+        sampling.dispatch(spanEvent, (event) => logger.dispatch(event))
       }
     }
 
@@ -867,16 +892,23 @@ export function withEnvDefaults(): LoggerPlugin {
       setIdFormat(envIdFormat as IdFormat)
     }
     const envSampleRate = _env.TRACE_SAMPLE_RATE
+    const samplingDefaults: ConfigElement[] = []
     if (envSampleRate !== undefined) {
       const rate = Number.parseFloat(envSampleRate)
       if (!Number.isNaN(rate) && rate >= 0 && rate <= 1) {
-        // oxlint-disable-next-line typescript/no-deprecated -- the env var's own reader applies it
-        setSampleRate(rate)
+        samplingDefaults.push({ sampleRate: rate })
       }
     }
 
     // Explicit config array — pass through, buildPipeline reads env defaults
-    if (Array.isArray(configOrProps)) return factory(name, configOrProps)
+    if (Array.isArray(configOrProps)) {
+      return factory(
+        name,
+        samplingDefaults.length > 0
+          ? [...samplingDefaults, ...configOrProps]
+          : configOrProps,
+      )
+    }
 
     // No config array — use env-dynamic pipeline.
     // Pass a config array through the factory so all upstream plugins get applied,
@@ -892,14 +924,22 @@ export function withEnvDefaults(): LoggerPlugin {
       // Object props — create logger with props + env pipeline
       // We need to pass props AND a config array. But factory only accepts one or the other.
       // Solution: create via factory with config array, then the child() with props.
-      const logger = factory(name, [{ level: "trace" as LogLevel }, envStage])
+      const logger = factory(name, [
+        ...samplingDefaults,
+        { level: "trace" as LogLevel },
+        envStage,
+      ])
       return applyNamespaceGating(
         logger.child(configOrProps as Record<string, unknown>),
       )
     }
 
     return applyNamespaceGating(
-      factory(name, [{ level: "trace" as LogLevel }, envStage]),
+      factory(name, [
+        ...samplingDefaults,
+        { level: "trace" as LogLevel },
+        envStage,
+      ]),
     )
   }
 }

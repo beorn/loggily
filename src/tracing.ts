@@ -139,10 +139,15 @@ let sampleRate = 1.0
  * @param rate - Sampling rate from 0.0 (sample nothing) to 1.0 (sample everything, default)
  */
 export function setSampleRate(rate: number): void {
+  validateSampleRate(rate)
+  sampleRate = rate
+}
+
+/** @internal Shared validation; local configuration must not mutate defaults. */
+export function validateSampleRate(rate: number): void {
   if (rate < 0 || rate > 1) {
     throw new Error(`Sample rate must be between 0.0 and 1.0, got ${rate}`)
   }
-  sampleRate = rate
 }
 
 /**
@@ -158,8 +163,8 @@ export function getSampleRate(): number {
  * Determine whether a new trace should be sampled.
  * Called at trace creation time (head-based sampling).
  */
-export function shouldSample(): boolean {
-  if (sampleRate >= 1.0) return true
-  if (sampleRate <= 0.0) return false
-  return Math.random() < sampleRate
+export function shouldSample(rate = sampleRate, draw = Math.random): boolean {
+  if (rate >= 1.0) return true
+  if (rate <= 0.0) return false
+  return draw() < rate
 }
