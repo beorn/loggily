@@ -16,6 +16,7 @@ import {
   traceparent,
   setSampleRate,
   getSampleRate,
+  type Event,
 } from "../src/index.ts"
 import {
   enableContextPropagation,
@@ -714,6 +715,46 @@ describe("config object idFormat", () => {
 })
 
 describe("config object sampleRate", () => {
+  test.each([[0, 1], [1, 0]])(
+    "keeps independent logger sampling isolated (%s then %s)",
+    (firstRate, secondRate) => {
+      const emitted: string[] = []
+      const existing = createLogger("existing", [
+        (event: Event) => {
+          if (event.kind === "span") emitted.push(event.name)
+          return null
+        },
+      ])
+      const local = [firstRate, secondRate].map((sampleRate) =>
+        createLogger(`local-${sampleRate}`, [
+          { sampleRate },
+          (event: Event) => {
+            if (event.kind === "span") emitted.push(event.name)
+            return null
+          },
+        ]),
+      )
+      const subsequent = createLogger("subsequent", [
+        (event: Event) => {
+          if (event.kind === "span") emitted.push(event.name)
+          return null
+        },
+      ])
+
+      for (const logger of [existing, ...local, subsequent]) {
+        const span = logger.span!("work")
+        expect(span.spanData.id).toBeTruthy()
+        span.end()
+      }
+      expect.soft(emitted.sort()).toEqual([
+        "existing:work",
+        "local-1:work",
+        "subsequent:work",
+      ])
+      expect.soft(getSampleRate()).toBe(1)
+    },
+  )
+
   test("{ sampleRate: 0.0 } in config array suppresses all spans", () => {
     const log = createLogger("test", [
       { level: "trace", sampleRate: 0.0 },
