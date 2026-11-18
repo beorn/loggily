@@ -251,6 +251,33 @@ describe("redaction keeps its boundary", () => {
     expect(String(seen[0]!.props?.["code.file.path"])).toContain("[REDACTED]")
   })
 
+  test("a non-Error cause keeps key redaction: a secret key inside it is replaced, its other keys kept", () => {
+    const { log, seen } = capture()
+    log.warn!(
+      new Error("outer", {
+        cause: { password: "ordinary-private-value", host: "db1" },
+      }),
+    )
+    const stacktrace = String(seen[0]!.props?.["exception.stacktrace"])
+    expect(stacktrace).toContain(
+      'Caused by: {"password":"[REDACTED]","host":"db1"}',
+    )
+    expect(JSON.stringify(seen)).not.toContain("ordinary-private-value")
+  })
+
+  test("an Error promoted from the data keeps key redaction in its non-Error cause", () => {
+    const { log, seen } = capture()
+    log.warn!("sync failed", {
+      failure: new Error("outer", {
+        cause: { nested: { apiToken: "plain-private-token" } },
+      }),
+    })
+    expect(String(seen[0]!.props?.["exception.stacktrace"])).toContain(
+      '"apiToken":"[REDACTED]"',
+    )
+    expect(JSON.stringify(seen)).not.toContain("plain-private-token")
+  })
+
   test("the console route still gets the redacted Error itself", () => {
     const { log, seen } = capture()
     log.warn!("failed", { error: new Error("Bearer console-secret") })
@@ -319,6 +346,19 @@ describe("a worker console Error", () => {
       ),
     )
     expect(line).not.toHaveProperty("exception.type")
+  })
+
+  test("a non-Error cause's secret key is redacted before the attributes leave the worker", () => {
+    const messages = fromWorker(() =>
+      console.error(
+        new Error("outer", { cause: { secret: "worker-private-value" } }),
+      ),
+    )
+    expect(JSON.stringify(messages)).not.toContain("worker-private-value")
+    const [line] = mainThreadLines(messages)
+    expect(String(line!["exception.stacktrace"])).toContain(
+      'Caused by: {"secret":"[REDACTED]"}',
+    )
   })
 
   test("causes go through the same builder and token patterns are redacted on the main side", () => {

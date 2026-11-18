@@ -11,6 +11,9 @@ import { isSecretKey } from "./redaction.js"
 /** The attributes `exceptionAttributes` writes: strings, and the frame's line number. */
 export type ExceptionAttributes = Record<string, string | number>
 
+/** What a secret-keyed value inside a cause becomes: the redaction stage's default replacement. */
+const SECRET_REPLACEMENT = "[REDACTED]"
+
 /** How many causes the text follows, as the earlier nested serializer did; it also ends a cause cycle. */
 const CAUSE_DEPTH = 3
 
@@ -86,12 +89,17 @@ function causeText(cause: unknown, depth: number): string {
   return `\nCaused by: ${valueText(cause)}`
 }
 
-/** A non-Error cause keeps its details: strings as they are, anything else as JSON, String() only as a last resort. */
+/**
+ * A non-Error cause keeps its details: strings as they are, anything else as JSON, String() only as a last resort.
+ * A value under a key the redaction policy treats as secret is replaced here, because this text is built before the
+ * redaction stage runs and that stage only sees it as a string (pattern redaction, no key redaction).
+ */
 function valueText(value: unknown): string {
   if (typeof value === "string") return value
   const seen = new WeakSet<object>()
   try {
-    const json = JSON.stringify(value, (_key, val: unknown) => {
+    const json = JSON.stringify(value, (key, val: unknown) => {
+      if (key !== "" && isSecretKey(key)) return SECRET_REPLACEMENT
       if (typeof val === "bigint" || typeof val === "symbol") {
         return val.toString()
       }
