@@ -154,7 +154,9 @@ export function forwardConsole(
         // code, stack and causes survive whatever the clone keeps of a custom Error.
         let exception: ExceptionAttributes | undefined
         const safe = args.map((a) => {
-          if (typeof a === "function") return `[Function: ${a.name || "anonymous"}]`
+          if (typeof a === "function") {
+            return `[Function: ${a.name || "anonymous"}]`
+          }
           if (typeof a === "symbol") return a.toString()
           if (!(a instanceof Error)) return a
           if (exception !== undefined) return formatErrorText(a)
@@ -309,7 +311,10 @@ export function createWorkerLogHandler(): (message: unknown) => void {
       logger.dispatch(message)
     } else if (isWorkerConsoleMessage(message)) {
       const logger = getLogger(message.namespace || "worker")
-      const { message: msg, data } = formatConsoleArgs(message.args, message.exception)
+      const { message: msg, data } = formatConsoleArgs(
+        message.args,
+        message.exception,
+      )
       dispatchToLogger(logger, message.level, msg, data)
     }
   }
@@ -437,7 +442,10 @@ export function createWorkerConsoleHandler(
 
   return (message: WorkerConsoleMessage) => {
     const logger = getLogger(message.namespace)
-    const { message: msg, data } = formatConsoleArgs(message.args, message.exception)
+    const { message: msg, data } = formatConsoleArgs(
+      message.args,
+      message.exception,
+    )
     dispatchToLogger(logger, message.level, msg, data)
   }
 }

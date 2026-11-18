@@ -24,16 +24,27 @@ import {
 import { formatJSONEvent } from "../src/pipeline.ts"
 import { createConsoleMock } from "./helpers.ts"
 
-const OLD_KEYS = ["error_type", "error_message", "error_stack", "error_code", "error_cause"]
+const OLD_KEYS = [
+  "error_type",
+  "error_message",
+  "error_stack",
+  "error_code",
+  "error_cause",
+]
 
 /** A logger whose events land in `seen` after redaction, as every output and forwarding stage would see them. */
-function capture(redacted = true): { log: ReturnType<typeof baseCreateLogger>; seen: Event[] } {
+function capture(redacted = true): {
+  log: ReturnType<typeof baseCreateLogger>
+  seen: Event[]
+} {
   const seen: Event[] = []
   const stage = (event: Event) => {
     seen.push(event)
     return event
   }
-  const factory = redacted ? pipe(baseCreateLogger, withRedaction()) : baseCreateLogger
+  const factory = redacted
+    ? pipe(baseCreateLogger, withRedaction())
+    : baseCreateLogger
   return { log: factory("app", [{ level: "trace" }, stage]), seen }
 }
 
@@ -82,7 +93,11 @@ describe("log.<level>(err) writes the OTel exception attributes", () => {
   test("a code is kept in the text too, for the exception and for each cause", () => {
     const { log, seen } = capture(false)
     const cause = codedError("connection refused", "ECONNREFUSED")
-    log.error!(Object.assign(new Error("request failed", { cause }), { code: "ETIMEDOUT" }))
+    log.error!(
+      Object.assign(new Error("request failed", { cause }), {
+        code: "ETIMEDOUT",
+      }),
+    )
     const text = String(seen[0]!.props?.["exception.stacktrace"])
     expect(text).toContain("  code: ETIMEDOUT")
     expect(text).toContain(`Caused by: ${cause.stack}\n  code: ECONNREFUSED`)
@@ -92,7 +107,10 @@ describe("log.<level>(err) writes the OTel exception attributes", () => {
     const { log, seen } = capture(false)
     log.error!(Object.assign(new RangeError("x"), { code: "" }))
     log.error!(Object.assign(new RangeError("y"), { code: 42 }))
-    expect(seen.map((event) => event.props?.["error.type"])).toEqual(["RangeError", "RangeError"])
+    expect(seen.map((event) => event.props?.["error.type"])).toEqual([
+      "RangeError",
+      "RangeError",
+    ])
   })
 
   test("causes are text in the stacktrace, three deep, and a non-Error cause keeps its details", () => {
@@ -103,8 +121,12 @@ describe("log.<level>(err) writes the OTel exception attributes", () => {
     const first = new Error("DNS failed", { cause: second })
     const top = new Error("timeout", { cause: first })
     log.error!(top)
-    log.error!(new Error("refused", { cause: { reason: "quota", remaining: 0 } }))
-    const [chained, plain] = seen.map((event) => String(event.props?.["exception.stacktrace"]))
+    log.error!(
+      new Error("refused", { cause: { reason: "quota", remaining: 0 } }),
+    )
+    const [chained, plain] = seen.map((event) =>
+      String(event.props?.["exception.stacktrace"]),
+    )
     expect(chained).toContain("Caused by: Error: DNS failed")
     expect(chained).toContain("Caused by: Error: network unreachable")
     expect(chained).toContain("Caused by: Error: level 3")
@@ -118,7 +140,9 @@ describe("log.<level>(err) writes the OTel exception attributes", () => {
     const b = new Error("b", { cause: a })
     ;(a as { cause?: unknown }).cause = b
     log.error!(a)
-    expect(String(seen[0]!.props?.["exception.stacktrace"]).match(/Caused by:/g)).toHaveLength(3)
+    expect(
+      String(seen[0]!.props?.["exception.stacktrace"]).match(/Caused by:/g),
+    ).toHaveLength(3)
   })
 
   test("a stack with no parsable frame omits the code.* fields, never writes them empty", () => {
@@ -135,7 +159,10 @@ describe("log.<level>(err) writes the OTel exception attributes", () => {
   test("the JSON line on disk carries the attributes flat", () => {
     const { log, seen } = capture(false)
     log.error!(codedError("gone", "ECONNRESET"), "send failed")
-    const line = JSON.parse(formatJSONEvent(seen[0]!)) as Record<string, unknown>
+    const line = JSON.parse(formatJSONEvent(seen[0]!)) as Record<
+      string,
+      unknown
+    >
     expect(line.msg).toBe("send failed")
     expect(line["exception.type"]).toBe("Error")
     expect(line["error.type"]).toBe("ECONNRESET")
@@ -159,7 +186,9 @@ describe("an Error passed inside the data object", () => {
 
   test("an explicit Error argument wins over one in the data", () => {
     const { log, seen } = capture(false)
-    log.error!(new Error("the real one"), "failed", { other: new Error("bystander") })
+    log.error!(new Error("the real one"), "failed", {
+      other: new Error("bystander"),
+    })
     const props = onlyProps(seen)
     expect(props["exception.message"]).toBe("the real one")
     expect(String(props.other)).toContain("Error: bystander")
@@ -169,10 +198,19 @@ describe("an Error passed inside the data object", () => {
     const { log, seen } = capture(false)
     const second = new Error("second", { cause: new Error("second's cause") })
     const nested = new Error("nested")
-    log.warn!("two errors", { first: new Error("first"), second, wrapper: { nested } })
-    const line = JSON.parse(formatJSONEvent(seen[0]!)) as Record<string, unknown>
+    log.warn!("two errors", {
+      first: new Error("first"),
+      second,
+      wrapper: { nested },
+    })
+    const line = JSON.parse(formatJSONEvent(seen[0]!)) as Record<
+      string,
+      unknown
+    >
     expect(line["exception.message"]).toBe("first")
-    expect(line.second).toBe(`${second.stack}\nCaused by: ${(second.cause as Error).stack}`)
+    expect(line.second).toBe(
+      `${second.stack}\nCaused by: ${(second.cause as Error).stack}`,
+    )
     expect((line.wrapper as Record<string, unknown>).nested).toBe(nested.stack)
   })
 
@@ -181,7 +219,10 @@ describe("an Error passed inside the data object", () => {
     const loop: Record<string, unknown> = { name: "loop" }
     loop.self = loop
     log.info!("values", { big: 10n, sym: Symbol("s"), loop })
-    const line = JSON.parse(formatJSONEvent(seen[0]!)) as Record<string, unknown>
+    const line = JSON.parse(formatJSONEvent(seen[0]!)) as Record<
+      string,
+      unknown
+    >
     expect(line.big).toBe("10")
     expect(line.sym).toBe("Symbol(s)")
     expect((line.loop as Record<string, unknown>).self).toBe("[Circular]")
@@ -200,7 +241,9 @@ describe("redaction keeps its boundary", () => {
 
   test("token patterns are redacted in the message, a cause and the code path", () => {
     const { log, seen } = capture()
-    const err = new Error("call failed Bearer abc.def.ghi", { cause: new Error("upstream sk-cause-secret-1") })
+    const err = new Error("call failed Bearer abc.def.ghi", {
+      cause: new Error("upstream sk-cause-secret-1"),
+    })
     err.stack = `Error: call failed Bearer abc.def.ghi\n    at run (/srv/ghp_${"a".repeat(36)}/job.ts:3:9)`
     log.error!(err)
     const serialized = JSON.stringify(seen)
@@ -231,14 +274,18 @@ describe("a worker console Error", () => {
   }
 
   /** The JSON lines the main thread's default logger writes for those messages. */
-  function mainThreadLines(messages: WorkerConsoleMessage[]): Record<string, unknown>[] {
+  function mainThreadLines(
+    messages: WorkerConsoleMessage[],
+  ): Record<string, unknown>[] {
     const previous = process.env.LOG_FORMAT
     process.env.LOG_FORMAT = "json"
     const consoleMock = createConsoleMock()
     try {
       const handle = createWorkerLogHandler()
       for (const message of messages) handle(message)
-      return consoleMock.output.map((row) => JSON.parse(row.message) as Record<string, unknown>)
+      return consoleMock.output.map(
+        (row) => JSON.parse(row.message) as Record<string, unknown>,
+      )
     } finally {
       vi.restoreAllMocks()
       if (previous === undefined) delete process.env.LOG_FORMAT
@@ -248,7 +295,9 @@ describe("a worker console Error", () => {
 
   test("crosses the thread boundary as the canonical attributes; other arguments keep their place", () => {
     const err = codedError("cannot write", "EACCES")
-    const [line] = mainThreadLines(fromWorker(() => console.error("write failed", err, { attempt: 2 })))
+    const [line] = mainThreadLines(
+      fromWorker(() => console.error("write failed", err, { attempt: 2 })),
+    )
     expect(line!["exception.type"]).toBe("Error")
     expect(line!["exception.message"]).toBe("cannot write")
     expect(line!["error.type"]).toBe("EACCES")
@@ -261,17 +310,27 @@ describe("a worker console Error", () => {
 
   test("an ordinary object with name/message/stack keys is never read as an exception", () => {
     const [line] = mainThreadLines(
-      fromWorker(() => console.warn("plain", { name: "Box", message: "not an error", stack: "fake" })),
+      fromWorker(() =>
+        console.warn("plain", {
+          name: "Box",
+          message: "not an error",
+          stack: "fake",
+        }),
+      ),
     )
     expect(line).not.toHaveProperty("exception.type")
   })
 
   test("causes go through the same builder and token patterns are redacted on the main side", () => {
     const messages = fromWorker(() =>
-      console.error(new Error("outer", { cause: new Error("inner Bearer worker.token.x") })),
+      console.error(
+        new Error("outer", { cause: new Error("inner Bearer worker.token.x") }),
+      ),
     )
     const [line] = mainThreadLines(messages)
-    expect(String(line!["exception.stacktrace"])).toContain("Caused by: Error: inner")
+    expect(String(line!["exception.stacktrace"])).toContain(
+      "Caused by: Error: inner",
+    )
     expect(JSON.stringify(line)).not.toContain("worker.token.x")
   })
 })

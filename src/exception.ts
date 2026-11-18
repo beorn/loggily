@@ -28,7 +28,9 @@ export function exceptionAttributes(err: Error): ExceptionAttributes {
   }
   const frame = topFrame(err.stack)
   if (frame !== undefined) {
-    if (frame.functionName !== undefined) attributes["code.function.name"] = frame.functionName
+    if (frame.functionName !== undefined) {
+      attributes["code.function.name"] = frame.functionName
+    }
     attributes["code.file.path"] = frame.filePath
     attributes["code.line.number"] = frame.lineNumber
   }
@@ -62,7 +64,10 @@ export function takeDataException(
 }
 
 function errorHead(err: Error): string {
-  const head = typeof err.stack === "string" && err.stack !== "" ? err.stack : `${err.name}: ${err.message}`
+  const head =
+    typeof err.stack === "string" && err.stack !== ""
+      ? err.stack
+      : `${err.name}: ${err.message}`
   const code = codeOf(err)
   return code === undefined ? head : `${head}\n  code: ${code}`
 }
@@ -75,7 +80,9 @@ function codeOf(err: Error): string | undefined {
 
 function causeText(cause: unknown, depth: number): string {
   if (depth <= 0 || cause === undefined || cause === null) return ""
-  if (cause instanceof Error) return `\nCaused by: ${errorHead(cause)}${causeText(cause.cause, depth - 1)}`
+  if (cause instanceof Error) {
+    return `\nCaused by: ${errorHead(cause)}${causeText(cause.cause, depth - 1)}`
+  }
   return `\nCaused by: ${valueText(cause)}`
 }
 
@@ -85,7 +92,9 @@ function valueText(value: unknown): string {
   const seen = new WeakSet<object>()
   try {
     const json = JSON.stringify(value, (_key, val: unknown) => {
-      if (typeof val === "bigint" || typeof val === "symbol") return val.toString()
+      if (typeof val === "bigint" || typeof val === "symbol") {
+        return val.toString()
+      }
       if (typeof val === "object" && val !== null) {
         if (seen.has(val)) return "[Circular]"
         seen.add(val)
@@ -105,9 +114,12 @@ function topFrame(
   const match = line === undefined ? null : FRAME.exec(line)
   if (match === null) return undefined
   const [, functionName, filePath, lineNumber] = match
+  if (filePath === undefined || lineNumber === undefined) return undefined
   return {
-    ...(functionName !== undefined && functionName !== "<anonymous>" ? { functionName } : {}),
-    filePath: filePath!,
+    ...(functionName !== undefined && functionName !== "<anonymous>"
+      ? { functionName }
+      : {}),
+    filePath,
     lineNumber: Number(lineNumber),
   }
 }
