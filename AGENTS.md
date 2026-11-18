@@ -205,13 +205,15 @@ log.error?.(new Error("timeout"), "request failed", { url: "/api" }) // Error + 
 log.error?.("manual error", { code: "ETIMEOUT" }) // String message + data
 ```
 
-Error.cause chains are serialized automatically (up to 3 levels deep):
+An Error is written as OpenTelemetry's exception attributes (`exception.type`, `exception.message`,
+`exception.stacktrace`, `error.type`, `code.*`); causes are `Caused by:` text in the stacktrace, up to 3 deep. See
+[docs/api/logger.md](docs/api/logger.md#errors-one-exception-shape).
 
 ```typescript
 const err = new Error("timeout")
 err.cause = new Error("DNS failed")
 log.error?.(err)
-// props includes: error_cause: { name: "Error", message: "DNS failed", stack: "..." }
+// props includes: exception.stacktrace: "Error: timeout\n    at …\nCaused by: Error: DNS failed\n    at …"
 ```
 
 ### Child Loggers

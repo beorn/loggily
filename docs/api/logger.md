@@ -38,39 +38,33 @@ log.error?.(new Error("timeout"), "request failed", { url: "/api" })
 log.error?.("manual error", { code: "ETIMEOUT" })
 ```
 
-### Error.cause Chain Serialization
+### Errors: one exception shape
 
-When logging errors with `.cause` chains, loggily serializes the full chain (up to 3 levels deep):
+A logged Error is written as OpenTelemetry's exception attributes, flat in the record:
 
 ```typescript
-const inner = new Error("DNS failed")
-const err = new Error("timeout")
-err.cause = inner
+const err = Object.assign(new Error("no such file"), { code: "ENOENT" })
+log.error?.(err, "read failed")
+// msg: "read failed"
+// exception.type: "Error", exception.message: "no such file",
+// exception.stacktrace: "Error: no such file\n    at …\n  code: ENOENT",
+// error.type: "ENOENT"        (the code when it is a nonempty string, else the name)
+// code.function.name, code.file.path, code.line.number: the top stack frame, omitted when unknown
+```
 
+Causes are text in `exception.stacktrace`, three deep, the way Java and Python write them:
+
+```typescript
+const err = new Error("request timeout", { cause: new Error("DNS failed") })
 log.error?.(err)
-// props includes:
-//   error_cause: { name: "Error", message: "DNS failed",
-//     stack: "..." }
+// exception.stacktrace: "Error: request timeout\n    at …\nCaused by: Error: DNS failed\n    at …"
 ```
 
-Nested cause chains are followed recursively. If a cause itself has a `.cause`, it is serialized as a nested `cause` property:
+A non-Error cause keeps its details as JSON (`Caused by: {"reason":"quota"}`).
 
-```typescript
-const root = new Error("ECONNREFUSED")
-const mid = new Error("DNS failed")
-mid.cause = root
-const outer = new Error("request timeout")
-outer.cause = mid
-
-log.error?.(outer)
-// error_cause: {
-//   name: "Error", message: "DNS failed",
-//   cause: { name: "Error",
-//     message: "ECONNREFUSED", ... }
-// }
-```
-
-Non-Error cause values (the spec allows any value) are included as-is.
+An Error passed inside the data instead (`log.warn("failed", { error })`) becomes the record's exception when no
+Error argument was given: the first own top-level one, unless its key is secret (`password`, `token`, …), which
+redaction replaces whole. Any other Error in the record is written as the same text: stack, code and causes.
 
 ### Child Creation
 

@@ -211,7 +211,7 @@ describe("logging methods", () => {
     log.error!(err)
 
     expect(consoleMock.output[0]!.message).toContain("Something went wrong")
-    expect(consoleMock.output[0]!.message).toContain("error_type")
+    expect(consoleMock.output[0]!.message).toContain("exception.type")
   })
 })
 
@@ -619,8 +619,8 @@ describe("JSON format output", () => {
     const output = consoleMock.output[0]!.message
     const parsed = JSON.parse(output) as Record<string, unknown>
     expect(parsed.msg).toBe("test error")
-    expect(parsed.error_type).toBe("Error")
-    expect(parsed.error_stack).toContain("Error: test error")
+    expect(parsed["exception.type"]).toBe("Error")
+    expect(parsed["exception.stacktrace"]).toContain("Error: test error")
   })
 
   test("JSON span output includes duration", () => {

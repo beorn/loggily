@@ -340,7 +340,8 @@ describe("JSON format configuration", () => {
 
     const parsed = parseJSON(consoleMock.output[0]!.message)
     expect(parsed.msg).toBe("json error")
-    expect(parsed.error_type).toBe("Error")
+    expect(parsed["exception.type"]).toBe("Error")
+    expect(parsed).not.toHaveProperty("error_type")
   })
 
   test("JSON format works with spans", () => {

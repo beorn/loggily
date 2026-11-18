@@ -102,7 +102,7 @@ export {
 } from "./tracing.js"
 
 // Re-export pipeline builder and utilities for power users
-export { buildPipeline, type Pipeline, serializeCause } from "./pipeline.js"
+export { buildPipeline, type Pipeline } from "./pipeline.js"
 export {
   setStderrLineWriter,
   getStderrLineWriter,

@@ -298,14 +298,11 @@ describe("forwardConsole", () => {
     forwardConsole(mockPostMessage)
     console.error(new Error("test error"))
 
-    const serializedError = messages[0]!.args[0] as {
-      name: string
-      message: string
-      stack: string
-    }
-    expect(serializedError.name).toBe("Error")
-    expect(serializedError.message).toBe("test error")
-    expect(serializedError.stack).toContain("Error: test error")
+    expect(messages[0]!.args[0]).toBe("Error: test error")
+    expect(messages[0]!.exception?.["exception.type"]).toBe("Error")
+    expect(messages[0]!.exception?.["exception.stacktrace"]).toContain(
+      "Error: test error",
+    )
   })
 
   test("handles non-serializable values", () => {
@@ -579,8 +576,8 @@ describe("createWorkerLogger", () => {
     expect(logEvents.length).toBeGreaterThanOrEqual(1)
     const event = logEvents[0]!
     expect(event.message).toBe("test error")
-    expect(event.props?.error_type).toBe("Error")
-    expect(event.props?.error_stack).toContain("Error: test error")
+    expect(event.props?.["exception.type"]).toBe("Error")
+    expect(event.props?.["exception.stacktrace"]).toContain("Error: test error")
   })
 
   test("creates child loggers that also post via postMessage", () => {

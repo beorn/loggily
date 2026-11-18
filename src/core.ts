@@ -34,7 +34,6 @@ import {
   CAPTURE_SPAN,
   buildPipeline,
   safeStringify,
-  serializeCause,
   readEnvLevel,
   readEnvLevelForNamespace,
   readEnvNs,
@@ -46,6 +45,7 @@ import {
 } from "./pipeline.js"
 import { createConsoleSink as createStructuredConsoleSink } from "./console-sinks.js"
 import { withRedaction } from "./redaction.js"
+import { exceptionAttributes, takeDataException } from "./exception.js"
 
 import {
   createMetricsCollector as _createMetricsCollector,
@@ -354,34 +354,19 @@ function createLoggerImpl(
     if (msgOrError instanceof Error) {
       const err = msgOrError
       const contextTags = _getContextTags?.() ?? {}
-      if (typeof dataOrMsg === "string") {
-        message = dataOrMsg
-        data = {
-          ...contextTags,
-          ...props,
-          ...extraData,
-          error_type: err.name,
-          error_message: err.message,
-          error_stack: err.stack,
-          error_code: (err as { code?: string }).code,
-          error_cause:
-            err.cause !== undefined ? serializeCause(err.cause) : undefined,
-        }
-      } else {
-        message = err.message
-        data = {
-          ...contextTags,
-          ...props,
-          ...(dataOrMsg as Record<string, unknown>),
-          error_type: err.name,
-          error_stack: err.stack,
-          error_code: (err as { code?: string }).code,
-          error_cause:
-            err.cause !== undefined ? serializeCause(err.cause) : undefined,
-        }
+      const rest =
+        typeof dataOrMsg === "string"
+          ? extraData
+          : (dataOrMsg as Record<string, unknown> | undefined)
+      message = typeof dataOrMsg === "string" ? dataOrMsg : err.message
+      data = {
+        ...contextTags,
+        ...props,
+        ...rest,
+        ...exceptionAttributes(err),
       }
       userArgs.push(err)
-      if (data && Object.keys(data).length > 0) userArgs.push(data)
+      userArgs.push(data)
     } else {
       message = resolveMessage(msgOrError)
       const contextTags = _getContextTags?.()
@@ -395,6 +380,12 @@ function createLoggerImpl(
           : Object.keys(props).length > 0 || dataOrMsg
             ? { ...props, ...(dataOrMsg as Record<string, unknown>) }
             : undefined
+      // No Error argument: an Error inside the data is the record's exception (one per record, OpenTelemetry's model).
+      const found = data === undefined ? undefined : takeDataException(data)
+      if (found !== undefined) {
+        data = { ...found.rest, ...exceptionAttributes(found.error) }
+        userArgs.push(found.error)
+      }
       if (data && Object.keys(data).length > 0) userArgs.push(data)
     }
 

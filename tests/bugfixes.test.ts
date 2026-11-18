@@ -237,7 +237,7 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
     expect(consoleMock.output[0]!.message).toContain("[Circular]")
   })
 
-  test("Error object in data is serialized with message and stack", () => {
+  test("Error object in data becomes the record's exception, with message and stack", () => {
     const log = createLogger("test", [
       { level: "trace", format: "json" },
       console,
@@ -252,10 +252,9 @@ describe("safe stringify (km-loggily.json-stringify-throws)", () => {
       string,
       unknown
     >
-    const errObj = parsed.err as Record<string, unknown>
-    expect(errObj).toBeDefined()
-    expect(errObj.message).toBe("test error")
-    expect(errObj.stack).toContain("Error: test error")
+    expect(parsed.err).toBeUndefined()
+    expect(parsed["exception.message"]).toBe("test error")
+    expect(parsed["exception.stacktrace"]).toContain("Error: test error")
   })
 
   test("nested circular references are handled", () => {
@@ -425,16 +424,9 @@ describe("Error.cause chain serialization", () => {
     log.error?.(root)
 
     const event = logs[0] as LogEvent
-    expect(event.props?.error_cause).toEqual({
-      name: "Error",
-      message: "DNS failed",
-      stack: expect.any(String),
-      cause: {
-        name: "Error",
-        message: "network unreachable",
-        stack: expect.any(String),
-      },
-    })
+    const text = String(event.props?.["exception.stacktrace"])
+    expect(text).toContain("Caused by: Error: DNS failed")
+    expect(text).toContain("Caused by: Error: network unreachable")
   })
 
   test("Error.cause chain depth is capped at 3", () => {
@@ -458,17 +450,13 @@ describe("Error.cause chain serialization", () => {
 
     const event = logs[0] as LogEvent
     // Should have cause chain but capped at depth 3
-    let cause = event.props?.error_cause as Record<string, unknown>
-    expect(cause).toBeDefined()
-    let depth = 0
-    while (cause?.cause) {
-      depth++
-      cause = cause.cause as Record<string, unknown>
-    }
-    expect(depth).toBeLessThanOrEqual(3)
+    const text = String(event.props?.["exception.stacktrace"])
+    expect(text.match(/Caused by:/gu)).toHaveLength(3)
+    expect(text).toContain("Caused by: Error: level 2")
+    expect(text).not.toContain("level 1")
   })
 
-  test("Error without cause has no error_cause property", () => {
+  test("Error without cause has no cause text", () => {
     const logs: Event[] = []
     const log = createLogger("test", [
       (e: Event) => {
@@ -481,7 +469,7 @@ describe("Error.cause chain serialization", () => {
     log.error?.(new Error("simple error"))
 
     const event = logs[0] as LogEvent
-    expect(event.props?.error_cause).toBeUndefined()
+    expect(event.props?.["exception.stacktrace"]).not.toContain("Caused by:")
   })
 
   test("Error with non-Error cause serializes the raw value", () => {
@@ -500,7 +488,9 @@ describe("Error.cause chain serialization", () => {
     log.error?.(err)
 
     const event = logs[0] as LogEvent
-    expect(event.props?.error_cause).toBe("string cause")
+    expect(event.props?.["exception.stacktrace"]).toContain(
+      "Caused by: string cause",
+    )
   })
 
   test("Error.cause with code property is preserved", () => {
@@ -521,9 +511,9 @@ describe("Error.cause chain serialization", () => {
     log.error?.(err)
 
     const event = logs[0] as LogEvent
-    const serializedCause = event.props?.error_cause as Record<string, unknown>
-    expect(serializedCause.code).toBe("ECONNREFUSED")
-    expect(serializedCause.message).toBe("connection refused")
+    const text = String(event.props?.["exception.stacktrace"])
+    expect(text).toContain("Caused by: Error: connection refused")
+    expect(text).toContain("code: ECONNREFUSED")
   })
 
   test("Error.cause in error(error, message, data) overload", () => {
@@ -543,11 +533,9 @@ describe("Error.cause chain serialization", () => {
 
     const event = logs[0] as LogEvent
     expect(event.message).toBe("request failed")
-    expect(event.props?.error_cause).toEqual({
-      name: "Error",
-      message: "DNS failed",
-      stack: expect.any(String),
-    })
+    expect(event.props?.["exception.stacktrace"]).toContain(
+      "Caused by: Error: DNS failed",
+    )
     expect(event.props?.url).toBe("/api")
   })
 
@@ -560,18 +548,19 @@ describe("Error.cause chain serialization", () => {
     const root = new Error("timeout")
     root.cause = new Error("DNS failed")
 
-    log.info?.("error in data", { err: root })
+    log.info?.("error in data", { err: root, ctx: { nested: root } })
 
     expect(consoleMock.output).toHaveLength(1)
     const parsed = JSON.parse(consoleMock.output[0]!.message) as Record<
       string,
       unknown
     >
-    const errObj = parsed.err as Record<string, unknown>
-    expect(errObj.cause).toEqual({
-      name: "Error",
-      message: "DNS failed",
-      stack: expect.any(String),
-    })
+    expect(parsed["exception.stacktrace"]).toContain(
+      "Caused by: Error: DNS failed",
+    )
+    // A nested Error keeps the same text: its stack and its causes.
+    const ctx = parsed.ctx as Record<string, unknown>
+    expect(ctx.nested).toContain("Error: timeout")
+    expect(ctx.nested).toContain("Caused by: Error: DNS failed")
   })
 })

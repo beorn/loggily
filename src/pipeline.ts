@@ -2,6 +2,7 @@ import { colors as pc } from "./colors.js"
 import { createFileWriter } from "./file-writer.js"
 import { setIdFormat, validateSampleRate } from "./tracing.js"
 import type { IdFormat } from "./tracing.js"
+import { formatErrorText } from "./exception.js"
 
 // ============ Types ============
 
@@ -142,44 +143,13 @@ function writeStderr(text: string): void {
 
 // ============ Formatting ============
 
-/** Serialize Error.cause chains up to a max depth */
-export function serializeCause(cause: unknown, maxDepth: number = 3): unknown {
-  if (maxDepth <= 0 || cause === undefined || cause === null) return undefined
-  if (cause instanceof Error) {
-    const result: Record<string, unknown> = {
-      name: cause.name,
-      message: cause.message,
-      stack: cause.stack,
-    }
-    if ((cause as { code?: string }).code) {
-      result.code = (cause as { code?: string }).code
-    }
-    if (cause.cause !== undefined) {
-      result.cause = serializeCause(cause.cause, maxDepth - 1)
-    }
-    return result
-  }
-  // Non-Error cause (spec allows any value)
-  return cause
-}
-
 export function safeStringify(value: unknown): string {
   const seen = new WeakSet()
   return JSON.stringify(value, (_key, val) => {
     if (typeof val === "bigint") return val.toString()
     if (typeof val === "symbol") return val.toString()
-    if (val instanceof Error) {
-      const result: Record<string, unknown> = {
-        message: val.message,
-        stack: val.stack,
-        name: val.name,
-      }
-      if ((val as { code?: string }).code) {
-        result.code = (val as { code?: string }).code
-      }
-      if (val.cause !== undefined) result.cause = serializeCause(val.cause)
-      return result
-    }
+    // Any Error left in a record (a second one, or a nested one) is the one shape's text: stack and causes.
+    if (val instanceof Error) return formatErrorText(val)
     if (typeof val === "object" && val !== null) {
       if (seen.has(val)) return "[Circular]"
       seen.add(val)

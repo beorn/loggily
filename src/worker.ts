@@ -45,6 +45,11 @@ import {
   withSpans,
   type ConditionalLogger,
 } from "./core.js"
+import {
+  exceptionAttributes,
+  formatErrorText,
+  type ExceptionAttributes,
+} from "./exception.js"
 import type {
   Event,
   LogEvent,
@@ -62,6 +67,11 @@ export interface WorkerConsoleMessage {
   namespace?: string
   args: unknown[]
   timestamp: number
+  /**
+   * The first Error argument's exception attributes, built in the worker by the one builder (ADR-0031 decision 2)
+   * and merged into the record by the main thread's handler. The argument itself travels as `name: message` text.
+   */
+  exception?: ExceptionAttributes
 }
 
 // ============ Type Guards ============
@@ -139,22 +149,25 @@ export function forwardConsole(
   ] as const) {
     console[level] = (...args: unknown[]) => {
       try {
-        // Sanitize non-cloneable values before postMessage (structuredClone rejects them)
-        const safe = args.map((a) =>
-          typeof a === "function"
-            ? `[Function: ${a.name || "anonymous"}]`
-            : typeof a === "symbol"
-              ? a.toString()
-              : a instanceof Error
-                ? { name: a.name, message: a.message, stack: a.stack }
-                : a,
-        )
+        // Sanitize non-cloneable values before postMessage (structuredClone rejects them). An Error is sent as the
+        // one exception shape: the first as attributes beside `name: message`, any other as its full text, so its
+        // code, stack and causes survive whatever the clone keeps of a custom Error.
+        let exception: ExceptionAttributes | undefined
+        const safe = args.map((a) => {
+          if (typeof a === "function") return `[Function: ${a.name || "anonymous"}]`
+          if (typeof a === "symbol") return a.toString()
+          if (!(a instanceof Error)) return a
+          if (exception !== undefined) return formatErrorText(a)
+          exception = exceptionAttributes(a)
+          return `${a.name}: ${a.message}`
+        })
         postMessage({
           type: "console",
           level,
           namespace,
           args: safe,
           timestamp: Date.now(),
+          ...(exception === undefined ? {} : { exception }),
         })
       } catch {
         originalConsole?.[level](...args)
@@ -296,7 +309,7 @@ export function createWorkerLogHandler(): (message: unknown) => void {
       logger.dispatch(message)
     } else if (isWorkerConsoleMessage(message)) {
       const logger = getLogger(message.namespace || "worker")
-      const { message: msg, data } = formatConsoleArgs(message.args)
+      const { message: msg, data } = formatConsoleArgs(message.args, message.exception)
       dispatchToLogger(logger, message.level, msg, data)
     }
   }
@@ -321,7 +334,10 @@ function safeStringify(value: unknown): string {
 }
 
 /** Format console args into a message string and optional data object */
-function formatConsoleArgs(args: unknown[]): {
+function formatConsoleArgs(
+  args: unknown[],
+  exception?: ExceptionAttributes,
+): {
   message: string
   data: Record<string, unknown> | undefined
 } {
@@ -343,7 +359,12 @@ function formatConsoleArgs(args: unknown[]): {
       ? (lastArg as Record<string, unknown>)
       : undefined
 
-  return { message, data }
+  // The worker's exception attributes join the record explicitly; an object that merely has name/message/stack keys
+  // is never read as an exception.
+  return {
+    message,
+    data: exception === undefined ? data : { ...data, ...exception },
+  }
 }
 
 /** Dispatch a message to a logger at the given console level */
@@ -416,7 +437,7 @@ export function createWorkerConsoleHandler(
 
   return (message: WorkerConsoleMessage) => {
     const logger = getLogger(message.namespace)
-    const { message: msg, data } = formatConsoleArgs(message.args)
+    const { message: msg, data } = formatConsoleArgs(message.args, message.exception)
     dispatchToLogger(logger, message.level, msg, data)
   }
 }

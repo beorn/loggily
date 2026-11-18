@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.14.0
+
+Not yet published: 0.14.0 is one coordinated breaking release (ADR-0031, one observability path), and later changes
+for it land under this heading before it goes to npm.
+
+- **Breaking: one exception shape.** A logged Error is written as OpenTelemetry's exception attributes, flat in the
+  record: `exception.type`, `exception.message`, `exception.stacktrace`, `error.type` (the error's code when it is a
+  nonempty string, else its name), and `code.function.name`, `code.file.path`, `code.line.number` for the top stack
+  frame, omitted when unknown. Causes, up to three, are `Caused by:` text in `exception.stacktrace`; an error's code is
+  a `code:` line there too.
+  - **Deleted:** the flat `error_type`, `error_message`, `error_stack`, `error_code` and `error_cause` fields, the
+    nested `{name, message, stack, code, cause}` object `safeStringify` wrote for an Error, and the `serializeCause`
+    export.
+  - An Error passed inside the data (`log.warn("failed", { error })`) is the record's exception when no Error argument
+    was given: the first own top-level one, on a copy of the data, unless its key is secret, which redaction replaces
+    whole as before. Any other Error in a record is written as the same text: stack, code and causes.
+  - A worker's console Error crosses to the main thread as these attributes (`WorkerConsoleMessage.exception`), not as
+    a plain `{name, message, stack}` object.
+
 ## 0.13.1
 
 - A regular-file writer whose last byte is not LF sends one leading newline

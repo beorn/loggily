@@ -261,7 +261,7 @@ function redactArgv(
   }
 }
 
-function isSecretKey(key: string): boolean {
+export function isSecretKey(key: string): boolean {
   const normalized = key
     .replace(/([a-z0-9])([A-Z])/gu, "$1_$2")
     .replaceAll(/[^a-z0-9]+/giu, "_")

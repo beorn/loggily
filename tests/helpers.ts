@@ -3,6 +3,7 @@
  */
 
 import { vi } from "vitest"
+import { exceptionAttributes } from "../src/exception.ts"
 import { safeStringify } from "../src/pipeline.ts"
 
 export interface CapturedLog {
@@ -24,17 +25,8 @@ export interface CapturedLog {
 function formatArg(arg: unknown): string {
   if (typeof arg === "string") return arg
   if (arg instanceof Error) {
-    // Include the error name, message, stack, code, cause shape so tests
-    // that look for "error_type"/"error_stack" keywords can still match.
-    const payload: Record<string, unknown> = {
-      error_type: arg.name,
-      error_message: arg.message,
-      error_stack: arg.stack,
-    }
-    const code = (arg as { code?: string }).code
-    if (code) payload.error_code = code
-    if (arg.cause !== undefined) payload.error_cause = safeStringify(arg.cause)
-    return safeStringify(payload)
+    // The one exception shape, so tests can look for its attribute names.
+    return safeStringify(exceptionAttributes(arg))
   }
   if (typeof arg === "bigint") return arg.toString()
   if (typeof arg === "object" && arg !== null) return safeStringify(arg)
