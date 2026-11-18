@@ -253,7 +253,7 @@ describe("redaction keeps its boundary", () => {
 
   test("a non-Error cause keeps key redaction: a secret key inside it is replaced, its other keys kept", () => {
     const { log, seen } = capture()
-    log.warn!(
+    log.error!(
       new Error("outer", {
         cause: { password: "ordinary-private-value", host: "db1" },
       }),
