@@ -76,6 +76,13 @@ export { withRedaction, type RedactionOptions } from "./redaction.js"
 /** Node-only completion for CLI stdout/stderr before a caller-owned forced exit. */
 export { drainOutput } from "./node-output.js"
 
+/** Server-side only: the process's one crash handler, installed by a process entry (ADR-0031 decision 3). Tested under Bun. */
+export {
+  installCrashHandler,
+  CRASH_FLUSH_TIMEOUT_MS,
+  type CrashHandlerOptions,
+} from "./crash.js"
+
 export {
   createFileWriter,
   type FileWriter,

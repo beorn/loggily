@@ -5,6 +5,13 @@
 Not yet published: 0.14.0 is one coordinated breaking release (ADR-0031, one observability path), and later changes
 for it land under this heading before it goes to npm.
 
+- **Added: one crash handler.** `installCrashHandler({ logger, restore?, closers?, timeoutMs? })`, server-side only and tested under Bun (Node untested), called
+  once by a process entry (a second install throws). On `uncaughtException` or `unhandledRejection` it runs the
+  owner's synchronous `restore`, writes one `fatal` record with event name `exception` through the entry's logger,
+  gives the owner's async `closers` and the stdout/stderr drain one shared budget (default 2000 ms), then exits 1. A
+  level filter that suppresses `fatal` is not overridden: the handler writes one plain line to stderr saying so. A
+  closer or drain that fails or runs out of budget also gets one plain stderr line. Only the async steps are
+  time-bounded.
 - **Breaking: one exception shape.** A logged Error is written as OpenTelemetry's exception attributes, flat in the
   record: `exception.type`, `exception.message`, `exception.stacktrace`, `error.type` (the error's code when it is a
   nonempty string, else its name), and `code.function.name`, `code.file.path`, `code.line.number` for the top stack
