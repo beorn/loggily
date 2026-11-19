@@ -4,7 +4,7 @@
  *           FATAL `exception` record, flushes inside one budget and always exits 1. These run real Bun child
  *           processes, because the exit code, a closed fd 2 and a hung closer are facts a mocked exit cannot prove.
  * @level    l2 — real child processes under Bun
- * @consumer @i/1-instruments/31167-one-logging-path (tribe recall server; km entries in slice 2)
+ * @consumer @i/1-instruments/31167-one-logging-path (km entries in slice 2; tribe's recall server once loggily 0.14.0 is on npm)
  * @testonly none
  */
 
@@ -179,6 +179,49 @@ describe("installCrashHandler: one record, one budget, exit 1 (ADR-0031 decision
     expect(ms, r.marks).toBeGreaterThan(150)
     expect(r.stderr).toContain("crash flush: closer 0 timed out")
     expect(r.elapsedMs).toBeLessThan(5_000)
+  })
+
+  test("a hung closer and a hung drain share the one budget: no fresh budget for the drain", () => {
+    // stdout's end() never calls back, so the drain hangs too. One 1000 ms budget ends near 1000 ms after the crash;
+    // a drain given a fresh budget would end near 2000 ms.
+    const r = run(
+      `process.stdout.end = () => process.stdout;` +
+        ` let t0 = 0; process.on("exit", () => mark("exit after " + Math.round(performance.now() - t0)));` +
+        ` install({ timeoutMs: 1000, closers: [() => new Promise(() => {})] });` +
+        ` setTimeout(() => { t0 = performance.now(); throw new Error("x") })`,
+    )
+    expect(r.status, r.stderr).toBe(1)
+    expect(r.stderr).toContain("crash flush: closer 0 timed out")
+    expect(r.stderr).toContain("crash flush: stdout/stderr drain timed out")
+    const after = Number(/exit after (\d+)/u.exec(r.marks)?.[1])
+    expect(after, r.marks).toBeGreaterThanOrEqual(900)
+    expect(after, r.marks).toBeLessThan(1600)
+  })
+
+  test("a second crash while the first is being handled exits 1 at once, with one record", () => {
+    // The closer throws from a timer, outside any try: a second uncaughtException during handling.
+    const r = run(
+      `install({ timeoutMs: 5000, closers: [() => { setTimeout(() => { throw new Error("second") }, 10); return new Promise(() => {}) }] });` +
+        ` setTimeout(() => { throw new Error("first") })`,
+    )
+    expect(r.status, r.stderr).toBe(1)
+    expect(r.records).toHaveLength(1)
+    expect(r.records[0]!.props).toMatchObject({ "exception.message": "first" })
+    expect(r.elapsedMs).toBeLessThan(4_000)
+  })
+
+  test("the plain notice is cut at 2000 characters, so a huge message cannot flood stderr", () => {
+    const r = run(
+      `install(); setTimeout(() => { throw new Error("y".repeat(10_000)) })`,
+      "silent",
+    )
+    expect(r.status, r.stderr).toBe(1)
+    const line = r.stderr
+      .split("\n")
+      .find((l) => l.startsWith("uncaught uncaughtException"))
+    expect(line, r.stderr.slice(0, 300)).toBeDefined()
+    expect(line!.length).toBe(2001)
+    expect(line!.endsWith("…")).toBe(true)
   })
 
   test("a closer that rejects or throws is reported, never logged, and exit 1 still wins", () => {
